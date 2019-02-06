@@ -51,6 +51,7 @@ px4_add_board(
 		px4flow
 		px4fmu
 		px4io
+		pozyx
 		rc_input
 		roboclaw
 		stm32
