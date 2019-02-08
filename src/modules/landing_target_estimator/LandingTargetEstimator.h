@@ -43,8 +43,10 @@
 #pragma once
 
 #include <px4_workqueue.h>
+
 #include <drivers/drv_hrt.h>
-#include <systemlib/param/param.h>
+#include <lib/parameters/param.h>
+
 #include <uORB/uORB.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_attitude.h>
@@ -54,9 +56,11 @@
 #include <uORB/topics/landing_target_innovations.h>
 #include <uORB/topics/pozyx_report.h>
 #include <uORB/topics/parameter_update.h>
+
 #include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <matrix/Matrix.hpp>
+
 #include "KalmanFilter.h"
 
 
