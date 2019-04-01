@@ -52,40 +52,6 @@ set(NUTTX_APPS_DIR ${PX4_BINARY_DIR}/NuttX/apps CACHE FILEPATH "NuttX apps direc
 px4_add_git_submodule(TARGET git_nuttx PATH "${NUTTX_SRC_DIR}/nuttx")
 px4_add_git_submodule(TARGET git_nuttx_apps PATH "${NUTTX_SRC_DIR}/apps")
 
-if (CMAKE_HOST_APPLE OR CMAKE_HOST_WIN32)
-	# copy with rsync and create file dependencies
-	set(cp_cmd "rsync")
-	set(cp_opts)
-	list(APPEND cp_opts
-		-rp
-		--inplace
-	)
-else()
-	# copy with hard links
-	# archive, recursive, force, link (hardlinks)
-	set(cp_cmd "cp")
-	set(cp_opts "-aRfl")
-endif()
-
-###############################################################################
-# NuttX: copy to build directory
-###############################################################################
-file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${NUTTX_SRC_DIR}/nuttx)
-file(RELATIVE_PATH CP_DST ${CMAKE_SOURCE_DIR} ${PX4_BINARY_DIR}/NuttX)
-
-# copy during cmake configure
-execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${NUTTX_DIR})
-execute_process(COMMAND ${cp_cmd} ${cp_opts} ${CP_SRC} ${CP_DST} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
-###############################################################################
-# NuttX apps: copy to build directory
-###############################################################################
-file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${NUTTX_SRC_DIR}/apps)
-file(RELATIVE_PATH CP_DST ${CMAKE_SOURCE_DIR} ${PX4_BINARY_DIR}/NuttX)
-
-# copy during cmake configure
-execute_process(COMMAND ${cp_cmd} ${cp_opts} ${CP_SRC} ${CP_DST} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
 ###############################################################################
 # nuttx-config: copy to build directory
 ###############################################################################
@@ -110,41 +76,3 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_SRC_DIR}/n
 
 # copy defconfig
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_DEFCONFIG} ${NUTTX_DIR}/.config)
-
-# copy PX4 board config into nuttx
-file(STRINGS ${NUTTX_DEFCONFIG} config_expanded REGEX "# Automatically generated file; DO NOT EDIT.")
-if (NOT config_expanded)
-	set(ENV{PATH} "${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/tools:$ENV{PATH}")
-	execute_process(
-		COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD_CUSTOM=y olddefconfig
-		WORKING_DIRECTORY ${NUTTX_DIR}
-		OUTPUT_FILE nuttx_olddefconfig.log
-		ERROR_FILE nuttx_olddefconfig.log
-	)
-endif()
-
-###############################################################################
-# NuttX cmake defconfig
-###############################################################################
-
-# parse nuttx config options for cmake
-file(STRINGS ${NUTTX_DIR}/.config ConfigContents)
-foreach(NameAndValue ${ConfigContents})
-	# Strip leading spaces
-	string(REGEX REPLACE "^[ ]+" "" NameAndValue ${NameAndValue})
-
-	# Find variable name
-	string(REGEX MATCH "^CONFIG[^=]+" Name ${NameAndValue})
-
-	if (Name)
-		# Find the value
-		string(REPLACE "${Name}=" "" Value ${NameAndValue})
-
-		# remove extra quotes
-		string(REPLACE "\"" "" Value ${Value})
-
-		# Set the variable
-		#message(STATUS "${Name} ${Value}")
-		set(${Name} ${Value} CACHE INTERNAL "NUTTX DEFCONFIG: ${Name}" FORCE)
-	endif()
-endforeach()

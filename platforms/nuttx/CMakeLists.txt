@@ -83,9 +83,6 @@ target_link_libraries(nuttx_arch
 		arch_hrt
 )
 
-target_link_libraries(nuttx_c INTERFACE nuttx_drivers)
-target_link_libraries(nuttx_xx INTERFACE nuttx_c)
-
 target_link_libraries(px4 PRIVATE
 
 	-nostartfiles
@@ -106,11 +103,11 @@ target_link_libraries(px4 PRIVATE
 		${nuttx_libs}
 	-Wl,--end-group
 
+	${module_libraries}
+
 	m
 	gcc
-	)
-
-target_link_libraries(px4 PRIVATE ${module_libraries})
+)
 
 if (config_romfs_root)
 	add_subdirectory(${PX4_SOURCE_DIR}/ROMFS ${PX4_BINARY_DIR}/ROMFS)
