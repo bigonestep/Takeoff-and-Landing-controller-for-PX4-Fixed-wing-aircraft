@@ -64,6 +64,7 @@ bool FlightTaskManualAltitude::updateInitialize()
 bool FlightTaskManualAltitude::activate(vehicle_local_position_setpoint_s last_setpoint)
 {
 	bool ret = FlightTaskManual::activate(last_setpoint);
+	_position_lock.setYawResetCounter(_sub_attitude->get().quat_reset_counter);
 	_yaw_setpoint = NAN;
 	_yawspeed_setpoint = 0.0f;
 	_thrust_setpoint = matrix::Vector3f(0.0f, 0.0f, NAN); // altitude is controlled from position/velocity
@@ -299,26 +300,8 @@ void FlightTaskManualAltitude::_rotateIntoHeadingFrame(Vector2f &v)
 
 void FlightTaskManualAltitude::_updateHeadingSetpoints()
 {
-	/* Yaw-lock depends on stick input. If not locked,
-	 * yaw_sp is set to NAN.
-	 * TODO: add yawspeed to get threshold.*/
-	if (fabsf(_yawspeed_setpoint) > FLT_EPSILON) {
-		// no fixed heading when rotating around yaw by stick
-		_yaw_setpoint = NAN;
-
-	} else {
-		// hold the current heading when no more rotation commanded
-		if (!PX4_ISFINITE(_yaw_setpoint)) {
-			_yaw_setpoint = _yaw;
-
-		} else {
-			// check reset counter and update yaw setpoint if necessary
-			if (_sub_attitude->get().quat_reset_counter != _heading_reset_counter) {
-				_yaw_setpoint += matrix::Eulerf(matrix::Quatf(_sub_attitude->get().delta_q_reset)).psi();
-				_heading_reset_counter = _sub_attitude->get().quat_reset_counter;
-			}
-		}
-	}
+	_yaw_setpoint = _position_lock.updateYawLock(_yawspeed, _yaw, _yawspeed_setpoint, _yaw_setpoint);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
 }
 
 void FlightTaskManualAltitude::_updateSetpoints()

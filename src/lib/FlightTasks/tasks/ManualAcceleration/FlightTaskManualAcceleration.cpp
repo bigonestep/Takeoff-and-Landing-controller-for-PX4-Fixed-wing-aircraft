@@ -69,38 +69,21 @@ bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s la
 bool FlightTaskManualAcceleration::update()
 {
 	_velocity_setpoint = Vector3f();
+	// Map sticks input with deadzone and exponential curve to acceleration and yawspeed
 	_acceleration_setpoint = Vector3f(&_sticks_expo(0)) * 10;
+	_yawspeed_setpoint = _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get());
+
 	printf("ACC IN TASK:\n");
 	_acceleration_setpoint.print();
 
+	// Rotate horizontal acceleration input to body heading
 	float yaw_rotate = PX4_ISFINITE(_yaw_setpoint) ? _yaw_setpoint : _yaw;
 	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(_acceleration_setpoint(0), _acceleration_setpoint(1), 0.0f));
 	_acceleration_setpoint(0) = v_r(0);
 	_acceleration_setpoint(1) = v_r(1);
 
-	// Use sticks input with deadzone and exponential curve for vertical velocity and yawspeed
-	_yawspeed_setpoint = _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get());
-
-	/* Yaw-lock depends on stick input. If not locked,
-	 * yaw_sp is set to NAN.
-	 * TODO: add yawspeed to get threshold.*/
-	if (fabsf(_yawspeed_setpoint) > FLT_EPSILON) {
-		// no fixed heading when rotating around yaw by stick
-		_yaw_setpoint = NAN;
-
-	} else {
-		// hold the current heading when no more rotation commanded
-		if (!PX4_ISFINITE(_yaw_setpoint)) {
-			_yaw_setpoint = _yaw;
-
-		} else {
-			// check reset counter and update yaw setpoint if necessary
-			if (_sub_attitude->get().quat_reset_counter != _heading_reset_counter) {
-				_yaw_setpoint += matrix::Eulerf(matrix::Quatf(_sub_attitude->get().delta_q_reset)).psi();
-				_heading_reset_counter = _sub_attitude->get().quat_reset_counter;
-			}
-		}
-	}
+	_yaw_setpoint = _position_lock.updateYawLock(_yawspeed, _yaw, _yawspeed_setpoint, _yaw_setpoint);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
 
 	return true;
 }

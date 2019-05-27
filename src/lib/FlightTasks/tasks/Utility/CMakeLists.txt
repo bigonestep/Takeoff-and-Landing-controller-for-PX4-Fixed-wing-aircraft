@@ -39,6 +39,7 @@ px4_add_library(FlightTaskUtility
 	VelocitySmoothing.cpp
 	ManualVelocitySmoothingXY.cpp
 	ManualVelocitySmoothingZ.cpp
+	PositionLock.hpp
 )
 
 target_link_libraries(FlightTaskUtility PUBLIC FlightTask hysteresis)

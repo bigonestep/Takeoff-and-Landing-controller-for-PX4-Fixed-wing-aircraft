@@ -40,6 +40,7 @@
 #pragma once
 
 #include "FlightTaskManual.hpp"
+#include "PositionLock.hpp"
 #include <uORB/topics/home_position.h>
 
 class FlightTaskManualAltitude : public FlightTaskManual
@@ -69,6 +70,8 @@ protected:
 	 *  will exit velocity control and enter position control.
 	 */
 	void _updateAltitudeLock();
+
+	PositionLock _position_lock; /**< object taking care of altitude and yaw lock logic */
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTaskManual,
 					(ParamFloat<px4::params::MPC_HOLD_MAX_Z>) _param_mpc_hold_max_z,

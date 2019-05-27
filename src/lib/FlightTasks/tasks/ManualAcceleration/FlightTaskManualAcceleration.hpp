@@ -41,6 +41,7 @@
 #pragma once
 
 #include "FlightTaskManual.hpp"
+#include "PositionLock.hpp"
 
 class FlightTaskManualAcceleration : public FlightTaskManual
 {
@@ -54,6 +55,8 @@ public:
 	bool update() override;
 
 protected:
+	PositionLock _position_lock; /**< object taking care of altitude and yaw lock logic */
+
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTaskManual,
 					(ParamFloat<px4::params::MPC_VEL_MANUAL>) _param_mpc_vel_manual,
 					(ParamFloat<px4::params::MPC_ACC_HOR_MAX>) _param_mpc_acc_hor_max,

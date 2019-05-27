@@ -35,5 +35,5 @@ px4_add_library(FlightTaskManualAcceleration
 	FlightTaskManualAcceleration.cpp
 )
 
-target_link_libraries(FlightTaskManualAcceleration PUBLIC FlightTaskManual)
+target_link_libraries(FlightTaskManualAcceleration PUBLIC FlightTaskManual FlightTaskUtility)
 target_include_directories(FlightTaskManualAcceleration PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

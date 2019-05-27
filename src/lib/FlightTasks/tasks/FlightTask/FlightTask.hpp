@@ -178,7 +178,6 @@ protected:
 
 	uORB::SubscriptionPollable<vehicle_local_position_s> *_sub_vehicle_local_position{nullptr};
 	uORB::SubscriptionPollable<vehicle_attitude_s> *_sub_attitude{nullptr};
-	uint8_t _heading_reset_counter{0}; /**< estimator heading reset */
 
 	/** Reset all setpoints to NAN */
 	void _resetSetpoints();
@@ -204,6 +203,7 @@ protected:
 	matrix::Vector3f _position; /**< current vehicle position */
 	matrix::Vector3f _velocity; /**< current vehicle velocity */
 	float _yaw = 0.f; /**< current vehicle yaw heading */
+	float _yawspeed = 0.f; /**< current vehicle rotational rate around yaw axis */
 	float _dist_to_bottom = 0.0f; /**< current height above ground level */
 
 	/**
