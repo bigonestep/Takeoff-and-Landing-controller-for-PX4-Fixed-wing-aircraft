@@ -97,7 +97,8 @@ bool FlightTaskManualAltitude::activate(vehicle_local_position_setpoint_s last_s
 void FlightTaskManualAltitude::_scaleSticks()
 {
 	// Use sticks input with deadzone and exponential curve for vertical velocity and yawspeed
-	_yawspeed_setpoint = _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get());
+	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint, _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
 
 	const float vel_max_z = (_sticks(2) > 0.0f) ? _constraints.speed_down : _constraints.speed_up;
 	_velocity_setpoint(2) = vel_max_z * _sticks_expo(2);
@@ -298,16 +299,8 @@ void FlightTaskManualAltitude::_rotateIntoHeadingFrame(Vector2f &v)
 	v(1) = v_r(1);
 }
 
-void FlightTaskManualAltitude::_updateHeadingSetpoints()
-{
-	_yaw_setpoint = _position_lock.updateYawLock(_yawspeed, _yaw, _yawspeed_setpoint, _yaw_setpoint);
-	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
-}
-
 void FlightTaskManualAltitude::_updateSetpoints()
 {
-	_updateHeadingSetpoints(); // get yaw setpoint
-
 	// Thrust in xy are extracted directly from stick inputs. A magnitude of
 	// 1 means that maximum thrust along xy is demanded. A magnitude of 0 means no
 	// thrust along xy is demanded. The maximum thrust along xy depends on the thrust

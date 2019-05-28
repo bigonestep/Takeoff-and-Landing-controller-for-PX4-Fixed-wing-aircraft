@@ -68,10 +68,13 @@ bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s la
 
 bool FlightTaskManualAcceleration::update()
 {
-	_velocity_setpoint = Vector3f();
-	// Map sticks input with deadzone and exponential curve to acceleration and yawspeed
+	// Yaw
+	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint, _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
+
+	// Map sticks input to acceleration
 	_acceleration_setpoint = Vector3f(&_sticks_expo(0)) * 10;
-	_yawspeed_setpoint = _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get());
+	_velocity_setpoint = Vector3f();
 
 	printf("ACC IN TASK:\n");
 	_acceleration_setpoint.print();
@@ -81,9 +84,6 @@ bool FlightTaskManualAcceleration::update()
 	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(_acceleration_setpoint(0), _acceleration_setpoint(1), 0.0f));
 	_acceleration_setpoint(0) = v_r(0);
 	_acceleration_setpoint(1) = v_r(1);
-
-	_yaw_setpoint = _position_lock.updateYawLock(_yawspeed, _yaw, _yawspeed_setpoint, _yaw_setpoint);
-	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
 
 	return true;
 }
