@@ -121,16 +121,20 @@ bool PositionControl::_interfaceMapping()
 	// For instance: reference is velocity-setpoint -> position and position-setpoint = 0
 	//               reference is thrust-setpoint -> position, velocity, position-/velocity-setpoint = 0
 	for (int i = 0; i <= 2; i++) {
-
 		if (PX4_ISFINITE(_pos_sp(i))) {
 			// Position control is required
 
 			if (!PX4_ISFINITE(_vel_sp(i))) {
-				// Velocity is not used as feedforward term.
+				// No velocity feedforward term.
 				_vel_sp(i) = 0.0f;
 			}
 
-			// thrust setpoint is not supported in position control
+			if (!PX4_ISFINITE(_acc_sp(i))) {
+				// No acceleration feedforward term.
+				_acc_sp(i) = 0.0f;
+			}
+
+			// thrust feed-forward is not supported in position control
 			_thr_sp(i) = NAN;
 
 			// to run position control, we require valid position and velocity
@@ -139,13 +143,18 @@ bool PositionControl::_interfaceMapping()
 			}
 
 		} else if (PX4_ISFINITE(_vel_sp(i))) {
+			// Velocity controller is active without position control
 
-			// Velocity controller is active without position control.
-			// Set integral states and setpoints to 0
+			// Reset position control states and setpoints
 			_pos_sp(i) = _pos(i) = 0.0f;
 			_ctrl_pos[i] = false; // position control-loop is not used
 
-			// thrust setpoint is not supported in velocity control
+			if (!PX4_ISFINITE(_acc_sp(i))) {
+				// No acceleration feedforward term.
+				_acc_sp(i) = 0.0f;
+			}
+
+			// thrust feed-forward is not supported in velocity control
 			_thr_sp(i) = NAN;
 
 			// to run velocity control, we require valid velocity
@@ -153,9 +162,9 @@ bool PositionControl::_interfaceMapping()
 				failsafe = true;
 			}
 
-		} else if (PX4_ISFINITE(_thr_sp(i))) {
+		} else if (PX4_ISFINITE(_thr_sp(i)) || PX4_ISFINITE(_acc_sp(i))) {
+			// Thrust or acceleration setpoint was generated directly.
 
-			// Thrust setpoint was generated from sticks directly.
 			// Set all integral states and setpoints to 0
 			_pos_sp(i) = _pos(i) = 0.0f;
 			_vel_sp(i) = _vel(i) = 0.0f;
@@ -170,9 +179,6 @@ bool PositionControl::_interfaceMapping()
 			// nothing is valid. do failsafe
 			failsafe = true;
 		}
-
-		// Set the acceleration setpoint to 0 if it's unused to not add anything in the feed-forward.
-		_acc_sp(i) = PX4_ISFINITE(_acc_sp(i)) ? _acc_sp(i) : 0.f;
 	}
 
 	// ensure that vel_dot is finite, otherwise set to 0
@@ -218,9 +224,9 @@ bool PositionControl::_interfaceMapping()
 void PositionControl::_positionController()
 {
 	// P-position controller
-	const Vector3f vel_sp_position = (_pos_sp - _pos).emult(Vector3f(_param_mpc_xy_p.get(), _param_mpc_xy_p.get(),
-					 _param_mpc_z_p.get()));
-	_vel_sp = vel_sp_position + _vel_sp;
+	const Vector3f propotional_gain(_param_mpc_xy_p.get(), _param_mpc_xy_p.get(), _param_mpc_z_p.get());
+	const Vector3f vel_sp_position = (_pos_sp - _pos).emult(propotional_gain);
+	_vel_sp += vel_sp_position;
 
 	// Constrain horizontal velocity by prioritizing the velocity component along the
 	// the desired position setpoint over the feed-forward term.
