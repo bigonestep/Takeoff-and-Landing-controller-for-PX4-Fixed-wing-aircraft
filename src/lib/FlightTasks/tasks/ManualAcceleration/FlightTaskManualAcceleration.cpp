@@ -51,6 +51,7 @@ bool FlightTaskManualAcceleration::initializeSubscriptions(SubscriptionArray &su
 	if (!FlightTaskManual::initializeSubscriptions(subscription_array)) {
 		return false;
 	}
+
 	return true;
 }
 
@@ -69,8 +70,10 @@ bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s la
 bool FlightTaskManualAcceleration::update()
 {
 	// Yaw
-	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint, _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
-	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
+	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint,
+					  _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter,
+			Quatf(_sub_attitude->get().delta_q_reset));
 
 	// Map sticks input to acceleration
 	_acceleration_setpoint = Vector3f(&_sticks_expo(0)) * 10;
@@ -81,7 +84,8 @@ bool FlightTaskManualAcceleration::update()
 
 	// Rotate horizontal acceleration input to body heading
 	float yaw_rotate = PX4_ISFINITE(_yaw_setpoint) ? _yaw_setpoint : _yaw;
-	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(_acceleration_setpoint(0), _acceleration_setpoint(1), 0.0f));
+	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(_acceleration_setpoint(0),
+				_acceleration_setpoint(1), 0.0f));
 	_acceleration_setpoint(0) = v_r(0);
 	_acceleration_setpoint(1) = v_r(1);
 

@@ -58,7 +58,9 @@ public:
 	 * @param yaw_stick_input current yaw rotational rate state
 	 * @return yaw setpoint to execute to have a yaw lock at the correct moment in time
 	 */
-	void updateYawFromStick(float &yawspeed_setpoint, float &yaw_setpoint, const float desired_yawspeed, const float yaw, const float dt) {
+	void updateYawFromStick(float &yawspeed_setpoint, float &yaw_setpoint, const float desired_yawspeed, const float yaw,
+				const float dt)
+	{
 		_yawspeed_slew_rate.setSlewRate(1.f);
 		yawspeed_setpoint = _yawspeed_slew_rate.update(desired_yawspeed, dt);
 		yaw_setpoint = updateYawLock(yaw, yawspeed_setpoint, yaw_setpoint);
@@ -75,7 +77,8 @@ public:
 	 * @param yaw current yaw setpoint which then will be overwritten by the return value
 	 * @return yaw setpoint to execute to have a yaw lock at the correct moment in time
 	 */
-	static float updateYawLock(const float yaw, const float yawspeed_setpoint, const float yaw_setpoint) {
+	static float updateYawLock(const float yaw, const float yawspeed_setpoint, const float yaw_setpoint)
+	{
 		// Yaw-lock depends on desired yawspeed input. If not locked, yaw_sp is set to NAN.
 		if (fabsf(yawspeed_setpoint) > FLT_EPSILON) {
 			// no fixed heading when rotating around yaw by stick
@@ -98,12 +101,14 @@ public:
 	 * @param delta_q_reset rotation offset from the last reset that happened
 	 * @return updated yaw setpoint to use with reference reset taken into account
 	 */
-	float updateYawReset(const float yaw_setpoint, const uint8_t yaw_reset_counter, const matrix::Quatf delta_q_reset) {
+	float updateYawReset(const float yaw_setpoint, const uint8_t yaw_reset_counter, const matrix::Quatf delta_q_reset)
+	{
 		// check if reset counter changed and update yaw setpoint if necessary
 		if (yaw_reset_counter != _yaw_reset_counter) {
 			_yaw_reset_counter = yaw_reset_counter;
 			return yaw_setpoint + matrix::Eulerf(delta_q_reset).psi();
 		}
+
 		return yaw_setpoint;
 	}
 

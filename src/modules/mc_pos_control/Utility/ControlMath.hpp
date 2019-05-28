@@ -59,7 +59,8 @@ vehicle_attitude_setpoint_s thrustToAttitude(const matrix::Vector3f &thr_sp, con
  * @param yaw_sp the desired yaw setpoint
  * @return vehicle_attitude_setpoints_s struct for attitude controller
  */
-vehicle_attitude_setpoint_s accelerationToAttitude(const matrix::Vector3f &acc_sp, const float yaw_sp, const float hover_thrust);
+vehicle_attitude_setpoint_s accelerationToAttitude(const matrix::Vector3f &acc_sp, const float yaw_sp,
+		const float hover_thrust);
 
 /**
  * Converts a body z vector and yaw set-point to a desired attitude.

@@ -39,6 +39,7 @@ TEST(AttitudeControlTest, SlewUpLimited)
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(.1f);
 	_slew_rate.setForcedValue(-5.5f);
+
 	for (int i = 1; i <= 10; i++) {
 		EXPECT_FLOAT_EQ(_slew_rate.update(20.f, .2f), -5.5f + i * .02f);
 	}
@@ -49,6 +50,7 @@ TEST(AttitudeControlTest, SlewDownLimited)
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(1.1f);
 	_slew_rate.setForcedValue(17.3f);
+
 	for (int i = 1; i <= 10; i++) {
 		EXPECT_FLOAT_EQ(_slew_rate.update(-50.f, .3f), 17.3f - i * .33f);
 	}
@@ -59,9 +61,11 @@ TEST(AttitudeControlTest, ReachValueSlewed)
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(.2f);
 	_slew_rate.setForcedValue(8.f);
+
 	for (int i = 1; i <= 10; i++) {
 		EXPECT_FLOAT_EQ(_slew_rate.update(10.f, 1.f), 8.f + i * .2f);
 	}
+
 	for (int i = 1; i <= 10; i++) {
 		EXPECT_FLOAT_EQ(_slew_rate.update(10.f, 1.f), 10.f);
 	}

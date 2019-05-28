@@ -68,7 +68,8 @@ public:
 	 * @param deltatime time in seconds since last update
 	 * @return actual value that complies with the slew rate
 	 */
-	Type update(const Type new_value, const float deltatime) {
+	Type update(const Type new_value, const float deltatime)
+	{
 		// Limit the rate of change of the value
 		const float dvalue_desired = new_value - _value;
 		const float dvalue_max = _slew_rate * deltatime;

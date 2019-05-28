@@ -97,8 +97,10 @@ bool FlightTaskManualAltitude::activate(vehicle_local_position_setpoint_s last_s
 void FlightTaskManualAltitude::_scaleSticks()
 {
 	// Use sticks input with deadzone and exponential curve for vertical velocity and yawspeed
-	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint, _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
-	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter, Quatf(_sub_attitude->get().delta_q_reset));
+	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint,
+					  _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
+	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter,
+			Quatf(_sub_attitude->get().delta_q_reset));
 
 	const float vel_max_z = (_sticks(2) > 0.0f) ? _constraints.speed_down : _constraints.speed_up;
 	_velocity_setpoint(2) = vel_max_z * _sticks_expo(2);

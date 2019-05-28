@@ -63,7 +63,8 @@ vehicle_attitude_setpoint_s accelerationToAttitude(const Vector3f &acc_sp, const
 	return att_sp;
 }
 
-vehicle_attitude_setpoint_s bodyzToAttitude(Vector3f body_z, const float yaw_sp) {
+vehicle_attitude_setpoint_s bodyzToAttitude(Vector3f body_z, const float yaw_sp)
+{
 	vehicle_attitude_setpoint_s att_sp = {};
 	att_sp.yaw_body = yaw_sp;
 
