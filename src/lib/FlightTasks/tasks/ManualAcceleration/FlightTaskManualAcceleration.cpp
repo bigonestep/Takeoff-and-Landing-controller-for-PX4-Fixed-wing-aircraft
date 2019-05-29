@@ -89,5 +89,6 @@ bool FlightTaskManualAcceleration::update()
 	_acceleration_setpoint(0) = v_r(0);
 	_acceleration_setpoint(1) = v_r(1);
 
+	_constraints.want_takeoff = _checkTakeoff();
 	return true;
 }

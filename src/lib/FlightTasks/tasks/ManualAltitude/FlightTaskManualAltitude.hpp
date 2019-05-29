@@ -56,7 +56,6 @@ public:
 protected:
 	virtual void _updateSetpoints(); /**< updates all setpoints */
 	virtual void _scaleSticks(); /**< scales sticks to velocity in z */
-	bool _checkTakeoff() override;
 
 	/**
 	 * rotates vector into local frame

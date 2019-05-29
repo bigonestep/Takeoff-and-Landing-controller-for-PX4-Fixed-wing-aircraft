@@ -323,12 +323,6 @@ void FlightTaskManualAltitude::_updateSetpoints()
 	_respectGroundSlowdown();
 }
 
-bool FlightTaskManualAltitude::_checkTakeoff()
-{
-	// stick is deflected above 65% throttle (_sticks(2) is in the range [-1,1])
-	return _sticks(2) < -0.3f;
-}
-
 bool FlightTaskManualAltitude::update()
 {
 	_scaleSticks();
