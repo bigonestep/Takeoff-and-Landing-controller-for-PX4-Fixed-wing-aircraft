@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013 - 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013 - 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -227,13 +227,6 @@ private:
 	 * Publish attitude.
 	 */
 	void publish_attitude();
-
-	/**
-	 * Adjust the setpoint during landing.
-	 * Thrust is adjusted to support the land-detector during detection.
-	 * @param setpoint gets adjusted based on land-detector state
-	 */
-	void limit_thrust_during_landing(vehicle_local_position_setpoint_s &setpoint);
 
 	/**
 	 * Start flightasks based on navigation state.
@@ -583,13 +576,14 @@ MulticopterPositionControl::run()
 				// Check if position, velocity or thrust pairs are valid -> trigger failsaife if no pair is valid
 				if (!(PX4_ISFINITE(setpoint.x) && PX4_ISFINITE(setpoint.y)) &&
 				    !(PX4_ISFINITE(setpoint.vx) && PX4_ISFINITE(setpoint.vy)) &&
+				    !(PX4_ISFINITE(setpoint.acceleration[0]) && PX4_ISFINITE(setpoint.acceleration[1])) &&
 				    !(PX4_ISFINITE(setpoint.thrust[0]) && PX4_ISFINITE(setpoint.thrust[1]))) {
 					failsafe(setpoint, _states, true, !was_in_failsafe);
 				}
 
 				// Check if altitude, climbrate or thrust in D-direction are valid -> trigger failsafe if none
 				// of these setpoints are valid
-				if (!PX4_ISFINITE(setpoint.z) && !PX4_ISFINITE(setpoint.vz) && !PX4_ISFINITE(setpoint.thrust[2])) {
+				if (!PX4_ISFINITE(setpoint.z) && !PX4_ISFINITE(setpoint.vz) && !PX4_ISFINITE(setpoint.acceleration[2]) && !PX4_ISFINITE(setpoint.thrust[2])) {
 					failsafe(setpoint, _states, true, !was_in_failsafe);
 				}
 			}
@@ -608,9 +602,10 @@ MulticopterPositionControl::run()
 						    constraints.speed_up, !_control_mode.flag_control_climb_rate_enabled, time_stamp_current);
 			constraints.speed_up = _takeoff.updateRamp(_dt, constraints.speed_up);
 
-			if (_takeoff.getTakeoffState() < TakeoffState::rampup && !PX4_ISFINITE(setpoint.thrust[2])) {
+			if (_takeoff.getTakeoffState() < TakeoffState::rampup) {
 				// we are not flying yet and need to avoid any corrections
 				reset_setpoint_to_nan(setpoint);
+				Vector3f(0.f, 0.f, 100.f).copyTo(setpoint.acceleration);
 				setpoint.thrust[0] = setpoint.thrust[1] = setpoint.thrust[2] = 0.0f;
 				// set yaw-sp to current yaw
 				// TODO: we need a clean way to disable yaw control
@@ -623,7 +618,25 @@ MulticopterPositionControl::run()
 				_flight_tasks.reActivate();
 			}
 
-			if (_takeoff.getTakeoffState() < TakeoffState::flight && !PX4_ISFINITE(setpoint.thrust[2])) {
+			// Part of landing logic: if ground-contact/maybe landed was detected, turn off
+			// controller. This message does not have to be logged as part of the vehicle_local_position_setpoint topic.
+			// Note: only adust thrust output if there was not thrust-setpoint demand in D-direction.
+			if (_takeoff.getTakeoffState() > TakeoffState::rampup) {
+				if (_vehicle_land_detected.ground_contact
+				|| _vehicle_land_detected.maybe_landed) {
+					// we set thrust to zero, this will help to decide if we are actually landed or not
+					Vector3f(0.f, 0.f, 100.f).copyTo(setpoint.acceleration);
+					setpoint.thrust[0] = setpoint.thrust[1] = setpoint.thrust[2] = 0.0f;
+					// set yaw-sp to current yaw to avoid any corrections
+					setpoint.yaw = _states.yaw;
+					setpoint.yawspeed = 0.f;
+					// prevent any integrator windup
+					_control.resetIntegralXY();
+					_control.resetIntegralZ();
+				}
+			}
+
+			if (_takeoff.getTakeoffState() < TakeoffState::flight) {
 				constraints.tilt = math::radians(_param_mpc_tiltmax_lnd.get());
 			}
 
@@ -664,6 +677,7 @@ MulticopterPositionControl::run()
 			local_pos_sp.vx = PX4_ISFINITE(_control.getVelSp()(0)) ? _control.getVelSp()(0) : setpoint.vx;
 			local_pos_sp.vy = PX4_ISFINITE(_control.getVelSp()(1)) ? _control.getVelSp()(1) : setpoint.vy;
 			local_pos_sp.vz = PX4_ISFINITE(_control.getVelSp()(2)) ? _control.getVelSp()(2) : setpoint.vz;
+			_control.getAccelerationSetpoint().copyTo(local_pos_sp.acceleration);
 			_control.getThrustSetpoint().copyTo(local_pos_sp.thrust);
 
 			// Publish local position setpoint
@@ -674,13 +688,6 @@ MulticopterPositionControl::run()
 			// Inform FlightTask about the input and output of the velocity controller
 			// This is used to properly initialize the velocity setpoint when onpening the position loop (position unlock)
 			_flight_tasks.updateVelocityControllerIO(_control.getVelSp(), Vector3f(local_pos_sp.thrust));
-
-			// Part of landing logic: if ground-contact/maybe landed was detected, turn off
-			// controller. This message does not have to be logged as part of the vehicle_local_position_setpoint topic.
-			// Note: only adust thrust output if there was not thrust-setpoint demand in D-direction.
-			if (_takeoff.getTakeoffState() > TakeoffState::rampup && !PX4_ISFINITE(setpoint.thrust[2])) {
-				limit_thrust_during_landing(local_pos_sp);
-			}
 
 			// Fill attitude setpoint. Attitude is computed from yaw and thrust setpoint.
 			_att_sp = ControlMath::thrustToAttitude(matrix::Vector3f(local_pos_sp.thrust), local_pos_sp.yaw);
@@ -847,6 +854,11 @@ MulticopterPositionControl::start_flight_task()
 			error =  _flight_tasks.switchTask(FlightTaskIndex::ManualPositionSmoothVel);
 			break;
 
+		case 4:
+			error =  _flight_tasks.switchTask(FlightTaskIndex::ManualAcceleration);
+			break;
+
+
 		default:
 			error =  _flight_tasks.switchTask(FlightTaskIndex::ManualPosition);
 			break;
@@ -921,27 +933,10 @@ MulticopterPositionControl::start_flight_task()
 }
 
 void
-MulticopterPositionControl::limit_thrust_during_landing(vehicle_local_position_setpoint_s &setpoint)
-{
-	if (_vehicle_land_detected.ground_contact
-	    || _vehicle_land_detected.maybe_landed) {
-		// we set thrust to zero, this will help to decide if we are actually landed or not
-		setpoint.thrust[0] = setpoint.thrust[1] = setpoint.thrust[2] = 0.0f;
-		// set yaw-sp to current yaw to avoid any corrections
-		setpoint.yaw = _states.yaw;
-		setpoint.yawspeed = 0.f;
-		// prevent any integrator windup
-		_control.resetIntegralXY();
-		_control.resetIntegralZ();
-	}
-}
-
-void
 MulticopterPositionControl::failsafe(vehicle_local_position_setpoint_s &setpoint, const PositionControlStates &states,
 				     const bool force, const bool warn)
 {
 	_failsafe_land_hysteresis.set_state_and_update(true, hrt_absolute_time());
-
 	if (!_failsafe_land_hysteresis.get_state() && !force) {
 		// just keep current setpoint and don't do anything.
 

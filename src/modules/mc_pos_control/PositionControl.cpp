@@ -86,7 +86,6 @@ bool PositionControl::updateSetpoint(const vehicle_local_position_setpoint_s &se
 void PositionControl::generateThrustYawSetpoint(const float dt)
 {
 	if (_skip_controller) {
-
 		// Already received a valid thrust set-point.
 		// Limit the thrust vector.
 		float thr_mag = _thr_sp.length();
@@ -101,7 +100,6 @@ void PositionControl::generateThrustYawSetpoint(const float dt)
 		// Just set the set-points equal to the current vehicle state.
 		_pos_sp = _pos;
 		_vel_sp = _vel;
-		_acc_sp = _acc;
 
 	} else {
 		_positionController();
@@ -174,6 +172,9 @@ bool PositionControl::_interfaceMapping()
 			_thr_int(i) = 0.0f;
 			// Don't require velocity derivative.
 			_vel_dot(i) = 0.0f;
+
+			// Set the acceleration setpoint to 0 if it's unused.
+			_acc_sp(i) = PX4_ISFINITE(_acc_sp(i)) ? _acc_sp(i) : 0.f;
 
 		} else {
 			// nothing is valid. do failsafe
