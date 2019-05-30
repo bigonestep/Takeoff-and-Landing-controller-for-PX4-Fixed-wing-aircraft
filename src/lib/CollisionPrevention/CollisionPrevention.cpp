@@ -45,7 +45,7 @@ using namespace time_literals;
 CollisionPrevention::CollisionPrevention(ModuleParams *parent) :
 	ModuleParams(parent)
 {
-
+	memset(&_obstacle_map.distances[0], UINT16_MAX, sizeof(_obstacle_map.distances));
 }
 
 CollisionPrevention::~CollisionPrevention()
@@ -62,6 +62,16 @@ bool CollisionPrevention::initializeSubscriptions(SubscriptionArray &subscriptio
 		return false;
 	}
 
+	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+		if (!subscription_array.get(ORB_ID(distance_sensor), _sub_distance_sensor[i], i)) {
+			return false;
+		}
+	}
+
+	if (!subscription_array.get(ORB_ID(vehicle_attitude), _sub_vehicle_attitude)) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -69,9 +79,9 @@ void CollisionPrevention::publishConstrainedSetpoint(const Vector2f &original_se
 		const Vector2f &adapted_setpoint)
 {
 
-	collision_constraints_s	constraints;	/**< collision constraints message */
+	collision_constraints_s	constraints;
 
-	//fill in values
+	// fill in values
 	constraints.timestamp = hrt_absolute_time();
 
 	constraints.original_setpoint[0] = original_setpoint(0);
@@ -88,10 +98,89 @@ void CollisionPrevention::publishConstrainedSetpoint(const Vector2f &original_se
 	}
 }
 
+void CollisionPrevention::updateMapOffboard()
+{
+	const obstacle_distance_s &obstacle_distance = _sub_obstacle_distance->get();
+
+	// Update the map with offboard data if the data is not stale
+	if (hrt_elapsed_time(&obstacle_distance.timestamp) < RANGE_STREAM_TIMEOUT_US
+	    /*obstacle_distance.timestamp > _obstacle_map.timestamp*/) {
+		_obstacle_map = obstacle_distance;
+	}
+}
+
+void CollisionPrevention::updateMapDistanceSensor()
+{
+	const distance_sensor_s &distance_sensor = _sub_distance_sensor[1]->get();
+
+	const float hfov = 30; // degrees
+
+	// Update the map with rangefinder data if the data is not stale and newer
+	if (hrt_elapsed_time(&distance_sensor.timestamp) < RANGE_STREAM_TIMEOUT_US &&
+	    distance_sensor.timestamp > _obstacle_map.timestamp) {
+
+		const matrix::Eulerf &attitude = Eulerf(Quatf(_sub_vehicle_attitude->get().q));
+
+		// Check for data validity
+		if ((distance_sensor.current_distance > distance_sensor.min_distance) &&
+		    (distance_sensor.current_distance < distance_sensor.max_distance)) {
+
+			_obstacle_map.timestamp = distance_sensor.timestamp;
+
+			if (_obstacle_map.increment > 0) {
+				// Map already has data
+				_obstacle_map.max_distance = math::max(int(_obstacle_map.max_distance),
+								       int(distance_sensor.max_distance * 100.0f));
+				_obstacle_map.min_distance = math::min(int(_obstacle_map.min_distance),
+								       int(distance_sensor.min_distance * 100.0f)); // TODO : static cast? rounding?
+
+			} else {
+				_obstacle_map.max_distance = distance_sensor.max_distance * 100.0f; // convert to cm
+				_obstacle_map.min_distance = distance_sensor.min_distance * 100.0f; // convert to cm
+				_obstacle_map.increment = hfov; // TODO : check rounding to ceil this when getting from message
+			}
+
+			// calculate yaw offset of sensor in body frame
+			float offset_body = sensorOrientationToOffset(distance_sensor);
+
+			// convert the offset from body to local frame
+			float offset_local = math::degrees(wrap_pi(attitude.psi() + offset_body));
+
+			// convert orientation from range [-180, 180] to [0, 360]
+			offset_local += 180.0f;
+
+			// calculate the field of view boundary bin indices
+			const int lower_bound = (int)floor(offset_local - (hfov / 2.0f)) /
+						float(_obstacle_map.increment);
+			const int upper_bound = (int)floor(offset_local + (hfov / 2.0f)) /
+						float(_obstacle_map.increment);
+
+			for (int bin = lower_bound; bin <= upper_bound; ++bin) {
+				int wrap_bin = bin;
+
+				if (wrap_bin < 0) {
+					// wrap bin index around the array
+					wrap_bin = (360 / _obstacle_map.increment) + bin;
+				}
+
+				// compensate measurement for vehicle tilt and convert to cm
+				_obstacle_map.distances[wrap_bin] = distance_sensor.current_distance * 100.0f;
+				//cosf(attitude.theta()); /*TODO : why */
+			}
+
+		}
+
+	}
+
+
+}
+
 void CollisionPrevention::calculateConstrainedSetpoint(Vector2f &setpoint,
 		const Vector2f &curr_pos, const Vector2f &curr_vel)
 {
-	const obstacle_distance_s &obstacle_distance = _sub_obstacle_distance->get();
+	// Update obstacle map using all sensors
+	updateMapOffboard();
+	updateMapDistanceSensor();
 
 	//The maximum velocity formula contains a square root, therefore the whole calculation is done with squared norms.
 	//that way the root does not have to be calculated for every range bin but once at the end.
@@ -101,18 +190,18 @@ void CollisionPrevention::calculateConstrainedSetpoint(Vector2f &setpoint,
 	//Limit the deviation of the adapted setpoint from the originally given joystick input (slightly less than 90 degrees)
 	float max_slide_angle_rad = 0.5f;
 
-	if (hrt_elapsed_time(&obstacle_distance.timestamp) < RANGE_STREAM_TIMEOUT_US) {
+	if (hrt_elapsed_time(&_obstacle_map.timestamp) < RANGE_STREAM_TIMEOUT_US) { // TODO : update name
 		if (setpoint_length > 0.001f) {
 
-			int distances_array_size = sizeof(obstacle_distance.distances) / sizeof(obstacle_distance.distances[0]);
+			int distances_array_size = sizeof(_obstacle_map.distances) / sizeof(_obstacle_map.distances[0]);
 
 			for (int i = 0; i < distances_array_size; i++) {
 
 				//determine if distance bin is valid and contains a valid distance measurement
-				if (obstacle_distance.distances[i] < obstacle_distance.max_distance &&
-				    obstacle_distance.distances[i] > obstacle_distance.min_distance && i * obstacle_distance.increment < 360) {
-					float distance = obstacle_distance.distances[i] / 100.0f; //convert to meters
-					float angle = math::radians((float)i * obstacle_distance.increment);
+				if (_obstacle_map.distances[i] < _obstacle_map.max_distance &&
+				    _obstacle_map.distances[i] > _obstacle_map.min_distance && i * _obstacle_map.increment < 360) {
+					float distance = _obstacle_map.distances[i] / 100.0f; //convert to meters
+					float angle = math::radians((float)i * _obstacle_map.increment);
 
 					//split current setpoint into parallel and orthogonal components with respect to the current bin direction
 					Vector2f bin_direction = {cos(angle), sin(angle)};

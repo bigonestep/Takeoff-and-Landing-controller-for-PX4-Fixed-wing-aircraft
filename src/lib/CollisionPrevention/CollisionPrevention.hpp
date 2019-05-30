@@ -33,7 +33,9 @@
 
 /**
  * @file CollisionPrevention.hpp
+ *
  * @author Tanja Baumann <tanja@auterion.com>
+ * @author Mohammed Kabir <mhkabir98@gmail.com>
  *
  * CollisionPrevention controller.
  *
@@ -44,8 +46,10 @@
 #include <px4_module_params.h>
 #include <float.h>
 #include <matrix/matrix/math.hpp>
-#include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/collision_constraints.h>
+#include <uORB/topics/distance_sensor.h>
+#include <uORB/topics/obstacle_distance.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <mathlib/mathlib.h>
 #include <drivers/drv_hrt.h>
 #include <uORB/topics/mavlink_log.h>
@@ -78,12 +82,18 @@ private:
 	orb_advert_t _constraints_pub{nullptr};  	/**< constraints publication */
 	orb_advert_t _mavlink_log_pub{nullptr};	 	/**< Mavlink log uORB handle */
 
-	uORB::Subscription<obstacle_distance_s> *_sub_obstacle_distance{nullptr}; /**< obstacle distances received form a range sensor */
+	uORB::Subscription<obstacle_distance_s> *_sub_obstacle_distance{nullptr}; /**< obstacle map received from offboard */
+	uORB::Subscription<distance_sensor_s>
+	*_sub_distance_sensor[ORB_MULTI_MAX_INSTANCES]; /**< distance data received from onboard rangefinders */
+	uORB::Subscription<vehicle_attitude_s> *_sub_vehicle_attitude{nullptr}; /**< vehicle attitude */
 
 	static constexpr uint64_t RANGE_STREAM_TIMEOUT_US{500000};
 	static constexpr uint64_t MESSAGE_THROTTLE_US{5000000};
 
 	hrt_abstime _last_message{0};
+
+	// Robotcentric map of obstacles in the local frame
+	obstacle_distance_s _obstacle_map{};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MPC_COL_PREV_D>) _param_mpc_col_prev_d, /**< collision prevention keep minimum distance */
@@ -92,6 +102,35 @@ private:
 	)
 
 	void update();
+
+	inline float sensorOrientationToOffset(distance_sensor_s distance_sensor)
+	{
+		float offset = 0.0f;
+
+		switch (distance_sensor.orientation) {
+		case distance_sensor_s::ROTATION_RIGHT_FACING:
+			offset = M_PI_F / 2.0f;
+			break;
+
+		case distance_sensor_s::ROTATION_LEFT_FACING:
+			offset = -M_PI_F / 2.0f;
+			break;
+
+		case distance_sensor_s::ROTATION_BACKWARD_FACING:
+			offset = M_PI_F;
+			break;
+			/*
+			case distance_sensor_s::ROTATION_CUSTOM:
+				offset = Eulerf(Quatf(distance_sensor.q)).psi();
+				break;*/
+		}
+
+		return offset;
+	}
+
+	void updateMapOffboard();
+
+	void updateMapDistanceSensor();
 
 	void calculateConstrainedSetpoint(matrix::Vector2f &setpoint, const matrix::Vector2f &curr_pos,
 					  const matrix::Vector2f &curr_vel);
