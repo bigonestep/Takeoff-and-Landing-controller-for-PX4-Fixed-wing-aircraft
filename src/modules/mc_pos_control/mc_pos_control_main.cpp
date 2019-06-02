@@ -612,8 +612,7 @@ MulticopterPositionControl::run()
 				setpoint.yaw = _states.yaw;
 				setpoint.yawspeed = 0.f;
 				// prevent any integrator windup
-				_control.resetIntegralXY();
-				_control.resetIntegralZ();
+				_control.resetIntegral();
 				// reactivate the task which will reset the setpoint to current state
 				_flight_tasks.reActivate();
 			}
@@ -631,8 +630,7 @@ MulticopterPositionControl::run()
 					setpoint.yaw = _states.yaw;
 					setpoint.yawspeed = 0.f;
 					// prevent any integrator windup
-					_control.resetIntegralXY();
-					_control.resetIntegralZ();
+					_control.resetIntegral();
 				}
 			}
 
@@ -646,15 +644,13 @@ MulticopterPositionControl::run()
 				limit_altitude(setpoint);
 			}
 
-			// Set position controller input
-			_control.updateConstraints(constraints);
-			_control.updateState(_states);
-			_control.updateSetpoint(setpoint);
-
 			// Run position control
-			_control.generateThrustYawSetpoint(_dt);
+			_control.setState(_states);
+			_control.setInputSetpoint(setpoint);
+			_control.setConstraints(constraints);
+			_control.update(_dt);
 
-			// Get position controller output
+			// Get position control output
 			vehicle_local_position_setpoint_s local_pos_sp{};
 			local_pos_sp.timestamp = hrt_absolute_time();
 			_control.getOutputSetpoint(local_pos_sp);

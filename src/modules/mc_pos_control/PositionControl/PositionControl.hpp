@@ -80,31 +80,22 @@ public:
 	~PositionControl() = default;
 
 	/**
-	 *	Overwrites certain parameters.
-	 *	Overwrites are required for unit-conversion.
-	 *	This method should only be called if parameters
-	 *	have been updated.
-	 */
-	void overwriteParams();
-
-	/**
-	 * Update the current vehicle state.
+	 * Pass the current vehicle state to the controller
 	 * @param PositionControlStates structure
 	 */
-	void updateState(const PositionControlStates &states);
+	void setState(const PositionControlStates &states);
 
 	/**
-	 * Update the desired setpoints.
+	 * Pass the desired setpoints
 	 * @param setpoint a vehicle_local_position_setpoint_s structure
-	 * @return true if setpoint has updated correctly
 	 */
-	void updateSetpoint(const vehicle_local_position_setpoint_s &setpoint);
+	void setInputSetpoint(const vehicle_local_position_setpoint_s &setpoint);
 
 	/**
-	 * Set constraints that are stricter than the global limits.
+	 * Pass constraints that are stricter than the global limits
 	 * @param constraints a PositionControl structure with supported constraints
 	 */
-	void updateConstraints(const vehicle_constraints_s &constraints);
+	void setConstraints(const vehicle_constraints_s &constraints);
 
 	/**
 	 * Apply P-position and PID-velocity controller that updates the member
@@ -112,21 +103,15 @@ public:
 	 * @see _thr_sp
 	 * @see _yaw_sp
 	 * @see _yawspeed_sp
-	 * @param dt the delta-time
+	 * @param dt time in seconds since last iteration
 	 */
-	void generateThrustYawSetpoint(const float dt);
+	void update(const float dt);
 
 	/**
 	 * 	Set the integral term in xy to 0.
 	 * 	@see _thr_int
 	 */
-	void resetIntegralXY() { _vel_int(0) = _vel_int(1) = 0.0f; }
-
-	/**
-	 * 	Set the integral term in z to 0.
-	 * 	@see _thr_int
-	 */
-	void resetIntegralZ() { _vel_int(2) = 0.0f; }
+	void resetIntegral() { _vel_int = matrix::Vector3f(); }
 
 	/**
 	 * Get the controllers output local position setpoint
@@ -143,22 +128,25 @@ protected:
 private:
 	void _positionController(); /** applies the P-position-controller */
 	void _velocityController(const float &dt); /** applies the PID-velocity-controller */
-	void addIfNotNan(float &setpoint, const float feedforward);
-	void addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &feedforward);
+	void _addIfNotNan(float &setpoint, const float addition); /** adds to the setpoint but handles NAN cases correctly */
+	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition); /** _addIfNotNan for all vector components */
 
-	matrix::Vector3f _pos; /**< MC position */
-	matrix::Vector3f _vel; /**< MC velocity */
-	matrix::Vector3f _vel_dot; /**< MC velocity derivative */
+	// States
+	matrix::Vector3f _pos; /**< position */
+	matrix::Vector3f _vel; /**< velocity */
+	matrix::Vector3f _vel_dot; /**< velocity derivative (replacement for acceleration estimate) */
 	matrix::Vector3f _vel_int; /**< integral term of the velocity controller */
-	matrix::Vector3f _acc; /**< MC acceleration */
-	float _yaw = 0.0f; /**< MC yaw */
+	float _yaw = 0.0f; /**< yaw */
+
+	vehicle_constraints_s _constraints{}; /**< variable constraints */
+
+	// Setpoints
 	matrix::Vector3f _pos_sp; /**< desired position */
 	matrix::Vector3f _vel_sp; /**< desired velocity */
-	matrix::Vector3f _acc_sp; /**< desired acceleration: not supported yet */
+	matrix::Vector3f _acc_sp; /**< desired acceleration */
 	matrix::Vector3f _thr_sp; /**< desired thrust */
 	float _yaw_sp{}; /**< desired yaw */
 	float _yawspeed_sp{}; /** desired yaw-speed */
-	vehicle_constraints_s _constraints{}; /**< variable constraints */
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,

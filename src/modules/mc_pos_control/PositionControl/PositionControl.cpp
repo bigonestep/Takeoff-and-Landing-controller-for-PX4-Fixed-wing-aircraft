@@ -47,7 +47,7 @@ PositionControl::PositionControl(ModuleParams *parent) :
 	ModuleParams(parent)
 {}
 
-void PositionControl::updateState(const PositionControlStates &states)
+void PositionControl::setState(const PositionControlStates &states)
 {
 	_pos = states.position;
 	_vel = states.velocity;
@@ -55,7 +55,7 @@ void PositionControl::updateState(const PositionControlStates &states)
 	_vel_dot = states.acceleration;
 }
 
-void PositionControl::updateSetpoint(const vehicle_local_position_setpoint_s &setpoint)
+void PositionControl::setInputSetpoint(const vehicle_local_position_setpoint_s &setpoint)
 {
 	_pos_sp = Vector3f(setpoint.x, setpoint.y, setpoint.z);
 	_vel_sp = Vector3f(setpoint.vx, setpoint.vy, setpoint.vz);
@@ -65,7 +65,34 @@ void PositionControl::updateSetpoint(const vehicle_local_position_setpoint_s &se
 	_yawspeed_sp = setpoint.yawspeed;
 }
 
-void PositionControl::generateThrustYawSetpoint(const float dt)
+void PositionControl::setConstraints(const vehicle_constraints_s &constraints)
+{
+	_constraints = constraints;
+
+	// For safety check if adjustable constraints are below global constraints. If they are not stricter than global
+	// constraints, then just use global constraints for the limits.
+
+	const float tilt_max_radians = math::radians(math::max(_param_mpc_tiltmax_air.get(), _param_mpc_man_tilt_max.get()));
+
+	if (!PX4_ISFINITE(constraints.tilt)
+	    || !(constraints.tilt < tilt_max_radians)) {
+		_constraints.tilt = tilt_max_radians;
+	}
+
+	if (!PX4_ISFINITE(constraints.speed_up) || !(constraints.speed_up < _param_mpc_z_vel_max_up.get())) {
+		_constraints.speed_up = _param_mpc_z_vel_max_up.get();
+	}
+
+	if (!PX4_ISFINITE(constraints.speed_down) || !(constraints.speed_down < _param_mpc_z_vel_max_dn.get())) {
+		_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
+	}
+
+	if (!PX4_ISFINITE(constraints.speed_xy) || !(constraints.speed_xy < _param_mpc_xy_vel_max.get())) {
+		_constraints.speed_xy = _param_mpc_xy_vel_max.get();
+	}
+}
+
+void PositionControl::update(const float dt)
 {
 	_positionController();
 	_velocityController(dt);
@@ -79,7 +106,7 @@ void PositionControl::_positionController()
 	// P-position controller
 	const Vector3f propotional_gain(_param_mpc_xy_p.get(), _param_mpc_xy_p.get(), _param_mpc_z_p.get());
 	Vector3f vel_sp_position = (_pos_sp - _pos).emult(propotional_gain);
-	addIfNotNanVector(_vel_sp, vel_sp_position);
+	_addIfNotNanVector(_vel_sp, vel_sp_position);
 
 	// Constrain horizontal velocity by prioritizing the velocity component along the
 	// the desired position setpoint over the feed-forward term.
@@ -121,7 +148,7 @@ void PositionControl::_velocityController(const float &dt)
 
 	const Vector3f vel_err = _vel_sp - _vel;
 
-	// Acceleration to thrust feedforward conversion
+	// Acceleration to thrust addition conversion
 	static constexpr float CONSTANTS_ONE_G = 9.80665f; // m/s^2
 	const float scale = CONSTANTS_ONE_G / _param_mpc_thr_hover.get();
 	const Vector3f thr_ff = _acc_sp * _param_mpc_thr_hover.get() / CONSTANTS_ONE_G;
@@ -129,7 +156,7 @@ void PositionControl::_velocityController(const float &dt)
 	// Consider thrust in D-direction.
 	float thrust_desired_D = _param_mpc_z_vel_p.get() * vel_err(2) +  _param_mpc_z_vel_d.get() * _vel_dot(2) + _vel_int(
 					 2) - _param_mpc_thr_hover.get();
-	addIfNotNan(thrust_desired_D, thr_ff(2));
+	_addIfNotNan(thrust_desired_D, thr_ff(2));
 
 	acc_sp_velocity(2) += scale * (_param_mpc_z_vel_p.get() * vel_err(2) +  _param_mpc_z_vel_d.get() * _vel_dot(2) + _vel_int(
 				       2));
@@ -167,8 +194,8 @@ void PositionControl::_velocityController(const float &dt)
 		Vector2f thrust_desired_NE;
 		thrust_desired_NE(0) = _param_mpc_xy_vel_p.get() * vel_err(0) + _param_mpc_xy_vel_d.get() * _vel_dot(0) + _vel_int(0);
 		thrust_desired_NE(1) = _param_mpc_xy_vel_p.get() * vel_err(1) + _param_mpc_xy_vel_d.get() * _vel_dot(1) + _vel_int(1);
-		addIfNotNan(thrust_desired_NE(0), thr_ff(0));
-		addIfNotNan(thrust_desired_NE(1), thr_ff(1));
+		_addIfNotNan(thrust_desired_NE(0), thr_ff(0));
+		_addIfNotNan(thrust_desired_NE(1), thr_ff(1));
 
 		acc_sp_velocity(0) += scale * (_param_mpc_xy_vel_p.get() * vel_err(0) + _param_mpc_xy_vel_d.get() * _vel_dot(0) + _vel_int(0));
 		acc_sp_velocity(1) += scale * (_param_mpc_xy_vel_p.get() * vel_err(1) + _param_mpc_xy_vel_d.get() * _vel_dot(1) + _vel_int(1));
@@ -202,9 +229,9 @@ void PositionControl::_velocityController(const float &dt)
 	}
 
 	// No control input from setpoints or corresponding states which are NAN, reset integrator if necessary
-	addIfNotNanVector(_vel_int, Vector3f());
-	addIfNotNanVector(_thr_sp, thr_sp_velocity);
-	addIfNotNanVector(_acc_sp, acc_sp_velocity);
+	_addIfNotNanVector(_vel_int, Vector3f());
+	_addIfNotNanVector(_thr_sp, thr_sp_velocity);
+	_addIfNotNanVector(_acc_sp, acc_sp_velocity);
 }
 
 void PositionControl::getOutputSetpoint(vehicle_local_position_setpoint_s &local_position_setpoint)
@@ -221,51 +248,27 @@ void PositionControl::getOutputSetpoint(vehicle_local_position_setpoint_s &local
 	_thr_sp.copyTo(local_position_setpoint.thrust);
 }
 
-void PositionControl::updateConstraints(const vehicle_constraints_s &constraints)
-{
-	_constraints = constraints;
-
-	// For safety check if adjustable constraints are below global constraints. If they are not stricter than global
-	// constraints, then just use global constraints for the limits.
-
-	const float tilt_max_radians = math::radians(math::max(_param_mpc_tiltmax_air.get(), _param_mpc_man_tilt_max.get()));
-
-	if (!PX4_ISFINITE(constraints.tilt)
-	    || !(constraints.tilt < tilt_max_radians)) {
-		_constraints.tilt = tilt_max_radians;
-	}
-
-	if (!PX4_ISFINITE(constraints.speed_up) || !(constraints.speed_up < _param_mpc_z_vel_max_up.get())) {
-		_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-	}
-
-	if (!PX4_ISFINITE(constraints.speed_down) || !(constraints.speed_down < _param_mpc_z_vel_max_dn.get())) {
-		_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
-	}
-
-	if (!PX4_ISFINITE(constraints.speed_xy) || !(constraints.speed_xy < _param_mpc_xy_vel_max.get())) {
-		_constraints.speed_xy = _param_mpc_xy_vel_max.get();
-	}
-}
-
 void PositionControl::updateParams()
 {
 	ModuleParams::updateParams();
 }
 
-void PositionControl::addIfNotNan(float &setpoint, const float feedforward)
+void PositionControl::_addIfNotNan(float &setpoint, const float addition)
 {
-	if (PX4_ISFINITE(setpoint) && PX4_ISFINITE(feedforward)) {
-		setpoint += feedforward;
+	if (PX4_ISFINITE(setpoint) && PX4_ISFINITE(addition)) {
+		// No NAN, add to the setpoint
+		setpoint += addition;
 
 	} else if (!PX4_ISFINITE(setpoint)) {
-		setpoint = feedforward;
+		// Setpoint NAN, take addition
+		setpoint = addition;
 	}
+	// Addition is NAN or both are NAN, nothing to do
 }
 
-void PositionControl::addIfNotNanVector(Vector3f &setpoint, const Vector3f &feedforward)
+void PositionControl::_addIfNotNanVector(Vector3f &setpoint, const Vector3f &addition)
 {
 	for (int i = 0; i < 3; i++) {
-		addIfNotNan(setpoint(i), feedforward(i));
+		_addIfNotNan(setpoint(i), addition(i));
 	}
 }
