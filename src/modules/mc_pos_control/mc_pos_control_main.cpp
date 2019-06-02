@@ -646,16 +646,12 @@ MulticopterPositionControl::run()
 				limit_altitude(setpoint);
 			}
 
-			// Update states, setpoints and constraints.
+			// Set position controller inputs
 			_control.updateConstraints(constraints);
 			_control.updateState(_states);
+			_control.updateSetpoint(setpoint);
 
-			// update position controller setpoints
-			if (!_control.updateSetpoint(setpoint)) {
-				warn_rate_limited("Position-Control Setpoint-Update failed");
-			}
-
-			// Generate desired thrust and yaw.
+			// Run position control and generate thrust/acceleration and yaw setpoints
 			_control.generateThrustYawSetpoint(_dt);
 
 			// Fill local position, velocity and thrust setpoint.

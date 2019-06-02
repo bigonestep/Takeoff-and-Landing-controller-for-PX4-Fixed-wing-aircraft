@@ -98,7 +98,7 @@ public:
 	 * @param setpoint a vehicle_local_position_setpoint_s structure
 	 * @return true if setpoint has updated correctly
 	 */
-	bool updateSetpoint(const vehicle_local_position_setpoint_s &setpoint);
+	void updateSetpoint(const vehicle_local_position_setpoint_s &setpoint);
 
 	/**
 	 * Set constraints that are stricter than the global limits.
@@ -120,13 +120,13 @@ public:
 	 * 	Set the integral term in xy to 0.
 	 * 	@see _thr_int
 	 */
-	void resetIntegralXY() { _thr_int(0) = _thr_int(1) = 0.0f; }
+	void resetIntegralXY() { _vel_int(0) = _vel_int(1) = 0.0f; }
 
 	/**
 	 * 	Set the integral term in z to 0.
 	 * 	@see _thr_int
 	 */
-	void resetIntegralZ() { _thr_int(2) = 0.0f; }
+	void resetIntegralZ() { _vel_int(2) = 0.0f; }
 
 	/**
 	 * 	Get the
@@ -163,18 +163,7 @@ public:
 	 */
 	const matrix::Vector3f getVelSp()
 	{
-		matrix::Vector3f vel_sp{};
-
-		for (int i = 0; i <= 2; i++) {
-			if (_ctrl_vel[i]) {
-				vel_sp(i) = _vel_sp(i);
-
-			} else {
-				vel_sp(i) = NAN;
-			}
-		}
-
-		return vel_sp;
+		return _vel_sp;
 	}
 
 	/**
@@ -184,18 +173,7 @@ public:
 	 */
 	const matrix::Vector3f getPosSp()
 	{
-		matrix::Vector3f pos_sp{};
-
-		for (int i = 0; i <= 2; i++) {
-			if (_ctrl_pos[i]) {
-				pos_sp(i) = _pos_sp(i);
-
-			} else {
-				pos_sp(i) = NAN;
-			}
-		}
-
-		return pos_sp;
+		return _pos_sp;
 	}
 
 protected:
@@ -203,32 +181,24 @@ protected:
 	void updateParams() override;
 
 private:
-	/**
-	 * Maps setpoints to internal-setpoints.
-	 * @return true if mapping succeeded.
-	 */
-	bool _interfaceMapping();
-
 	void _positionController(); /** applies the P-position-controller */
 	void _velocityController(const float &dt); /** applies the PID-velocity-controller */
-	void _setCtrlFlag(bool value); /**< set control-loop flags (only required for logging) */
+	void addIfNotNan(float &setpoint, const float feedforward);
+	void addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &feedforward);
 
-	matrix::Vector3f _pos{}; /**< MC position */
-	matrix::Vector3f _vel{}; /**< MC velocity */
-	matrix::Vector3f _vel_dot{}; /**< MC velocity derivative */
-	matrix::Vector3f _acc{}; /**< MC acceleration */
-	float _yaw{0.0f}; /**< MC yaw */
-	matrix::Vector3f _pos_sp{}; /**< desired position */
-	matrix::Vector3f _vel_sp{}; /**< desired velocity */
-	matrix::Vector3f _acc_sp{}; /**< desired acceleration: not supported yet */
-	matrix::Vector3f _thr_sp{}; /**< desired thrust */
+	matrix::Vector3f _pos; /**< MC position */
+	matrix::Vector3f _vel; /**< MC velocity */
+	matrix::Vector3f _vel_dot; /**< MC velocity derivative */
+	matrix::Vector3f _vel_int; /**< integral term of the velocity controller */
+	matrix::Vector3f _acc; /**< MC acceleration */
+	float _yaw = 0.0f; /**< MC yaw */
+	matrix::Vector3f _pos_sp; /**< desired position */
+	matrix::Vector3f _vel_sp; /**< desired velocity */
+	matrix::Vector3f _acc_sp; /**< desired acceleration: not supported yet */
+	matrix::Vector3f _thr_sp; /**< desired thrust */
 	float _yaw_sp{}; /**< desired yaw */
 	float _yawspeed_sp{}; /** desired yaw-speed */
-	matrix::Vector3f _thr_int{}; /**< thrust integral term */
 	vehicle_constraints_s _constraints{}; /**< variable constraints */
-	bool _skip_controller{false}; /**< skips position/velocity controller. true for stabilized mode */
-	bool _ctrl_pos[3] = {true, true, true}; /**< True if the control-loop for position was used */
-	bool _ctrl_vel[3] = {true, true, true}; /**< True if the control-loop for velocity was used */
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,
