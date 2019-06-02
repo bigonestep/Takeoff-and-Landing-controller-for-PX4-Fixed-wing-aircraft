@@ -207,6 +207,20 @@ void PositionControl::_velocityController(const float &dt)
 	addIfNotNanVector(_acc_sp, acc_sp_velocity);
 }
 
+void PositionControl::getOutputSetpoint(vehicle_local_position_setpoint_s &local_position_setpoint)
+{
+	local_position_setpoint.x = _pos_sp(0);
+	local_position_setpoint.y = _pos_sp(1);
+	local_position_setpoint.z = _pos_sp(2);
+	local_position_setpoint.yaw = _yaw_sp;
+	local_position_setpoint.yawspeed = _yawspeed_sp;
+	local_position_setpoint.vx = _vel_sp(0);
+	local_position_setpoint.vy = _vel_sp(1);
+	local_position_setpoint.vz = _vel_sp(2);
+	_acc_sp.copyTo(local_position_setpoint.acceleration);
+	_thr_sp.copyTo(local_position_setpoint.thrust);
+}
+
 void PositionControl::updateConstraints(const vehicle_constraints_s &constraints)
 {
 	_constraints = constraints;
@@ -239,15 +253,18 @@ void PositionControl::updateParams()
 	ModuleParams::updateParams();
 }
 
-void PositionControl::addIfNotNan(float &setpoint, const float feedforward) {
+void PositionControl::addIfNotNan(float &setpoint, const float feedforward)
+{
 	if (PX4_ISFINITE(setpoint) && PX4_ISFINITE(feedforward)) {
 		setpoint += feedforward;
-	} else if(!PX4_ISFINITE(setpoint)) {
+
+	} else if (!PX4_ISFINITE(setpoint)) {
 		setpoint = feedforward;
 	}
 }
 
-void PositionControl::addIfNotNanVector(Vector3f &setpoint, const Vector3f &feedforward) {
+void PositionControl::addIfNotNanVector(Vector3f &setpoint, const Vector3f &feedforward)
+{
 	for (int i = 0; i < 3; i++) {
 		addIfNotNan(setpoint(i), feedforward(i));
 	}
