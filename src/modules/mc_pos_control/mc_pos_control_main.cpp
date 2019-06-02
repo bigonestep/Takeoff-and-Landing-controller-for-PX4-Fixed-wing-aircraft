@@ -69,7 +69,7 @@
 #include <lib/FlightTasks/FlightTasks.hpp>
 #include <lib/WeatherVane/WeatherVane.hpp>
 #include "PositionControl.hpp"
-#include "Utility/ControlMath.hpp"
+#include <ControlMath.hpp>
 #include "Takeoff.hpp"
 
 using namespace time_literals;
