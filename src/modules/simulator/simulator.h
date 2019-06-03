@@ -225,6 +225,7 @@ private:
 	orb_advert_t _battery_pub{nullptr};
 	orb_advert_t _differential_pressure_pub{nullptr};
 	orb_advert_t _dist_pub{nullptr};
+	orb_advert_t _dist2_pub{nullptr};
 	orb_advert_t _flow_pub{nullptr};
 	orb_advert_t _irlock_report_pub{nullptr};
 	orb_advert_t _visual_odometry_pub{nullptr};

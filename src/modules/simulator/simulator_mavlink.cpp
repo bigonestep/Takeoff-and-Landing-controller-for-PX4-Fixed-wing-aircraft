@@ -1092,7 +1092,13 @@ int Simulator::publish_distance_topic(const mavlink_distance_sensor_t *dist_mavl
 	dist.signal_quality = -1;
 
 	int dist_multi;
-	orb_publish_auto(ORB_ID(distance_sensor), &_dist_pub, &dist, &dist_multi, ORB_PRIO_HIGH);
+
+	if (dist.max_distance < 10.0f) {
+		orb_publish_auto(ORB_ID(distance_sensor), &_dist_pub, &dist, &dist_multi, ORB_PRIO_HIGH);
+
+	} else {
+		orb_publish_auto(ORB_ID(distance_sensor), &_dist2_pub, &dist, &dist_multi, ORB_PRIO_HIGH);
+	}
 
 	return OK;
 }
