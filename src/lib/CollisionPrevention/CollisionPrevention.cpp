@@ -68,7 +68,11 @@ bool CollisionPrevention::initializeSubscriptions(SubscriptionArray &subscriptio
 		}
 	}
 
-	if (!subscription_array.get(ORB_ID(vehicle_attitude), _sub_vehicle_attitude)) {
+	if (!subscription_array.get(ORB_ID(vehicle_attitude), _sub_attitude)) {
+		return false;
+	}
+
+	if (!subscription_array.get(ORB_ID(vehicle_local_position), _sub_local_position)) {
 		return false;
 	}
 
@@ -90,12 +94,16 @@ void CollisionPrevention::publishConstrainedSetpoint(const Vector2f &original_se
 	constraints.adapted_setpoint[1] = adapted_setpoint(1);
 
 	// publish constraints
-	if (_constraints_pub != nullptr) {
-		orb_publish(ORB_ID(collision_constraints), _constraints_pub, &constraints);
+	int instance_id;
+	orb_publish_auto(ORB_ID(collision_constraints), &_constraints_pub, &constraints, &instance_id, ORB_PRIO_DEFAULT);
 
-	} else {
-		_constraints_pub = orb_advertise(ORB_ID(collision_constraints), &constraints);
-	}
+}
+
+void CollisionPrevention::publishObstacleMap()
+{
+	// publish map
+	int instance_id;
+	orb_publish_auto(ORB_ID(obstacle_distance), &_map_pub, &_obstacle_map, &instance_id, ORB_PRIO_DEFAULT);
 }
 
 void CollisionPrevention::updateMapOffboard()
@@ -111,21 +119,25 @@ void CollisionPrevention::updateMapOffboard()
 
 void CollisionPrevention::updateMapDistanceSensor()
 {
-	const distance_sensor_s &distance_sensor = _sub_distance_sensor[1]->get();
+	distance_sensor_s distance_sensor = _sub_distance_sensor[0]->get();
+
+	if (distance_sensor.max_distance > 5.0f) {
+		distance_sensor = _sub_distance_sensor[1]->get();
+	}
+
+	const vehicle_local_position_s &local_position = _sub_local_position->get();
 
 	const float hfov = 30; // degrees
+	const float vfov = 30; // degrees
 
 	// Update the map with rangefinder data if the data is not stale and newer
 	if (hrt_elapsed_time(&distance_sensor.timestamp) < RANGE_STREAM_TIMEOUT_US &&
 	    distance_sensor.timestamp > _obstacle_map.timestamp) {
 
-		const matrix::Eulerf &attitude = Eulerf(Quatf(_sub_vehicle_attitude->get().q));
+		_obstacle_map.timestamp = distance_sensor.timestamp;
 
-		// Check for data validity
-		if ((distance_sensor.current_distance > distance_sensor.min_distance) &&
-		    (distance_sensor.current_distance < distance_sensor.max_distance)) {
-
-			_obstacle_map.timestamp = distance_sensor.timestamp;
+		// Check sensor minimum distance
+		if (distance_sensor.current_distance > distance_sensor.min_distance) {
 
 			if (_obstacle_map.increment > 0) {
 				// Map already has data
@@ -140,21 +152,40 @@ void CollisionPrevention::updateMapDistanceSensor()
 				_obstacle_map.increment = hfov; // TODO : check rounding to ceil this when getting from message
 			}
 
-			// calculate yaw offset of sensor in body frame
-			float offset_body = sensorOrientationToOffset(distance_sensor);
+			// Calculate yaw offset of sensor in body frame
+			float sensor_yaw_body = sensorOrientationToYawOffset(distance_sensor);
 
-			// convert the offset from body to local frame
-			float offset_local = math::degrees(wrap_pi(attitude.psi() + offset_body));
+			// Convert the offset from body to local frame
+			matrix::Quatf attitude = Quatf(_sub_attitude->get().q);
+			float sensor_yaw_local = math::degrees(wrap_2pi(Eulerf(attitude).psi() + sensor_yaw_body));
 
-			// convert orientation from range [-180, 180] to [0, 360]
-			offset_local += 180.0f;
+			// Calculate pitch of sensor in local frame. TODO : any better way to do this?
+			attitude = Quatf(Eulerf(0.0f, 0.0f, sensor_yaw_body)) * attitude;
+			float sensor_pitch_local = Eulerf(attitude).theta();
+
+			//PX4_INFO("sensor pitch : %f", (double)sensor_pitch_local);
+
+			// Calculate maximum distance the sensor can measure without seeing the ground
+			if (local_position.dist_bottom_valid) {
+
+				float angle = sensor_pitch_local - math::radians(vfov) / 2.0f;
+
+				float max_distance_compensated = 0.9f * -(local_position.dist_bottom + 0.5f) / sinf(angle);
+
+				distance_sensor.max_distance = math::constrain(max_distance_compensated,
+							       distance_sensor.min_distance,
+							       distance_sensor.max_distance);
+
+				// PX4_INFO("beam angle : %f, compensated max : %f", double(math::degrees(angle)), double(distance_sensor.max_distance));
+			}
 
 			// calculate the field of view boundary bin indices
-			const int lower_bound = (int)floor(offset_local - (hfov / 2.0f)) /
+			const int lower_bound = (int)floor(sensor_yaw_local - (hfov / 2.0f)) /
 						float(_obstacle_map.increment);
-			const int upper_bound = (int)floor(offset_local + (hfov / 2.0f)) /
-						float(_obstacle_map.increment);
+			const int upper_bound = (int)floor(sensor_yaw_local + (hfov / 2.0f)) /
+						float(_obstacle_map.increment); // TODO : why floor
 
+			// Perform map update
 			for (int bin = lower_bound; bin <= upper_bound; ++bin) {
 				int wrap_bin = bin;
 
@@ -163,10 +194,23 @@ void CollisionPrevention::updateMapDistanceSensor()
 					wrap_bin = (360 / _obstacle_map.increment) + bin;
 				}
 
-				// compensate measurement for vehicle tilt and convert to cm
-				_obstacle_map.distances[wrap_bin] = distance_sensor.current_distance * 100.0f;
-				//cosf(attitude.theta()); /*TODO : why */
+				// Check sensor maximum distance after ground compensation
+				if (distance_sensor.current_distance < distance_sensor.max_distance) {
+
+					// compensate measurement for sensor pitch and convert to cm
+					_obstacle_map.distances[wrap_bin] = distance_sensor.current_distance * cosf(sensor_pitch_local) * 100.0f;
+
+				} else {
+
+					// No return from sensor - way is clear
+					_obstacle_map.distances[wrap_bin] = UINT16_MAX;
+				}
+
+				//PX4_INFO("original %f, compensated %f", (double)distance_sensor.current_distance, (double)(distance_sensor.current_distance * cosf(attitude.theta())));
+
 			}
+
+
 
 		}
 
@@ -199,7 +243,8 @@ void CollisionPrevention::calculateConstrainedSetpoint(Vector2f &setpoint,
 
 				//determine if distance bin is valid and contains a valid distance measurement
 				if (_obstacle_map.distances[i] < _obstacle_map.max_distance &&
-				    _obstacle_map.distances[i] > _obstacle_map.min_distance && i * _obstacle_map.increment < 360) {
+				    _obstacle_map.distances[i] > _obstacle_map.min_distance &&
+				    i * _obstacle_map.increment < 360) {
 					float distance = _obstacle_map.distances[i] / 100.0f; //convert to meters
 					float angle = math::radians((float)i * _obstacle_map.increment);
 
@@ -251,8 +296,8 @@ void CollisionPrevention::calculateConstrainedSetpoint(Vector2f &setpoint,
 			}
 		}
 
-	} else if (_last_message + MESSAGE_THROTTLE_US < hrt_absolute_time()) {
-		mavlink_log_critical(&_mavlink_log_pub, "No range data received");
+	} else if (1/*_last_message + MESSAGE_THROTTLE_US < hrt_absolute_time()*/) {
+		//mavlink_log_critical(&_mavlink_log_pub, "No range data received");
 		_last_message = hrt_absolute_time();
 	}
 }
@@ -276,5 +321,6 @@ void CollisionPrevention::modifySetpoint(Vector2f &original_setpoint, const floa
 
 	_interfering = currently_interfering;
 	publishConstrainedSetpoint(original_setpoint, new_setpoint);
+	publishObstacleMap();
 	original_setpoint = new_setpoint;
 }

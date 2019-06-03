@@ -50,6 +50,7 @@
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_local_position.h>
 #include <mathlib/mathlib.h>
 #include <drivers/drv_hrt.h>
 #include <uORB/topics/mavlink_log.h>
@@ -80,12 +81,14 @@ private:
 	bool _interfering{false};		/**< states if the collision prevention interferes with the user input */
 
 	orb_advert_t _constraints_pub{nullptr};  	/**< constraints publication */
+	orb_advert_t _map_pub{nullptr};  			/**< map publication */
 	orb_advert_t _mavlink_log_pub{nullptr};	 	/**< Mavlink log uORB handle */
 
 	uORB::Subscription<obstacle_distance_s> *_sub_obstacle_distance{nullptr}; /**< obstacle map received from offboard */
 	uORB::Subscription<distance_sensor_s>
 	*_sub_distance_sensor[ORB_MULTI_MAX_INSTANCES]; /**< distance data received from onboard rangefinders */
-	uORB::Subscription<vehicle_attitude_s> *_sub_vehicle_attitude{nullptr}; /**< vehicle attitude */
+	uORB::Subscription<vehicle_attitude_s> *_sub_attitude{nullptr};
+	uORB::Subscription<vehicle_local_position_s> *_sub_local_position{nullptr};
 
 	static constexpr uint64_t RANGE_STREAM_TIMEOUT_US{500000};
 	static constexpr uint64_t MESSAGE_THROTTLE_US{5000000};
@@ -103,7 +106,7 @@ private:
 
 	void update();
 
-	inline float sensorOrientationToOffset(distance_sensor_s distance_sensor)
+	inline float sensorOrientationToYawOffset(distance_sensor_s distance_sensor)
 	{
 		float offset = 0.0f;
 
@@ -136,5 +139,7 @@ private:
 					  const matrix::Vector2f &curr_vel);
 
 	void publishConstrainedSetpoint(const matrix::Vector2f &original_setpoint, const matrix::Vector2f &adapted_setpoint);
+
+	void publishObstacleMap();
 
 };
