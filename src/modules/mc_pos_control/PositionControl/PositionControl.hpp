@@ -129,7 +129,7 @@ private:
 	void _positionController(); /** applies the P-position-controller */
 	void _velocityController(const float &dt); /** applies the PID-velocity-controller */
 	void _addIfNotNan(float &setpoint, const float addition); /** adds to the setpoint but handles NAN cases correctly */
-	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition); /** _addIfNotNan for all vector components */
+	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition); /** same but bulk for Vector3f */
 
 	// States
 	matrix::Vector3f _pos; /**< position */
