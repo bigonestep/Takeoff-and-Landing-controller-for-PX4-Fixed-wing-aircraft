@@ -92,13 +92,17 @@ void PositionControl::setConstraints(const vehicle_constraints_s &constraints)
 	}
 }
 
-void PositionControl::update(const float dt)
+bool PositionControl::update(const float dt)
 {
 	_positionController();
 	_velocityController(dt);
 
 	_yawspeed_sp = PX4_ISFINITE(_yawspeed_sp) ? _yawspeed_sp : 0.f;
 	_yaw_sp = PX4_ISFINITE(_yaw_sp) ? _yaw_sp : _yaw;
+
+	// const bool valid_acceleration_setpoint = PX4_ISFINITE(_acc_sp(0)) && PX4_ISFINITE(_acc_sp(1)) && PX4_ISFINITE(_acc_sp(2));
+	const bool valid_thrust_setpoint = PX4_ISFINITE(_thr_sp(0)) && PX4_ISFINITE(_thr_sp(1)) && PX4_ISFINITE(_thr_sp(2));
+	return valid_thrust_setpoint; // TODO: require acceleration setpoint when it gets executed
 }
 
 void PositionControl::_positionController()

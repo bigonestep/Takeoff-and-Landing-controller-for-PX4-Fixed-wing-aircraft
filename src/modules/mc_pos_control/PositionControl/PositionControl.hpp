@@ -104,8 +104,9 @@ public:
 	 * @see _yaw_sp
 	 * @see _yawspeed_sp
 	 * @param dt time in seconds since last iteration
+	 * @return true if output setpoint is executable, false if not
 	 */
-	void update(const float dt);
+	bool update(const float dt);
 
 	/**
 	 * 	Set the integral term in xy to 0.
@@ -116,7 +117,7 @@ public:
 	/**
 	 * Get the controllers output local position setpoint
 	 * These setpoints are the ones which were executed on including PID output and feed-forward.
-	 * The acceleration or thrust and yaw, yawspeed setpoints should be used for attitude control.
+	 * The acceleration or thrust setpoints can be used for attitude control.
 	 * @param local_position_setpoint reference to struct to fill up
 	 */
 	void getOutputSetpoint(vehicle_local_position_setpoint_s &local_position_setpoint);
