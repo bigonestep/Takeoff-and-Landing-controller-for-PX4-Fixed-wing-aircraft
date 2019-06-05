@@ -32,7 +32,7 @@
 ############################################################################
 
 px4_add_library(SlewRate
-	SlewRate.hpp
+	dummy.cpp
 )
 target_include_directories(SlewRate
 	PUBLIC
