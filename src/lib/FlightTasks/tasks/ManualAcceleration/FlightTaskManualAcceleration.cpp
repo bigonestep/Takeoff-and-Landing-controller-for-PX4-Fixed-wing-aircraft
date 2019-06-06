@@ -76,18 +76,13 @@ bool FlightTaskManualAcceleration::update()
 			Quatf(_sub_attitude->get().delta_q_reset));
 
 	// Map sticks input to acceleration
-	_acceleration_setpoint = Vector3f(&_sticks_expo(0)) * 10;
-	_velocity_setpoint = Vector3f();
+	_acceleration_setpoint = Vector3f(&_sticks(0));
+	_position_lock.limitStickUnitLengthXY(_acceleration_setpoint);
+	_position_lock.rotateIntoHeadingFrameXY(_acceleration_setpoint, _yaw, _yaw_setpoint);
+	_acceleration_setpoint *= 10;
 
-	printf("ACC IN TASK:\n");
-	_acceleration_setpoint.print();
-
-	// Rotate horizontal acceleration input to body heading
-	float yaw_rotate = PX4_ISFINITE(_yaw_setpoint) ? _yaw_setpoint : _yaw;
-	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(_acceleration_setpoint(0),
-				_acceleration_setpoint(1), 0.0f));
-	_acceleration_setpoint(0) = v_r(0);
-	_acceleration_setpoint(1) = v_r(1);
+	// Add drag to limit speed and brake again
+	_acceleration_setpoint -= 2.f * _velocity;
 
 	_constraints.want_takeoff = _checkTakeoff();
 	return true;

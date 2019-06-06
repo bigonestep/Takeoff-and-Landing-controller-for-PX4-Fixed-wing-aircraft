@@ -59,10 +59,10 @@ public:
 	 * @return yaw setpoint to execute to have a yaw lock at the correct moment in time
 	 */
 	void updateYawFromStick(float &yawspeed_setpoint, float &yaw_setpoint, const float desired_yawspeed, const float yaw,
-				const float dt)
+				const float deltatime)
 	{
-		_yawspeed_slew_rate.setSlewRate(1.f);
-		yawspeed_setpoint = _yawspeed_slew_rate.update(desired_yawspeed, dt);
+		_yawspeed_slew_rate.setSlewRate(2.f * M_PI_F);
+		yawspeed_setpoint = _yawspeed_slew_rate.update(desired_yawspeed, deltatime);
 		yaw_setpoint = updateYawLock(yaw, yawspeed_setpoint, yaw_setpoint);
 	}
 
@@ -110,6 +110,22 @@ public:
 		}
 
 		return yaw_setpoint;
+	}
+
+	void limitStickUnitLengthXY(matrix::Vector3f &v) {
+		const matrix::Vector2f v2(v);
+		const float v2l = v2.length();
+		if (v2.length() > 1.0f) {
+			v(1) /= v2l;
+			v(2) /= v2l;
+		}
+	}
+
+	void rotateIntoHeadingFrameXY(matrix::Vector3f &v, const float yaw, const float yaw_setpoint) {
+		using namespace matrix;
+		// Rotate horizontal acceleration input to body heading
+		const float yaw_rotate = PX4_ISFINITE(yaw_setpoint) ? yaw_setpoint : yaw;
+		v = Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * v;
 	}
 
 	void setYawResetCounter(const uint8_t yaw_reset_counter) { _yaw_reset_counter = yaw_reset_counter; }

@@ -293,31 +293,17 @@ void FlightTaskManualAltitude::_respectGroundSlowdown()
 	}
 }
 
-void FlightTaskManualAltitude::_rotateIntoHeadingFrame(Vector2f &v)
-{
-	float yaw_rotate = PX4_ISFINITE(_yaw_setpoint) ? _yaw_setpoint : _yaw;
-	Vector3f v_r = Vector3f(Dcmf(Eulerf(0.0f, 0.0f, yaw_rotate)) * Vector3f(v(0), v(1), 0.0f));
-	v(0) = v_r(0);
-	v(1) = v_r(1);
-}
-
 void FlightTaskManualAltitude::_updateSetpoints()
 {
 	// Thrust in xy are extracted directly from stick inputs. A magnitude of
 	// 1 means that maximum thrust along xy is demanded. A magnitude of 0 means no
 	// thrust along xy is demanded. The maximum thrust along xy depends on the thrust
 	// setpoint along z-direction, which is computed in PositionControl.cpp.
-
-	Vector2f sp(&_sticks(0));
-	_rotateIntoHeadingFrame(sp);
-
-	if (sp.length() > 1.0f) {
-		sp.normalize();
-	}
-
-	_thrust_setpoint(0) = sp(0);
-	_thrust_setpoint(1) = sp(1);
+	_thrust_setpoint = Vector3f(&_sticks(0));
+	_position_lock.limitStickUnitLengthXY(_thrust_setpoint);
+	_position_lock.rotateIntoHeadingFrameXY(_thrust_setpoint, _yaw, _yaw_setpoint);
 	_thrust_setpoint(2) = NAN;
+	_acceleration_setpoint = 10.f * _thrust_setpoint;
 
 	_updateAltitudeLock();
 	_respectGroundSlowdown();
