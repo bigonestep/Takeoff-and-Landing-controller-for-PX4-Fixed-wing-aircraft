@@ -112,7 +112,12 @@ public:
 		return yaw_setpoint;
 	}
 
-	void limitStickUnitLengthXY(matrix::Vector3f &v) {
+	/**
+	 * Limit the the horizontal input from a square shaped joystick gimbal to a unit circle
+	 * @param v Vector containing x, y, z axis of the joystick gimbal. x, y get adjusted
+	 */
+	void limitStickUnitLengthXY(matrix::Vector3f &v)
+	{
 		const matrix::Vector2f v2(v);
 		const float v2l = v2.length();
 		if (v2.length() > 1.0f) {
@@ -121,7 +126,14 @@ public:
 		}
 	}
 
-	void rotateIntoHeadingFrameXY(matrix::Vector3f &v, const float yaw, const float yaw_setpoint) {
+	/**
+	 * Rotate horizontal component of joystick input into the vehicle body orientation
+	 * @param v Vector containing x, y, z axis of the joystick input.
+	 * @param yaw Current vehicle yaw heading
+	 * @param yaw_setpoint Current yaw setpoint if it's locked else NAN
+	 */
+	void rotateIntoHeadingFrameXY(matrix::Vector3f &v, const float yaw, const float yaw_setpoint)
+	{
 		using namespace matrix;
 		// Rotate horizontal acceleration input to body heading
 		const float yaw_rotate = PX4_ISFINITE(yaw_setpoint) ? yaw_setpoint : yaw;
