@@ -65,6 +65,14 @@ static constexpr wq_config_t I2C4{"wq:I2C4", 1250, -10};
 static constexpr wq_config_t att_pos_ctrl{"wq:att_pos_ctrl", 2000, -11}; // PX4 att/pos controllers, highest priority after sensors
 
 static constexpr wq_config_t hp_default{"wq:hp_default", 1500, -12};
+
+static constexpr wq_config_t UART0{"wq:UART0", 1000, -13};
+static constexpr wq_config_t UART1{"wq:UART1", 1000, -14};
+static constexpr wq_config_t UART2{"wq:UART2", 1000, -15};
+static constexpr wq_config_t UART3{"wq:UART3", 1000, -16};
+static constexpr wq_config_t UART4{"wq:UART4", 1000, -17};
+static constexpr wq_config_t UART5{"wq:UART5", 1000, -18};
+
 static constexpr wq_config_t lp_default{"wq:lp_default", 1700, -50};
 
 static constexpr wq_config_t test1{"wq:test1", 800, 0};
@@ -97,6 +105,8 @@ WorkQueue *WorkQueueFindOrCreate(const wq_config_t &new_wq);
  * @return		A work queue configuration.
  */
 const wq_config_t &device_bus_to_wq(uint32_t device_id);
+
+const wq_config_t &serial_port_to_wq(const char *serial);
 
 
 } // namespace px4
