@@ -71,9 +71,9 @@ public:
 	Type update(const Type new_value, const float deltatime)
 	{
 		// Limit the rate of change of the value
-		const float dvalue_desired = new_value - _value;
-		const float dvalue_max = _slew_rate * deltatime;
-		const float dvalue = math::constrain(dvalue_desired, -dvalue_max, dvalue_max);
+		const Type dvalue_desired = new_value - _value;
+		const Type dvalue_max = _slew_rate * deltatime;
+		const Type dvalue = math::constrain(dvalue_desired, -dvalue_max, dvalue_max);
 		_value += dvalue;
 		return _value;
 	}

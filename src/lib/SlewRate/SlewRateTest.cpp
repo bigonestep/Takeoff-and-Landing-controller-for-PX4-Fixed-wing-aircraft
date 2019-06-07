@@ -34,7 +34,7 @@
 #include <gtest/gtest.h>
 #include <SlewRate.hpp>
 
-TEST(AttitudeControlTest, SlewUpLimited)
+TEST(SlewRateTest, SlewUpLimited)
 {
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(.1f);
@@ -45,7 +45,7 @@ TEST(AttitudeControlTest, SlewUpLimited)
 	}
 }
 
-TEST(AttitudeControlTest, SlewDownLimited)
+TEST(SlewRateTest, SlewDownLimited)
 {
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(1.1f);
@@ -56,7 +56,7 @@ TEST(AttitudeControlTest, SlewDownLimited)
 	}
 }
 
-TEST(AttitudeControlTest, ReachValueSlewed)
+TEST(SlewRateTest, ReachValueSlewed)
 {
 	SlewRate<float> _slew_rate;
 	_slew_rate.setSlewRate(.2f);
