@@ -49,7 +49,6 @@ public:
 	FlightTaskManualAcceleration();
 
 	virtual ~FlightTaskManualAcceleration() = default;
-	bool initializeSubscriptions(SubscriptionArray &subscription_array) override;
 	bool activate(vehicle_local_position_setpoint_s last_setpoint) override;
 	bool updateInitialize() override;
 	bool update() override;

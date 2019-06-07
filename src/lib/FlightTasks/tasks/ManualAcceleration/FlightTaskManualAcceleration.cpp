@@ -46,15 +46,6 @@ FlightTaskManualAcceleration::FlightTaskManualAcceleration()
 
 }
 
-bool FlightTaskManualAcceleration::initializeSubscriptions(SubscriptionArray &subscription_array)
-{
-	if (!FlightTaskManual::initializeSubscriptions(subscription_array)) {
-		return false;
-	}
-
-	return true;
-}
-
 bool FlightTaskManualAcceleration::updateInitialize()
 {
 	bool ret = FlightTaskManual::updateInitialize();
