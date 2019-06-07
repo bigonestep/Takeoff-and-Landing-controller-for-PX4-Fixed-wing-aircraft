@@ -66,10 +66,13 @@ bool FlightTaskManualAcceleration::update()
 	_yaw_setpoint = _position_lock.updateYawReset(_yaw_setpoint, _sub_attitude->get().quat_reset_counter,
 			Quatf(_sub_attitude->get().delta_q_reset));
 
-	// Map sticks input to acceleration
-	_acceleration_setpoint = Vector3f(&_sticks(0));
-	_position_lock.limitStickUnitLengthXY(_acceleration_setpoint);
-	_position_lock.rotateIntoHeadingFrameXY(_acceleration_setpoint, _yaw, _yaw_setpoint);
+	// Map stick input to acceleration
+	Vector2f stick_xy(&_sticks(0));
+	_position_lock.limitStickUnitLengthXY(stick_xy);
+	_position_lock.rotateIntoHeadingFrameXY(stick_xy, _yaw, _yaw_setpoint);
+
+	_acceleration_setpoint = Vector3f(stick_xy(0), stick_xy(1), _sticks(2));
+
 	_acceleration_setpoint *= 10;
 
 	// Add drag to limit speed and brake again

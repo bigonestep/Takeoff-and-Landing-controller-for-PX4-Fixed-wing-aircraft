@@ -299,10 +299,10 @@ void FlightTaskManualAltitude::_updateSetpoints()
 	// 1 means that maximum thrust along xy is demanded. A magnitude of 0 means no
 	// thrust along xy is demanded. The maximum thrust along xy depends on the thrust
 	// setpoint along z-direction, which is computed in PositionControl.cpp.
-	_thrust_setpoint = Vector3f(&_sticks(0));
-	_position_lock.limitStickUnitLengthXY(_thrust_setpoint);
-	_position_lock.rotateIntoHeadingFrameXY(_thrust_setpoint, _yaw, _yaw_setpoint);
-	_thrust_setpoint(2) = NAN;
+	Vector2f stick_xy(&_sticks(0));
+	_position_lock.limitStickUnitLengthXY(stick_xy);
+	_position_lock.rotateIntoHeadingFrameXY(stick_xy, _yaw, _yaw_setpoint);
+	_thrust_setpoint = Vector3f(stick_xy(0), stick_xy(1), NAN);
 	_acceleration_setpoint = 10.f * _thrust_setpoint;
 
 	_updateAltitudeLock();
