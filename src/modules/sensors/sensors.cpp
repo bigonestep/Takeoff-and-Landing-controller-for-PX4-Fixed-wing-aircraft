@@ -91,6 +91,7 @@
 #include "parameters.h"
 #include "rc_update.h"
 #include "voted_sensors_update.h"
+#include "common.h"
 
 using namespace DriverFramework;
 using namespace sensors;
@@ -187,7 +188,8 @@ private:
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
-	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
+	SensorData	_airspeed_validator;		/**< data validator to monitor airspeed */
+	orb_advert_t 	_airspeed_pub_list[2] = {nullptr};
 
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	differential_pressure_s	_diff_pres {};
@@ -243,8 +245,8 @@ Sensors::Sensors(bool hil_enabled) :
 {
 	initialize_parameter_handles(_parameter_handles);
 
-	_airspeed_validator.set_timeout(300000);
-	_airspeed_validator.set_equal_value_threshold(100);
+	_airspeed_validator.voter.set_timeout(300000);
+	_airspeed_validator.voter.set_equal_value_threshold(100);
 
 #if BOARD_NUMBER_BRICKS > 0
 
@@ -292,58 +294,73 @@ Sensors::adc_init()
 void
 Sensors::diff_pres_poll(const vehicle_air_data_s &raw)
 {
-	differential_pressure_s diff_pres{};
+	for (int uorb_index = 0; uorb_index < _airspeed_validator.subscription_count; uorb_index++) {
+		bool diff_pres_updated;
+		orb_check(_airspeed_validator.subscription[uorb_index], &diff_pres_updated);
 
-	if (_diff_pres_sub.update(&diff_pres)) {
+		if (diff_pres_updated) {
+			differential_pressure_s diff_pres{};
+			int ret = orb_copy(ORB_ID(differential_pressure), _airspeed_validator.subscription[uorb_index], &diff_pres);
 
-		float air_temperature_celsius = (diff_pres.temperature > -300.0f) ? diff_pres.temperature :
-						(raw.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);
+			if (ret != PX4_OK) {
+				continue;
+			}
 
-		airspeed_s airspeed;
-		airspeed.timestamp = diff_pres.timestamp;
+			float air_temperature_celsius = (diff_pres.temperature > -300.0f) ? diff_pres.temperature :
+							(raw.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);
 
-		/* push data into validator */
-		float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
+			airspeed_s airspeed;
+			airspeed.timestamp = diff_pres.timestamp;
 
-		_airspeed_validator.put(airspeed.timestamp, airspeed_input, diff_pres.error_count,
-					ORB_PRIO_HIGH);
+			/* push data into validator */
+			float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
 
-		airspeed.confidence = _airspeed_validator.confidence(hrt_absolute_time());
+			_airspeed_validator.voter.put(uorb_index, airspeed.timestamp, airspeed_input, diff_pres.error_count,
+						      ORB_PRIO_HIGH);
 
-		enum AIRSPEED_SENSOR_MODEL smodel;
+			airspeed.confidence = 1.0f;	//_airspeed_validator.voter.confidence(hrt_absolute_time());
 
-		switch ((diff_pres.device_id >> 16) & 0xFF) {
-		case DRV_DIFF_PRESS_DEVTYPE_SDP31:
+			enum AIRSPEED_SENSOR_MODEL smodel;
 
-		/* fallthrough */
-		case DRV_DIFF_PRESS_DEVTYPE_SDP32:
+			switch ((diff_pres.device_id >> 16) & 0xFF) {
+			case DRV_DIFF_PRESS_DEVTYPE_SDP31:
 
-		/* fallthrough */
-		case DRV_DIFF_PRESS_DEVTYPE_SDP33:
 			/* fallthrough */
-			smodel = AIRSPEED_SENSOR_MODEL_SDP3X;
-			break;
+			case DRV_DIFF_PRESS_DEVTYPE_SDP32:
 
-		default:
-			smodel = AIRSPEED_SENSOR_MODEL_MEMBRANE;
-			break;
-		}
+			/* fallthrough */
+			case DRV_DIFF_PRESS_DEVTYPE_SDP33:
+				/* fallthrough */
+				smodel = AIRSPEED_SENSOR_MODEL_SDP3X;
+				break;
 
-		/* don't risk to feed negative airspeed into the system */
-		airspeed.indicated_airspeed_m_s = calc_indicated_airspeed_corrected((enum AIRSPEED_COMPENSATION_MODEL)
-						  _parameters.air_cmodel,
-						  smodel, _parameters.air_tube_length, _parameters.air_tube_diameter_mm,
-						  diff_pres.differential_pressure_filtered_pa, raw.baro_pressure_pa,
-						  air_temperature_celsius);
+			default:
+				smodel = AIRSPEED_SENSOR_MODEL_MEMBRANE;
+				break;
+			}
 
-		airspeed.true_airspeed_m_s = calc_true_airspeed_from_indicated(airspeed.indicated_airspeed_m_s, raw.baro_pressure_pa,
-					     air_temperature_celsius);
+			/* don't risk to feed negative airspeed into the system */
+			airspeed.indicated_airspeed_m_s = calc_indicated_airspeed_corrected((enum AIRSPEED_COMPENSATION_MODEL)
+							  _parameters.air_cmodel,
+							  smodel, _parameters.air_tube_length, _parameters.air_tube_diameter_mm,
+							  diff_pres.differential_pressure_filtered_pa, raw.baro_pressure_pa,
+							  air_temperature_celsius);
 
-		airspeed.air_temperature_celsius = air_temperature_celsius;
+			airspeed.true_airspeed_m_s = calc_true_airspeed_from_indicated(airspeed.indicated_airspeed_m_s, raw.baro_pressure_pa,
+						     air_temperature_celsius);
 
-		if (PX4_ISFINITE(airspeed.indicated_airspeed_m_s) && PX4_ISFINITE(airspeed.true_airspeed_m_s)) {
-			int instance;
-			orb_publish_auto(ORB_ID(airspeed), &_airspeed_pub, &airspeed, &instance, ORB_PRIO_DEFAULT);
+			airspeed.air_temperature_celsius = air_temperature_celsius;
+
+			if (PX4_ISFINITE(airspeed.indicated_airspeed_m_s) && PX4_ISFINITE(airspeed.true_airspeed_m_s)) {
+				int instance;
+
+				if (_airspeed_pub_list[uorb_index] != nullptr) {
+					orb_publish(ORB_ID(airspeed), _airspeed_pub_list[uorb_index], &airspeed);
+
+				} else {
+					_airspeed_pub_list[uorb_index] = orb_advertise_multi(ORB_ID(airspeed), &airspeed, &instance, ORB_PRIO_DEFAULT);
+				}
+			}
 		}
 	}
 }
@@ -563,6 +580,8 @@ Sensors::run()
 
 	_voted_sensors_update.init(raw);
 
+	VotedSensorsUpdate::init_sensor_class(ORB_ID(differential_pressure), _airspeed_validator, 2);
+
 	/* (re)load params and calibration */
 	parameter_update_poll(true);
 
@@ -715,8 +734,8 @@ int Sensors::print_status()
 {
 	_voted_sensors_update.print_status();
 
-	PX4_INFO("Airspeed status:");
-	_airspeed_validator.print();
+	//PX4_INFO("Airspeed status:");
+	//_airspeed_validator.print();
 
 	return 0;
 }

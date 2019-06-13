@@ -35,7 +35,6 @@ if [ ${VEHICLE_TYPE} = fw -o ${VEHICLE_TYPE} = vtol ]
 then
 	if param compare CBRK_AIRSPD_CHK 0
 	then
-		sdp3x_airspeed start -a
 
 		# Pixhawk 2.1 has a MS5611 on I2C which gets wrongly
 		# detected as MS5525 because the chip manufacturer was so
@@ -51,6 +50,8 @@ then
 		ms4525_airspeed start -a
 
 		ets_airspeed start -a
+
+		sdp3x_airspeed start -a
 
 	fi
 fi

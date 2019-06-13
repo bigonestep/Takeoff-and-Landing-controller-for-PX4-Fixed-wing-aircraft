@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <lib/ecl/validation/data_validator.h>
+#include <lib/ecl/validation/data_validator_group.h>
 /**
  * @file common.h
  * common definitions used in sensors module
@@ -53,4 +55,27 @@ constexpr uint8_t SENSOR_COUNT_MAX = math::max(MAG_COUNT_MAX,
 						     math::max(ACCEL_COUNT_MAX,
 								     BARO_COUNT_MAX)));
 
+struct SensorData {
+	SensorData()
+		: last_best_vote(0),
+		  subscription_count(0),
+		  voter(1),
+		  last_failover_count(0)
+	{
+		for (unsigned i = 0; i < SENSOR_COUNT_MAX; i++) {
+			enabled[i] = true;
+			subscription[i] = -1;
+			priority[i] = 0;
+		}
+	}
+
+	bool enabled[SENSOR_COUNT_MAX];
+
+	int subscription[SENSOR_COUNT_MAX]; /**< raw sensor data subscription */
+	uint8_t priority[SENSOR_COUNT_MAX]; /**< sensor priority */
+	uint8_t last_best_vote; /**< index of the latest best vote */
+	int subscription_count;
+	DataValidatorGroup voter;
+	unsigned int last_failover_count;
+};
 } /* namespace sensors */

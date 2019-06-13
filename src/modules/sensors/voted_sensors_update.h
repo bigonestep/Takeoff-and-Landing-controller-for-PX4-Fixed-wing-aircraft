@@ -142,33 +142,10 @@ public:
 	 */
 	void calc_mag_inconsistency(sensor_preflight_s &preflt);
 
+	static void    init_sensor_class(const struct orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
+
 private:
 
-	struct SensorData {
-		SensorData()
-			: last_best_vote(0),
-			  subscription_count(0),
-			  voter(1),
-			  last_failover_count(0)
-		{
-			for (unsigned i = 0; i < SENSOR_COUNT_MAX; i++) {
-				enabled[i] = true;
-				subscription[i] = -1;
-				priority[i] = 0;
-			}
-		}
-
-		bool enabled[SENSOR_COUNT_MAX];
-
-		int subscription[SENSOR_COUNT_MAX]; /**< raw sensor data subscription */
-		uint8_t priority[SENSOR_COUNT_MAX]; /**< sensor priority */
-		uint8_t last_best_vote; /**< index of the latest best vote */
-		int subscription_count;
-		DataValidatorGroup voter;
-		unsigned int last_failover_count;
-	};
-
-	void	init_sensor_class(const struct orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
 
 	/**
 	 * Poll the accelerometer for updated data.
