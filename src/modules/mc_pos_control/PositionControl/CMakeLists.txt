@@ -41,3 +41,4 @@ target_include_directories(PositionControl
 )
 
 px4_add_gtest(SRC PositionControlTest.cpp LINKLIBS PositionControl)
+px4_add_gtest(SRC ControlMathTest.cpp LINKLIBS PositionControl)

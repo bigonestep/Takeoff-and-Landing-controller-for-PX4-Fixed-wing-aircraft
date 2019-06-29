@@ -57,10 +57,19 @@ vehicle_attitude_setpoint_s thrustToAttitude(const matrix::Vector3f &thr_sp, con
  * Converts acceleration vector and yaw set-point to a desired attitude.
  * @param acc_sp a 3D vector
  * @param yaw_sp the desired yaw setpoint
+ * @param tilt_max maximum allowed tilt angle in radians
  * @return vehicle_attitude_setpoints_s struct for attitude controller
  */
 vehicle_attitude_setpoint_s accelerationToAttitude(const matrix::Vector3f &acc_sp, const float yaw_sp,
-		const float hover_thrust);
+		const float hover_thrust, const float tilt_max);
+
+/**
+ * Limits the tilt angle between two unit vectors
+ * @param body_unit unit vector that will get adjusted if angle is to big
+ * @param world_unit vector to measure the angle against
+ * @param max_angle maximum angle between vectors in radians
+ */
+void limitTilt(matrix::Vector3f &body_unit, const matrix::Vector3f &world_unit, const float max_angle);
 
 /**
  * Converts a body z vector and yaw set-point to a desired attitude.
