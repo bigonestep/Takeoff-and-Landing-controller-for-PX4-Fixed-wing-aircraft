@@ -46,15 +46,16 @@
 class FlightTaskManualAcceleration : public FlightTaskManual
 {
 public:
-	FlightTaskManualAcceleration();
-
+	FlightTaskManualAcceleration() = default;
 	virtual ~FlightTaskManualAcceleration() = default;
 	bool activate(vehicle_local_position_setpoint_s last_setpoint) override;
-	bool updateInitialize() override;
 	bool update() override;
 
 protected:
 	PositionLock _position_lock; /**< object taking care of altitude and yaw lock logic */
+
+	void lockAltitude();
+	void lockPosition(const float stick_input_xy);
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTaskManual,
 					(ParamFloat<px4::params::MPC_VEL_MANUAL>) _param_mpc_vel_manual,

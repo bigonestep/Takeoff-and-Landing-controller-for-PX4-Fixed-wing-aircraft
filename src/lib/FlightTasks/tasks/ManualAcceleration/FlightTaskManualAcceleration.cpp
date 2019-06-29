@@ -41,17 +41,6 @@
 
 using namespace matrix;
 
-FlightTaskManualAcceleration::FlightTaskManualAcceleration()
-{
-
-}
-
-bool FlightTaskManualAcceleration::updateInitialize()
-{
-	bool ret = FlightTaskManual::updateInitialize();
-	return ret;
-}
-
 bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s last_setpoint)
 {
 	bool ret = FlightTaskManual::activate(last_setpoint);
@@ -67,17 +56,73 @@ bool FlightTaskManualAcceleration::update()
 			Quatf(_sub_attitude->get().delta_q_reset));
 
 	// Map stick input to acceleration
-	Vector2f stick_xy(&_sticks(0));
+	Vector2f stick_xy(&_sticks_expo(0));
 	_position_lock.limitStickUnitLengthXY(stick_xy);
 	_position_lock.rotateIntoHeadingFrameXY(stick_xy, _yaw, _yaw_setpoint);
 
-	_acceleration_setpoint = Vector3f(stick_xy(0), stick_xy(1), _sticks(2));
-
+	_acceleration_setpoint = Vector3f(stick_xy(0), stick_xy(1), _sticks_expo(2));
 	_acceleration_setpoint *= 10;
 
 	// Add drag to limit speed and brake again
 	_acceleration_setpoint -= 2.f * _velocity;
 
+	lockAltitude();
+	lockPosition(stick_xy.length());
+
 	_constraints.want_takeoff = _checkTakeoff();
 	return true;
+}
+
+void FlightTaskManualAcceleration::lockAltitude()
+{
+	if (fabsf(_sticks_expo(2)) > FLT_EPSILON) {
+		_position_setpoint(2) = NAN;
+		_velocity_setpoint(2) = NAN;
+
+	} else {
+		if (!PX4_ISFINITE(_position_setpoint(2))) {
+			_position_setpoint(2) = _position(2);
+			_velocity_setpoint(2) = _velocity(2);
+		}
+
+		_position_setpoint(2) += _velocity_setpoint(2) * _deltatime;
+
+		const float velocity_setpoint_z_last = _velocity_setpoint(2);
+		_velocity_setpoint(2) += _acceleration_setpoint(2) * _deltatime;
+
+		if (fabsf(_velocity_setpoint(2)) > fabsf(velocity_setpoint_z_last)) {
+			_velocity_setpoint(2) = velocity_setpoint_z_last;
+		}
+	}
+}
+
+void FlightTaskManualAcceleration::lockPosition(const float stick_input_xy)
+{
+	if (stick_input_xy > FLT_EPSILON) {
+		_position_setpoint(0) = _position_setpoint(1) = NAN;
+		_velocity_setpoint(0) = _velocity_setpoint(1) = NAN;
+
+	} else {
+		Vector2f position_xy(_position_setpoint);
+		Vector2f velocity_xy(_velocity_setpoint);
+
+		if (!PX4_ISFINITE(position_xy(0))) {
+			position_xy = Vector2f(_position);
+			velocity_xy = Vector2f(_velocity);
+		}
+
+		position_xy += Vector2f(velocity_xy) * _deltatime;
+
+		const Vector2f velocity_xy_last = velocity_xy;
+		velocity_xy += Vector2f(_acceleration_setpoint) * _deltatime;
+
+		if (velocity_xy.norm_squared() > velocity_xy_last.norm_squared()) {
+			velocity_xy = velocity_xy_last;
+		}
+
+		_position_setpoint(0) = position_xy(0);
+		_position_setpoint(1) = position_xy(1);
+		_velocity_setpoint(0) = velocity_xy(0);
+		_velocity_setpoint(1) = velocity_xy(1);
+	}
 }
