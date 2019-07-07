@@ -90,6 +90,7 @@ add_library(mixer
 	mixer_load.c
 	mixer_multirotor.cpp
 	mixer_simple.cpp
+	mixer_thrust_vectoring.cpp
 )
 target_include_directories(mixer PRIVATE ${PX4_BINARY_DIR}/src/lib/mixer)
 
