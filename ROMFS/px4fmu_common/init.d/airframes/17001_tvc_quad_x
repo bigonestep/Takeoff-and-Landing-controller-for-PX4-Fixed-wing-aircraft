@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# @name Generic thrust vectoring hover vehicle
+#
+# @type TVC
+# @class Copter
+#
+# @output MAIN1 Control fin 1
+# @output MAIN2 Control fin 2
+# @output MAIN3 Control fin 3
+# @output MAIN4 Control fin 4
+# @output MAIN5 Thruster
+# @output MAIN6 feed-through of RC AUX1 channel
+# @output MAIN7 feed-through of RC AUX2 channel
+# @output MAIN8 Failsafe channel (triggered by flight termination)
+#
+# @maintainer Mathieu Bresciani
+#
+
+sh /etc/init.d/rc.mc_defaults
+
+set MAV_TYPE 2
+
+set MIXER tvc_quad_x
+
+#set PWM_OUT 12345
