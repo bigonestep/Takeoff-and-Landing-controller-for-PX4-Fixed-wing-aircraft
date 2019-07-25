@@ -108,6 +108,13 @@ TvcMixer::~TvcMixer()
 	delete[] _tmp_array;
 }
 
+unsigned
+TvcMixer::set_trim(float trim)
+{
+	_thrust_scale = trim * 100.f;
+	return _actuator_count;
+}
+
 TvcMixer *
 TvcMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf, unsigned &buflen)
 {
@@ -356,7 +363,7 @@ TvcMixer::mix(float *outputs, unsigned space)
 	// clean out class variable used to capture saturation
 	_saturation_status.value = 0;
 
-	// Apply thrust to first output, mapping is always 1-to-1
+	// Apply thrust to last output, mapping is always 1-to-1
 	outputs[_fins_count] = thrust;
 
 	// Do the mixing using the strategy given by the current Airmode configuration

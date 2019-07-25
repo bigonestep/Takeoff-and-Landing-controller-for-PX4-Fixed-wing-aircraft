@@ -989,10 +989,7 @@ public:
 	uint16_t		get_saturation_status(void) override;
 	void			groups_required(uint32_t &groups) override;
 
-	unsigned set_trim(float trim) override
-	{
-		return _actuator_count;
-	}
+	unsigned set_trim(float trim) override;
 
 	unsigned get_trim(float *trim) override
 	{
@@ -1121,6 +1118,7 @@ private:
 
 	unsigned			_actuator_count;
 	unsigned			_fins_count;
+	float 				_thrust_scale; //< Normalized thrust to real thrust factor
 	const Alloc_Vect		*_alloc_mat; //< Control allocation matrix made of several allocation vectors
 
 	float 				*_tmp_array = nullptr;
