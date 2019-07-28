@@ -30,8 +30,6 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 	_sub_flow(ORB_ID(optical_flow), 1000 / 100, 0, &getSubscriptions()),
 	// main prediction loop, 100 hz
 	_sub_sensor(ORB_ID(sensor_combined), 1000 / 100, 0, &getSubscriptions()),
-	// status updates 2 hz
-	_sub_param_update(ORB_ID(parameter_update), 1000 / 2, 0, &getSubscriptions()),
 	// gps 10 hz
 	_sub_gps(ORB_ID(vehicle_gps_position), 1000 / 10, 0, &getSubscriptions()),
 	// vision 50 hz
@@ -145,9 +143,6 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 	_polls[POLL_FLOW].fd = _sub_flow.getHandle();
 	_polls[POLL_FLOW].events = POLLIN;
 
-	_polls[POLL_PARAM].fd = _sub_param_update.getHandle();
-	_polls[POLL_PARAM].events = POLLIN;
-
 	_polls[POLL_SENSORS].fd = _sub_sensor.getHandle();
 	_polls[POLL_SENSORS].events = POLLIN;
 
@@ -257,7 +252,6 @@ void BlockLocalPositionEstimator::update()
 	_lastArmedState = armedState;
 
 	// see which updates are available
-	bool paramsUpdated = _sub_param_update.updated();
 	_baroUpdated = false;
 
 	if ((_param_lpe_fusion.get() & FUSE_BARO) && _sub_airdata.updated()) {
@@ -279,8 +273,13 @@ void BlockLocalPositionEstimator::update()
 	// get new data
 	updateSubscriptions();
 
-	// update parameters
-	if (paramsUpdated) {
+	// check for parameter updates
+	if (_parameter_update_sub.updated()) {
+		// clear update
+		parameter_update_s pupdate;
+		_parameter_update_sub.copy(&pupdate);
+
+		// update parameters from storage
 		SuperBlock::updateParams();
 		ModuleParams::updateParams();
 		updateSSParams();

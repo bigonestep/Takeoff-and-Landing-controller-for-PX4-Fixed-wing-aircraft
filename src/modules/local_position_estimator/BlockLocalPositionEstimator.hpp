@@ -9,6 +9,7 @@
 #include <matrix/Matrix.hpp>
 
 // uORB Subscriptions
+#include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionPollable.hpp>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/actuator_armed.h>
@@ -118,7 +119,7 @@ public:
 	enum {Y_mocap_x = 0, Y_mocap_y, Y_mocap_z, n_y_mocap};
 	enum {Y_land_vx = 0, Y_land_vy, Y_land_agl, n_y_land};
 	enum {Y_target_x = 0, Y_target_y, n_y_target};
-	enum {POLL_FLOW = 0, POLL_SENSORS, POLL_PARAM, n_poll};
+	enum {POLL_FLOW = 0, POLL_SENSORS, n_poll};
 	enum {
 		FUSE_GPS = 1 << 0,
 		FUSE_FLOW = 1 << 1,
@@ -253,7 +254,6 @@ private:
 	uORB::SubscriptionPollable<vehicle_angular_velocity_s> _sub_angular_velocity;
 	uORB::SubscriptionPollable<optical_flow_s> _sub_flow;
 	uORB::SubscriptionPollable<sensor_combined_s> _sub_sensor;
-	uORB::SubscriptionPollable<parameter_update_s> _sub_param_update;
 	uORB::SubscriptionPollable<vehicle_gps_position_s> _sub_gps;
 	uORB::SubscriptionPollable<vehicle_odometry_s> _sub_visual_odom;
 	uORB::SubscriptionPollable<vehicle_odometry_s> _sub_mocap_odom;
@@ -266,6 +266,8 @@ private:
 	uORB::SubscriptionPollable<distance_sensor_s> *_sub_sonar;
 	uORB::SubscriptionPollable<landing_target_pose_s> _sub_landing_target_pose;
 	uORB::SubscriptionPollable<vehicle_air_data_s> _sub_airdata;
+
+	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 
 	// publications
 	uORB::PublicationData<vehicle_local_position_s> _pub_lpos{ORB_ID(vehicle_local_position)};
