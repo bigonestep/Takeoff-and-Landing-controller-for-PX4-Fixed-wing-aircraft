@@ -89,7 +89,7 @@ public:
 	 */
 	void updateAvoidanceDesiredWaypoints(const matrix::Vector3f &curr_wp, const float curr_yaw, const float curr_yawspeed,
 					     const matrix::Vector3f &next_wp, const float next_yaw, const float next_yawspeed, const bool ext_yaw_active,
-					     const int wp_type);
+					     const int wp_type, const int next_wp_type);
 	/**
 	 * Updates the desired setpoints to send to the obstacle avoidance system.
 	 * @param pos_sp, desired position setpoint computed by the active FlightTask
@@ -129,10 +129,15 @@ private:
 
 	systemlib::Hysteresis _avoidance_point_not_valid_hysteresis{false}; /**< becomes true if the companion doesn't start sending valid setpoints */
 	systemlib::Hysteresis _no_progress_z_hysteresis{false}; /**< becomes true if the vehicle is not making progress towards the z component of the goal */
+	systemlib::Hysteresis _no_progress_xy_hysteresis{false}; /**< becomes true if the vehicle is not making progress towards the z component of the goal */
+
 
 	float _prev_pos_to_target_z = -1.f; /**< z distance to the goal */
+	float _prev_pos_to_target_xy_dist = -1.f;
 
 	bool _ext_yaw_active = false; /**< true, if external yaw handling is active */
+
+	int _next_wp_type = 0;
 
 	/**
 	 * Publishes vehicle command.

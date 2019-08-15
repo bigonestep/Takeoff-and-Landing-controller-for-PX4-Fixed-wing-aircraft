@@ -62,6 +62,7 @@ ObstacleAvoidance::ObstacleAvoidance(ModuleParams *parent) :
 	_failsafe_position.setNaN();
 	_avoidance_point_not_valid_hysteresis.set_hysteresis_time_from(false, TIME_BEFORE_FAILSAFE);
 	_no_progress_z_hysteresis.set_hysteresis_time_from(false, Z_PROGRESS_TIMEOUT_US);
+	_no_progress_xy_hysteresis.set_hysteresis_time_from(false, Z_PROGRESS_TIMEOUT_US);
 
 }
 
@@ -129,12 +130,13 @@ void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel
 
 void ObstacleAvoidance::updateAvoidanceDesiredWaypoints(const Vector3f &curr_wp, const float curr_yaw,
 		const float curr_yawspeed, const Vector3f &next_wp, const float next_yaw, const float next_yawspeed,
-		const bool ext_yaw_active, const int wp_type)
+		const bool ext_yaw_active, const int wp_type, const int next_wp_type)
 {
 	_desired_waypoint.timestamp = hrt_absolute_time();
 	_desired_waypoint.type = vehicle_trajectory_waypoint_s::MAV_TRAJECTORY_REPRESENTATION_WAYPOINTS;
 	_curr_wp = curr_wp;
 	_ext_yaw_active = ext_yaw_active;
+	_next_wp_type = next_wp_type;
 
 	curr_wp.copyTo(_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_1].position);
 	Vector3f(NAN, NAN, NAN).copyTo(_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_1].velocity);
@@ -144,7 +146,7 @@ void ObstacleAvoidance::updateAvoidanceDesiredWaypoints(const Vector3f &curr_wp,
 	_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_1].yaw_speed = curr_yawspeed;
 	_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_1].point_valid = true;
 	_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_1].type = wp_type;
-
+	printf("tupe %d\n", wp_type);
 	next_wp.copyTo(_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_2].position);
 	Vector3f(NAN, NAN, NAN).copyTo(_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_2].velocity);
 	Vector3f(NAN, NAN, NAN).copyTo(_desired_waypoint.waypoints[vehicle_trajectory_waypoint_s::POINT_2].acceleration);
@@ -181,11 +183,21 @@ void ObstacleAvoidance::checkAvoidanceProgress(const Vector3f &pos, const Vector
 	const float prev_curr_travelled = prev_to_closest_pt.length() / prev_to_target.length();
 
 	Vector2f pos_to_target = Vector2f(_curr_wp - _position);
+	float pos_to_target_xy_dist = pos_to_target.length();
+	bool no_progress_xy = pos_to_target_xy_dist > _prev_pos_to_target_xy_dist;
+	_no_progress_xy_hysteresis.set_state_and_update(no_progress_xy, hrt_absolute_time());
 
 	if (prev_curr_travelled > 1.0f) {
 		// if the vehicle projected position on the line previous-target is past the target waypoint,
 		// increase the target acceptance radius such that navigator will update the triplets
-		pos_control_status.acceptance_radius = pos_to_target.length() + 0.5f;
+		if (_next_wp_type == position_setpoint_s::SETPOINT_TYPE_LAND) {
+			if (_no_progress_xy_hysteresis.get_state()) {
+				pos_control_status.acceptance_radius = pos_to_target.length() + 0.5f;
+			}
+
+		} else {
+			pos_control_status.acceptance_radius = pos_to_target.length() + 0.5f;
+		}
 	}
 
 	const float pos_to_target_z = fabsf(_curr_wp(2) - _position(2));
@@ -193,14 +205,16 @@ void ObstacleAvoidance::checkAvoidanceProgress(const Vector3f &pos, const Vector
 	bool no_progress_z = (pos_to_target_z > _prev_pos_to_target_z);
 	_no_progress_z_hysteresis.set_state_and_update(no_progress_z, hrt_absolute_time());
 
-	if (pos_to_target.length() < target_acceptance_radius && pos_to_target_z > _param_nav_mc_alt_rad.get()
+	if ((pos_to_target.length() < target_acceptance_radius || prev_curr_travelled > 1.0f)
+	    && pos_to_target_z > _param_nav_mc_alt_rad.get()
 	    && _no_progress_z_hysteresis.get_state()) {
 		// vehicle above or below the target waypoint
 		pos_control_status.altitude_acceptance = pos_to_target_z + 0.5f;
 	}
 
-	_prev_pos_to_target_z = pos_to_target_z;
 
+	_prev_pos_to_target_z = pos_to_target_z;
+	_prev_pos_to_target_xy_dist = pos_to_target_xy_dist;
 	// do not check for waypoints yaw acceptance in navigator
 	pos_control_status.yaw_acceptance = NAN;
 
