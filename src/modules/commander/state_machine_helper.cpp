@@ -395,6 +395,33 @@ bool set_nav_state(vehicle_status_s *status, actuator_armed_s *armed, commander_
 		   const link_loss_actions_t rc_loss_act, const int offb_loss_act, const int offb_loss_rc_act,
 		   const int posctl_nav_loss_act)
 {
+
+	static bool rc_faked_once = false;
+
+	// reset fake RC loss after one cycle
+	if (status->rc_signal_lost) {
+		PX4_INFO("Removing RC loss fake");
+		status->rc_signal_lost = false;
+		PX4_INFO("internal state after rc loss: %d", internal_state->main_state);
+
+	}
+
+	// TODO: Fake RC loss here
+	bool enough_time_passed = (hrt_absolute_time() / 1000) - armed->armed_time_ms > 20000; // Fake after x seconds
+
+	if (armed->armed && enough_time_passed && !rc_faked_once) {
+		PX4_INFO("Faking RC loss...");
+		status->rc_signal_lost = true;
+		rc_faked_once = true;
+
+		PX4_INFO("internal state during rc loss: %d", internal_state->main_state);
+	}
+
+	if (!armed->armed) {
+		rc_faked_once = false;
+
+	}
+
 	navigation_state_t nav_state_old = status->nav_state;
 
 	const bool data_link_loss_act_configured = data_link_loss_act > link_loss_actions_t::DISABLED;
