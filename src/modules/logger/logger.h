@@ -69,7 +69,8 @@ enum class SDLogProfileMask : int32_t {
 	HIGH_RATE =             1 << 4,
 	DEBUG_TOPICS =          1 << 5,
 	SENSOR_COMPARISON =     1 << 6,
-	VISION_AND_AVOIDANCE =  1 << 7
+	VISION_AND_AVOIDANCE =  1 << 7,
+	ALL = 			1 << 8
 };
 
 enum class MissionLogType : int32_t {
@@ -335,6 +336,7 @@ private:
 	void add_debug_topics();
 	void add_sensor_comparison_topics();
 	void add_vision_and_avoidance_topics();
+	void add_all_topics();
 
 	/**
 	 * check current arming state or aux channel and start/stop logging if state changed and according to

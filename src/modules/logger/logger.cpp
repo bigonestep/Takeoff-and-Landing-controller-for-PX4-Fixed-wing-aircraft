@@ -506,6 +506,123 @@ bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
 	return updated;
 }
 
+void Logger::add_all_topics()
+{
+	static constexpr uint32_t MINIMAL_INTERVAL = 10000; // 10 seconds
+
+	add_topic("actuator_armed", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_0", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_1", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_2", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_3", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_virtual_fw", MINIMAL_INTERVAL);
+	add_topic("actuator_controls_virtual_mc", MINIMAL_INTERVAL);
+	add_topic("actuator_direct", MINIMAL_INTERVAL);;
+	add_topic("actuator_outputs", MINIMAL_INTERVAL);
+	add_topic("adc_report", MINIMAL_INTERVAL);
+	add_topic("airspeed", MINIMAL_INTERVAL);
+	add_topic("airspeed_validated", MINIMAL_INTERVAL);
+	add_topic("camera_capture", MINIMAL_INTERVAL);
+	add_topic("camera_trigger", MINIMAL_INTERVAL);
+	add_topic("collision_constraints", MINIMAL_INTERVAL);
+	add_topic("collision_report", MINIMAL_INTERVAL);
+	add_topic("commander_state", MINIMAL_INTERVAL);
+	add_topic("cpuload", MINIMAL_INTERVAL);
+	add_topic("debug_array", MINIMAL_INTERVAL);
+	add_topic("debug_key_value", MINIMAL_INTERVAL);
+	add_topic("debug_vect", MINIMAL_INTERVAL);
+	add_topic("ekf2_innovations", MINIMAL_INTERVAL);
+	add_topic("ekf2_timestamps", MINIMAL_INTERVAL);
+	add_topic("estimator_status", MINIMAL_INTERVAL);
+	add_topic("follow_target", MINIMAL_INTERVAL);
+	add_topic("geofence_result", MINIMAL_INTERVAL);
+	add_topic("home_position", MINIMAL_INTERVAL);
+	add_topic("input_rc", MINIMAL_INTERVAL);
+	add_topic("iridiumsbd_status", MINIMAL_INTERVAL);
+	add_topic("irlock_report", MINIMAL_INTERVAL);
+	add_topic("landing_gear", MINIMAL_INTERVAL);
+	add_topic("landing_gear", MINIMAL_INTERVAL);
+	add_topic("landng_target_innovations", MINIMAL_INTERVAL);
+	add_topic("landng_target_pose", MINIMAL_INTERVAL);
+	add_topic("led_control", MINIMAL_INTERVAL);
+	add_topic("manual_control_setpoint", MINIMAL_INTERVAL);
+	add_topic("mc_virtual_attitude_setpoint", MINIMAL_INTERVAL);
+	add_topic("mission", MINIMAL_INTERVAL);
+	add_topic("mission_result", MINIMAL_INTERVAL);
+	add_topic("mount_orientation", MINIMAL_INTERVAL);
+	add_topic("multirotor_motor_limits", MINIMAL_INTERVAL);
+	add_topic("multirotor_motor_limits", MINIMAL_INTERVAL);
+	add_topic("obstacle_distance", MINIMAL_INTERVAL);
+	add_topic("offboard_control_mode", MINIMAL_INTERVAL);
+	add_topic("optical_flow", MINIMAL_INTERVAL);
+	add_topic("orbit_status", MINIMAL_INTERVAL);
+	add_topic("parameter_update", MINIMAL_INTERVAL);
+	add_topic("ping", MINIMAL_INTERVAL);
+	add_topic("position_controller_landing_status", MINIMAL_INTERVAL);
+	add_topic("position_controller_status", MINIMAL_INTERVAL);
+	add_topic("position_setpoint_triplet", MINIMAL_INTERVAL);
+	add_topic("power_button_state", MINIMAL_INTERVAL);
+	add_topic("power_button_state", MINIMAL_INTERVAL);
+	add_topic("power_monitor", MINIMAL_INTERVAL);
+	add_topic("pwm_input", MINIMAL_INTERVAL);
+	add_topic("radio_status", MINIMAL_INTERVAL);
+	add_topic("rc_channels", MINIMAL_INTERVAL);
+	add_topic("rc_parameter_map", MINIMAL_INTERVAL);
+	add_topic("safety", MINIMAL_INTERVAL);
+	add_topic("satellite_info", MINIMAL_INTERVAL);
+	add_topic("sensor_bias", MINIMAL_INTERVAL);
+	add_topic("sensor_combined", MINIMAL_INTERVAL);
+	add_topic("sensor_correction", MINIMAL_INTERVAL);
+	add_topic("sensor_preflight", MINIMAL_INTERVAL);
+	add_topic("sensor_selection", MINIMAL_INTERVAL);
+	add_topic("subsystem_info", MINIMAL_INTERVAL);
+	add_topic("system_power", MINIMAL_INTERVAL);
+	add_topic("task_stack_info", MINIMAL_INTERVAL);
+	add_topic("telemetry_status", MINIMAL_INTERVAL);
+	add_topic("test_motor", MINIMAL_INTERVAL);
+	add_topic("timesync_status", MINIMAL_INTERVAL);
+	add_topic("trajectory_waypoint", MINIMAL_INTERVAL);
+	add_topic("transponder_report", MINIMAL_INTERVAL);
+	add_topic("tune_control", MINIMAL_INTERVAL);
+	add_topic("tune_control", MINIMAL_INTERVAL);
+	add_topic("uavcan_parameter_request", MINIMAL_INTERVAL);
+	add_topic("uavcan_parameter_value", MINIMAL_INTERVAL);
+	add_topic("vehicle_acceleration", MINIMAL_INTERVAL);
+	add_topic("vehicle_air_data", MINIMAL_INTERVAL);
+	add_topic("vehicle_angular_velocity", MINIMAL_INTERVAL);
+	add_topic("vehicle_attitude", MINIMAL_INTERVAL);
+	add_topic("vehicle_attitude_setpoint", MINIMAL_INTERVAL);
+	add_topic("vehicle_command", MINIMAL_INTERVAL);
+	add_topic("vehicle_command_ack", MINIMAL_INTERVAL);
+	add_topic("vehicle_constraints", MINIMAL_INTERVAL);
+	add_topic("vehicle_control_mode", MINIMAL_INTERVAL);
+	add_topic("vehicle_global_position", MINIMAL_INTERVAL);
+	add_topic("vehicle_gps_position", MINIMAL_INTERVAL);
+	add_topic("vehicle_land_detected", MINIMAL_INTERVAL);
+	add_topic("vehicle_local_position", MINIMAL_INTERVAL);
+	add_topic("vehicle_magnetometer", MINIMAL_INTERVAL);
+	add_topic("vehicle_odometry", MINIMAL_INTERVAL);
+	add_topic("vehicle_rates_setpoint", MINIMAL_INTERVAL);
+	add_topic("vehicle_roi", MINIMAL_INTERVAL);
+	add_topic("vehicle_status", MINIMAL_INTERVAL);
+	add_topic("vehicle_status_flags", MINIMAL_INTERVAL);
+	add_topic("vehicle_trajectory_waypoint", MINIMAL_INTERVAL);
+	add_topic("vtol_vehicle_status", MINIMAL_INTERVAL);
+	add_topic("wheel_encoders", MINIMAL_INTERVAL);
+	add_topic("wind_estimate", MINIMAL_INTERVAL);
+
+	add_topic_multi("battery_status", MINIMAL_INTERVAL);
+	add_topic_multi("differential_pressure", MINIMAL_INTERVAL);
+	add_topic_multi("distance_sensor", MINIMAL_INTERVAL);
+	add_topic_multi("esc_report", MINIMAL_INTERVAL);
+	add_topic_multi("rate_ctrl_status", MINIMAL_INTERVAL);
+	add_topic_multi("sensor_accel", MINIMAL_INTERVAL);
+	add_topic_multi("sensor_baro", MINIMAL_INTERVAL);
+	add_topic_multi("sensor_gyro", MINIMAL_INTERVAL);
+	add_topic_multi("sensor_gyro_control", MINIMAL_INTERVAL);
+	add_topic_multi("sensor_mag", MINIMAL_INTERVAL);
+}
+
 void Logger::add_default_topics()
 {
 	add_topic("actuator_controls_0", 100);
@@ -723,8 +840,8 @@ void Logger::initialize_mission_topics(MissionLogType type)
 	if (type == MissionLogType::Complete) {
 		add_mission_topic("camera_capture");
 		add_mission_topic("mission_result");
-		add_mission_topic("vehicle_global_position", 1000);
-		add_mission_topic("vehicle_status", 1000);
+		add_mission_topic("vehicle_global_position", MINIMAL_INTERVAL);;
+		add_mission_topic("vehicle_status", MINIMAL_INTERVAL);;
 
 	} else if (type == MissionLogType::Geotagging) {
 		add_mission_topic("camera_capture");
@@ -777,6 +894,10 @@ void Logger::initialize_configured_topics()
 
 	if (sdlog_profile & SDLogProfileMask::VISION_AND_AVOIDANCE) {
 		add_vision_and_avoidance_topics();
+	}
+
+	if (sdlog_profile & SDLogProfileMask::ALL) {
+		add_all_topics();
 	}
 }
 
@@ -1129,7 +1250,7 @@ void Logger::run()
 			px4_pollfd_struct_t fds[1];
 			fds[0].fd = polling_topic_sub;
 			fds[0].events = POLLIN;
-			int pret = px4_poll(fds, 1, 1000);
+			int pret = px4_poll(fds, 1, MINIMAL_INTERVAL);;
 
 			if (pret < 0) {
 				PX4_ERR("poll failed (%i)", pret);

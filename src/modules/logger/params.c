@@ -119,6 +119,7 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * @bit 5 Debug
  * @bit 6 Sensor comparison
  * @bit 7 Computer Vision and Avoidance
+ * @bit 8 All (every 10 seconds)
  * @reboot_required true
  * @group SD Logging
  */
