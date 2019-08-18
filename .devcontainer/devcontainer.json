@@ -1,0 +1,28 @@
+// For format details, see https://aka.ms/vscode-remote/devcontainer.json or the definition README at
+// https://github.com/microsoft/vscode-dev-containers/tree/master/containers/cpp
+{
+	"name": "C++",
+	"dockerFile": "Dockerfile",
+	"runArgs": [
+		// Uncomment the next line to use a non-root user. See https://aka.ms/vscode-remote/containers/non-root-user.
+		// "-u", "1000",
+
+		"--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined"
+	],
+
+	// Uncomment the next line if you want to publish any ports.
+	// "appPort": [],
+
+	// Uncomment the next line if you want to add in default container specific settings.json values
+	// "settings":  { "workbench.colorTheme": "Quiet Light" },
+
+	// Uncomment the next line to run commands after the container is created.
+	// "postCreateCommand": "gcc -v",
+
+	// Uncomment the next line to use a non-root user. See https://aka.ms/vscode-remote/containers/non-root-user.
+	// "runArgs": [ "-u", "1000" ],
+
+	"extensions": [
+		"ms-vscode.cpptools"
+	]
+}
