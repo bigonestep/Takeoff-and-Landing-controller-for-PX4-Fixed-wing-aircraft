@@ -1,8 +1,8 @@
 // For format details, see https://aka.ms/vscode-remote/devcontainer.json or the definition README at
 // https://github.com/microsoft/vscode-dev-containers/tree/master/containers/cpp
 {
-	"name": "C++",
-	"dockerFile": "Dockerfile",
+	"name": "px4io/px4-dev-nuttx",
+	"image": "px4io/px4-dev-nuttx",
 	"runArgs": [
 		// Uncomment the next line to use a non-root user. See https://aka.ms/vscode-remote/containers/non-root-user.
 		// "-u", "1000",
