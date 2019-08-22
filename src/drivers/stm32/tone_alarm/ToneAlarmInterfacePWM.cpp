@@ -145,8 +145,16 @@
 # if defined(CONFIG_STM32_TIM14)
 #  error Must not set CONFIG_STM32_TIM14 when TONE_ALARM_TIMER is 14
 # endif
+#elif TONE_ALARM_TIMER == 15
+# define TONE_ALARM_BASE                STM32_TIM15_BASE
+# define TONE_ALARM_CLOCK               STM32_APB2_TIM15_CLKIN
+# define TONE_ALARM_CLOCK_ENABLE        RCC_APB2ENR_TIM15EN
+# define TONE_ALARM_CLOCK_POWER_REG     STM32_RCC_APB2ENR
+# if defined(CONFIG_STM32_TIM15)
+#  error Must not set CONFIG_STM32_TIM15 when TONE_ALARM_TIMER is 15
+# endif
 #else
-# error Must set TONE_ALARM_TIMER to one of the timers between 1 and 14 (inclusive) to use this driver.
+# error Must set TONE_ALARM_TIMER to one of the timers between 1 and 15 (inclusive) to use this driver.
 #endif // TONE_ALARM_TIMER
 
 #if TONE_ALARM_CHANNEL == 1
