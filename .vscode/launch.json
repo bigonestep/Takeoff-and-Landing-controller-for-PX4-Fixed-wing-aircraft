@@ -255,6 +255,25 @@
                 "set mem inaccessible-by-default off",
                 "set print pretty"
             ]
-        }
+        },
+                {
+            "name": "Debug holybro_durandal-v1 (jlink)",
+            "device": "STM32H743II",
+            "svdFile": "${workspaceRoot}/../cmsis-svd/data/STMicro/STM32H7x3.svd",
+            "executable": "${command:cmake.launchTargetPath}",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "jlink",
+            "interface": "swd",
+            "internalConsoleOptions": "openOnSessionStart",
+            "preLaunchCommands": [
+                "source ${workspaceRoot}/platforms/nuttx/Debug/PX4",
+                "source ${workspaceRoot}/platforms/nuttx/Debug/NuttX",
+                "source ${workspaceRoot}/platforms/nuttx/Debug/ARMv7M",
+                "set mem inaccessible-by-default off",
+                "set print pretty",
+            ]
+        },
+        
     ]
 }
