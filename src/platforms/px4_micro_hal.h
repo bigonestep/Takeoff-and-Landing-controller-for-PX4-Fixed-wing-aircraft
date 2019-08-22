@@ -53,7 +53,7 @@ __BEGIN_DECLS
 #  define px4_enter_critical_section()       enter_critical_section()
 #  define px4_leave_critical_section(flags)  leave_critical_section(flags)
 
-#  if defined(CONFIG_ARCH_CHIP_STM32) || defined(CONFIG_ARCH_CHIP_STM32F7)
+#  if defined(CONFIG_ARCH_CHIP_STM32) || defined(CONFIG_ARCH_CHIP_STM32F7) || defined(CONFIG_ARCH_CHIP_STM32H7)
 
 #    if defined(CONFIG_ARCH_CHIP_STM32)
 #      include <stm32.h>
@@ -80,6 +80,21 @@ int stm32_flash_writeprotect(size_t page, bool enabled);
 #      define PX4_BBSRAM_GETDESC_IOCTL STM32F7_BBSRAM_GETDESC_IOCTL
 #      define PX4_FLASH_BASE  0x08000000
 #      define PX4_NUMBER_I2C_BUSES STM32F7_NI2C
+#    endif
+
+#    if defined(CONFIG_ARCH_CHIP_STM32H7)
+#      define PX4_SOC_ARCH_ID             PX4_SOC_ARCH_ID_STM32H7
+#      include <chip.h>
+#      include <hardware/stm32_flash.h>
+void stm32_flash_lock(void);
+void stm32_flash_unlock(void);
+int stm32_flash_writeprotect(size_t page, bool enabled);
+#      include <up_internal.h> //include up_systemreset() which is included on stm32.h
+#      include <stm32_bbsram.h>
+#      define PX4_BBSRAM_SIZE STM32H7_BBSRAM_SIZE
+#      define PX4_BBSRAM_GETDESC_IOCTL STM32H7_BBSRAM_GETDESC_IOCTL
+#      define PX4_FLASH_BASE  0x08000000
+#      define PX4_NUMBER_I2C_BUSES STM32H7_NI2C
 #    endif
 
 #    include <stm32_tim.h>
