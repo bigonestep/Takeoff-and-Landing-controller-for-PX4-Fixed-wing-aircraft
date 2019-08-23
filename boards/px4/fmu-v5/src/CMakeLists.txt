@@ -44,6 +44,7 @@ add_library(drivers_board
 
 target_link_libraries(drivers_board
 	PRIVATE
+		drivers_boards_common # board_gpio_init
 		drivers__led # drv_led_start
 		nuttx_arch # sdio
 		nuttx_drivers # sdio

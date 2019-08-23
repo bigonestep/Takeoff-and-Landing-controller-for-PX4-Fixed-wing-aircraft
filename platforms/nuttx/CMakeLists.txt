@@ -73,17 +73,6 @@ file(RELATIVE_PATH PX4_BINARY_DIR_REL ${CMAKE_CURRENT_BINARY_DIR} ${PX4_BINARY_D
 # because even relative linker script paths are different for linux, mac and windows
 CYGPATH(PX4_BINARY_DIR PX4_BINARY_DIR_CYG)
 
-target_link_libraries(nuttx_arch
-	INTERFACE
-		drivers_board
-		drivers_arch
-		drivers_boards_common
-		drivers_boards_common_arch
-)
-
-target_link_libraries(nuttx_c INTERFACE nuttx_drivers)
-target_link_libraries(nuttx_xx INTERFACE nuttx_c)
-
 target_link_libraries(px4 PRIVATE
 
 	-nostartfiles
@@ -100,6 +89,7 @@ target_link_libraries(px4 PRIVATE
 	-Wl,--gc-sections
 
 	-Wl,--start-group
+		drivers_arch
 		drivers_boards_common_arch
 		${nuttx_libs}
 	-Wl,--end-group

@@ -35,6 +35,7 @@ add_library(drivers_board
 	init.c
 	timer_config.c
 )
+add_dependencies(drivers_board nuttx_context)
 
 target_link_libraries(drivers_board
 	PRIVATE

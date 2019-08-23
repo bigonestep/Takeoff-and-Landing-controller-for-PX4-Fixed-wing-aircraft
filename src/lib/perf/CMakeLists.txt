@@ -33,3 +33,6 @@
 
 add_library(perf perf_counter.cpp)
 add_dependencies(perf prebuild_targets)
+target_link_libraries(perf PRIVATE
+	drivers_arch # HRT
+)
