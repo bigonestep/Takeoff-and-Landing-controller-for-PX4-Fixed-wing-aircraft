@@ -263,7 +263,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #ifdef CONFIG_MMCSD
-	int ret = stm32_sdio_initialize();
+	int ret = 0 && stm32_sdio_initialize();
 
 	if (ret != OK) {
 		led_on(LED_RED);
