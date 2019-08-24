@@ -182,45 +182,42 @@ uORB::DeviceNode::close(cdev::file_t *filp)
 }
 
 bool
-uORB::DeviceNode::copy_locked(void *dst, unsigned &generation)
+uORB::DeviceNode::copy(void *dst, unsigned &generation) const
 {
 	bool updated = false;
 
 	if (dst != nullptr) {
+		while (true) {
+			const unsigned gen = _generation;
+			const uint8_t qsize = _queue_size;
 
-		if (_generation > generation + _queue_size) {
-			// Reader is too far behind: some messages are lost
-			_lost_messages += _generation - (generation + _queue_size);
-			generation = _generation - _queue_size;
+			unsigned subscriber_gen = generation;
+
+			if (gen > subscriber_gen + qsize) {
+				// Reader is too far behind: some messages are lost
+				subscriber_gen = gen - qsize;
+			}
+
+			if ((gen == subscriber_gen) && (subscriber_gen > 0)) {
+				/* The subscriber already read the latest message, but nothing new was published yet.
+				 * Return the previous message
+				 */
+				--subscriber_gen;
+			}
+
+			memcpy(dst, _data + (_meta->o_size * (subscriber_gen % qsize)), _meta->o_size);
+
+			if (subscriber_gen < gen) {
+				++subscriber_gen;
+			}
+
+			// check generation again
+			if (gen == _generation) {
+				generation = subscriber_gen;
+				return true;
+			}
 		}
-
-		if ((_generation == generation) && (generation > 0)) {
-			/* The subscriber already read the latest message, but nothing new was published yet.
-			 * Return the previous message
-			 */
-			--generation;
-		}
-
-		memcpy(dst, _data + (_meta->o_size * (generation % _queue_size)), _meta->o_size);
-
-		if (generation < _generation) {
-			++generation;
-		}
-
-		updated = true;
 	}
-
-	return updated;
-}
-
-bool
-uORB::DeviceNode::copy(void *dst, unsigned &generation)
-{
-	ATOMIC_ENTER;
-
-	bool updated = copy_locked(dst, generation);
-
-	ATOMIC_LEAVE;
 
 	return updated;
 }
@@ -231,7 +228,7 @@ uORB::DeviceNode::copy_and_get_timestamp(void *dst, unsigned &generation)
 	ATOMIC_ENTER;
 
 	const hrt_abstime update_time = _last_update;
-	copy_locked(dst, generation);
+	copy(dst, generation);
 
 	ATOMIC_LEAVE;
 
@@ -253,7 +250,7 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 	 */
 	ATOMIC_ENTER;
 
-	copy_locked(buffer, sd->generation);
+	copy(buffer, sd->generation);
 
 	// if subscriber has an interval track the last update time
 	if (sd->update_interval) {

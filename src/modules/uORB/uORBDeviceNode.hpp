@@ -209,7 +209,7 @@ public:
 	 * @return bool
 	 *   Returns true if the data was copied.
 	 */
-	bool copy(void *dst, unsigned &generation);
+	bool copy(void *dst, unsigned &generation) const;
 
 	/**
 	 * Copies data and the corresponding generation
@@ -239,19 +239,6 @@ protected:
 	void poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events) override;
 
 private:
-
-	/**
-	 * Copies data and the corresponding generation
-	 * from a node to the buffer provided. Caller handles locking.
-	 *
-	 * @param dst
-	 *   The buffer into which the data is copied.
-	 * @param generation
-	 *   The generation that was copied.
-	 * @return bool
-	 *   Returns true if the data was copied.
-	 */
-	bool copy_locked(void *dst, unsigned &generation);
 
 	struct UpdateIntervalData {
 		uint64_t last_update{0}; /**< time at which the last update was provided, used when update_interval is nonzero */
