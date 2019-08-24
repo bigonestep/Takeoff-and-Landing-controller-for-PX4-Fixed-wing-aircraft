@@ -47,6 +47,7 @@
 #include <px4_posix.h>
 
 #include <drivers/drv_device.h>
+#include <containers/BlockingList.hpp>
 
 #define DEVICE_LOG(FMT, ...) PX4_LOG_NAMED(_name, FMT, ##__VA_ARGS__)
 #define DEVICE_DEBUG(FMT, ...) PX4_LOG_NAMED_COND(_name, _debug_enabled, FMT, ##__VA_ARGS__)
@@ -62,15 +63,14 @@ namespace device
  *
  * This class provides the basic driver template for I2C and SPI devices
  */
-class __EXPORT Device
+class Device : public ListNode<Device *>
 {
 public:
-	/**
-	 * Destructor.
-	 *
-	 * Public so that anonymous devices can be destroyed.
-	 */
-	virtual ~Device() = default;
+
+	virtual ~Device()
+	{
+		_list.remove(this);
+	}
 
 	/*
 	 * Direct access methods.
@@ -141,6 +141,8 @@ public:
 	uint8_t get_device_bus() const { return _device_id.devid_s.bus; }
 
 	uint32_t get_device_id() const { return _device_id.devid; }
+
+	const char *get_name() const { return _name; }
 
 	/**
 	 * Return the bus type the device is connected to.
@@ -227,13 +229,29 @@ public:
 		return num_written;
 	}
 
+	static void PrintList()
+	{
+		int i = 0;
+
+		for (const Device *dev : _list) {
+			char buf[32];
+			device_id_print_buffer(buf, 32, dev->get_device_id());
+			printf("%d: %s - %s\n", i, buf, dev->get_name());
+			i++;
+		}
+
+
+	}
+
 protected:
 	union DeviceId	_device_id;             /**< device identifier information */
 
 	const char	*_name;			/**< driver name */
 	bool		_debug_enabled{false};		/**< if true, debug messages are printed */
 
-	Device(const char *name) : _name(name)
+	Device() = delete;
+
+	explicit Device(const char *name) : _name(name)
 	{
 		/* setup a default device ID. When bus_type is UNKNOWN the
 		   other fields are invalid */
@@ -242,15 +260,19 @@ protected:
 		_device_id.devid_s.bus = 0;
 		_device_id.devid_s.address = 0;
 		_device_id.devid_s.devtype = 0;
+
+		_list.add(this);
 	}
 
-	Device(DeviceBusType bus_type, uint8_t bus, uint8_t address, uint8_t devtype = 0)
+	explicit Device(DeviceBusType bus_type, uint8_t bus, uint8_t address, uint8_t devtype = 0)
 	{
 		_device_id.devid = 0;
 		_device_id.devid_s.bus_type = bus_type;
 		_device_id.devid_s.bus = bus;
 		_device_id.devid_s.address = address;
 		_device_id.devid_s.devtype = devtype;
+
+		_list.add(this);
 	}
 
 	// no copy, assignment, move, move assignment
@@ -258,6 +280,10 @@ protected:
 	Device &operator=(const Device &) = delete;
 	Device(Device &&) = delete;
 	Device &operator=(Device &&) = delete;
+
+private:
+
+	static BlockingList<Device *> _list;
 
 };
 

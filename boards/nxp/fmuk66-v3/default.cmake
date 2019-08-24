@@ -79,6 +79,7 @@ px4_add_board(
 		bl_update
 		i2cdetect
 		config
+		devices
 		dumpfile
 		esc_calib
 		#hardfault_log # Needs bbsrm
