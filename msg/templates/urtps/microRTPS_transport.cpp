@@ -131,14 +131,6 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 
 	rx_buff_pos += len;
 
-	// Rebroadcast on a UDP port
-	if (nullptr != rebroadcast_node) {
-		ssize_t rb_len = rebroadcast_node->node_write(rx_buffer, rx_buff_pos);
-		if (rb_len != ssize_t(rx_buff_pos)) {
-			return -errno;
-		}
-	}
-
 	// We read some
 	size_t header_size = sizeof(struct Header);
 
@@ -220,6 +212,14 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 	// discard message from rx_buffer
 	rx_buff_pos -= header_size + payload_len;
 	memmove(rx_buffer, rx_buffer + msg_start_pos + header_size + payload_len, rx_buff_pos);
+
+	// Rebroadcast on an UDP port
+	if (nullptr != rebroadcast_node) {
+		ssize_t rb_len = rebroadcast_node->node_write(rx_buffer, rx_buff_pos);
+		if (rb_len != ssize_t(rx_buff_pos)) {
+			return -errno;
+		}
+	}
 
 	return len;
 }
