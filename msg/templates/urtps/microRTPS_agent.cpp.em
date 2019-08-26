@@ -80,12 +80,15 @@ recv_topics = [(alias[idx] if alias[idx] else s.short_name) for idx, s in enumer
 #define WAIT_CNST 2
 #define DEFAULT_RECV_PORT 2020
 #define DEFAULT_SEND_PORT 2019
+#define DEFAULT_BC_RECV_PORT 2022
+#define DEFAULT_BC_SEND_PORT 2021
 
 using namespace eprosima;
 using namespace eprosima::fastrtps;
 
 volatile sig_atomic_t running = 1;
 Transport_node *transport_node = nullptr;
+Transport_node *udp_rebroadcast_node = nullptr;
 RtpsTopics topics;
 uint32_t total_sent = 0, sent = 0;
 
@@ -119,6 +122,9 @@ struct options {
     int poll_ms = POLL_MS;
     uint16_t recv_port = DEFAULT_RECV_PORT;
     uint16_t send_port = DEFAULT_SEND_PORT;
+    uint16_t broadcast_recv_port = DEFAULT_BC_RECV_PORT;
+    uint16_t broadcast_send_port = DEFAULT_BC_SEND_PORT;
+    bool udp_rebroadcast = false;
 } _options;
 
 static void usage(const char *name)
@@ -131,6 +137,7 @@ static void usage(const char *name)
              "  -p <poll_ms>            Time in ms to poll over UART. Default 1ms\n"
              "  -r <reception port>     UDP port for receiving. Default 2019\n"
              "  -s <sending port>       UDP port for sending. Default 2020\n",
+             "  -z <udp rebroadcast>    Set UDP rebroadcast. Default 0 (false)\n",
              name);
 }
 
@@ -147,7 +154,7 @@ static int parse_options(int argc, char **argv)
 {
     int ch;
 
-    while ((ch = getopt(argc, argv, "t:d:w:b:p:r:s:")) != EOF)
+    while ((ch = getopt(argc, argv, "t:d:w:b:p:r:s:z:")) != EOF)
     {
         switch (ch)
         {
@@ -160,6 +167,7 @@ static int parse_options(int argc, char **argv)
             case 'p': _options.poll_ms        = strtol(optarg, nullptr, 10);  break;
             case 'r': _options.recv_port      = strtoul(optarg, nullptr, 10); break;
             case 's': _options.send_port      = strtoul(optarg, nullptr, 10); break;
+            case 'z': _options.udp_rebroadcast= static_cast<bool>(strtoul(optarg, nullptr, 10)); break;
             default:
                 usage(argv[0]);
             return -1;
@@ -180,6 +188,8 @@ void signal_handler(int signum)
    printf("Interrupt signal (%d) received.\n", signum);
    running = 0;
    transport_node->close();
+   if (nullptr != udp_rebroadcast_node)
+        udp_rebroadcast_node->close();
 }
 
 @[if recv_topics]@
@@ -240,6 +250,17 @@ int main(int argc, char** argv)
             transport_node = new UDP_node(_options.recv_port, _options.send_port);
             printf("\nUDP transport: recv port: %u; send port: %u; sleep: %dus\n\n",
                     _options.recv_port, _options.send_port, _options.sleep_us);
+            if (_options.udp_rebroadcast) {
+                udp_rebroadcast_node = new UDP_node(_options.broadcast_recv_port, _options.broadcast_send_port);
+                printf("\nUDP transport (rebroadcast): recv port: %u; send port: %u; sleep: %dus\n\n",
+                        _options.broadcast_recv_port, _options.broadcast_send_port, _options.sleep_us);
+
+                if (0 > udp_rebroadcast_node->init())
+                {
+                    printf("EXITING...\n");
+                    return -1;
+                }
+            }
         }
         break;
         default:
@@ -277,7 +298,7 @@ int main(int argc, char** argv)
         ++loop;
         if (!receiving) start = std::chrono::steady_clock::now();
         // Publish messages received from UART
-        while (0 < (length = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE)))
+        while (0 < (length = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE, udp_rebroadcast_node)))
         {
             topics.publish(topic_ID, data_buffer, sizeof(data_buffer));
             ++received;
@@ -307,6 +328,10 @@ int main(int argc, char** argv)
 @[end if]@
     delete transport_node;
     transport_node = nullptr;
+    if (nullptr != udp_rebroadcast_node) {
+        delete udp_rebroadcast_node;
+        udp_rebroadcast_node = nullptr;
+    }
 
     return 0;
 }

@@ -52,6 +52,7 @@ extern "C" __EXPORT int micrortps_client_main(int argc, char *argv[]);
 static int _rtps_task = -1;
 bool _should_exit_task = false;
 Transport_node *transport_node = nullptr;
+Transport_node *udp_rebroadcast_node = nullptr;
 struct options _options;
 
 const baudtype baudlist[] = {
@@ -84,6 +85,7 @@ static void usage(const char *name)
 	PRINT_MODULE_USAGE_PARAM_INT('w', 1, 1, 1000, "Time in ms for which each iteration sleeps", true);
 	PRINT_MODULE_USAGE_PARAM_INT('r', 2019, 0, 65536, "Select UDP Network Port for receiving (local)", true);
 	PRINT_MODULE_USAGE_PARAM_INT('s', 2020, 0, 65536, "Select UDP Network Port for sending (remote)", true);
+	PRINT_MODULE_USAGE_PARAM_INT('z', 0, 0, 1, "Set UDP rebroadcast", true);
 
 	PRINT_MODULE_USAGE_COMMAND("stop");
 	PRINT_MODULE_USAGE_COMMAND("status");
@@ -108,7 +110,7 @@ static int parse_options(int argc, char *argv[])
 	int myoptind = 1;
 	const char *myoptarg = nullptr;
 
-	while ((ch = px4_getopt(argc, argv, "t:d:u:l:w:b:p:r:s:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "t:d:u:l:w:b:p:r:s:z:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 't': _options.transport      = strcmp(myoptarg, "UDP") == 0 ?
 							    options::eTransports::UDP
@@ -122,13 +124,15 @@ static int parse_options(int argc, char *argv[])
 
 		case 'w': _options.sleep_ms       = strtol(myoptarg, nullptr, 10);    break;
 
-		case 'b': _options.baudrate       = getbaudrate(myoptarg); break;
+		case 'b': _options.baudrate       = getbaudrate(myoptarg);				break;
 
 		case 'p': _options.poll_ms        = strtol(myoptarg, nullptr, 10);      break;
 
 		case 'r': _options.recv_port      = strtoul(myoptarg, nullptr, 10);     break;
 
 		case 's': _options.send_port      = strtoul(myoptarg, nullptr, 10);     break;
+
+		case 'z': _options.udp_rebroadcast = static_cast<bool>(strtoul(myoptarg, nullptr, 10));     break;
 
 		default:
 			usage(argv[1]);
@@ -167,8 +171,17 @@ static int micrortps_start(int argc, char *argv[])
 
 	case options::eTransports::UDP: {
 			transport_node = new UDP_node(_options.recv_port, _options.send_port);
-			PX4_INFO("UDP transport: recv port: %u; send port: %u; sleep: %dms",
-				 _options.recv_port, _options.send_port, _options.sleep_ms);
+
+			if (_options.udp_rebroadcast) {
+				udp_rebroadcast_node = new UDP_node(_options.broadcast_recv_port, _options.broadcast_send_port);
+				PX4_INFO("UDP transport (rebroadcast): recv port: %u; send port: %u; sleep: %dms",
+					 _options.broadcast_recv_port, _options.broadcast_send_port, _options.sleep_ms);
+
+				if (0 > udp_rebroadcast_node->init()) {
+					printf("EXITING...\n");
+					return -1;
+				}
+			}
 		}
 		break;
 
@@ -263,7 +276,13 @@ int micrortps_client_main(int argc, char *argv[])
 
 		_should_exit_task = true;
 
-		if (nullptr != transport_node) { transport_node->close(); }
+		if (nullptr != transport_node) {
+			transport_node->close();
+
+			if (nullptr != udp_rebroadcast_node) {
+				udp_rebroadcast_node->close();
+			}
+		}
 
 		_rtps_task = -1;
 

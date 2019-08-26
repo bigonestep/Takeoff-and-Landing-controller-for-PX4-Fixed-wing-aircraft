@@ -185,7 +185,7 @@ void micrortps_start_topics(struct timespec &begin, int &total_read, uint32_t &r
     while (!_should_exit_task)
     {
 @[if recv_topics]@
-        while (0 < (read = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE)))
+        while (0 < (read = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE, udp_rebroadcast_node)))
         {
             total_read += read;
             switch (topic_ID)

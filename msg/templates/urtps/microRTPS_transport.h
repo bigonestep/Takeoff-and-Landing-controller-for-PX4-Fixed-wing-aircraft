@@ -46,7 +46,7 @@ public:
 
 	virtual int init() {return 0;}
 	virtual uint8_t close() {return 0;}
-	ssize_t read(uint8_t *topic_ID, char out_buffer[], size_t buffer_len);
+	ssize_t read(uint8_t *topic_ID, char out_buffer[], size_t buffer_len, Transport_node *rebroadcast_node);
 
 	/**
 	 * write a buffer

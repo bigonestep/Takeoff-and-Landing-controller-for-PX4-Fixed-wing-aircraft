@@ -105,7 +105,7 @@ uint16_t Transport_node::crc16(uint8_t const *buffer, size_t len)
 	return crc;
 }
 
-ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer_len)
+ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer_len, Transport_node *rebroadcast_node)
 {
 	if (nullptr == out_buffer || nullptr == topic_ID || !fds_OK()) {
 		return -1;
@@ -130,6 +130,14 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 	}
 
 	rx_buff_pos += len;
+
+	// Rebroadcast on a UDP port
+	if (nullptr != rebroadcast_node) {
+		ssize_t rb_len = rebroadcast_node->node_write(rx_buffer, rx_buff_pos);
+		if (rb_len != ssize_t(rx_buff_pos)) {
+			return -errno;
+		}
+	}
 
 	// We read some
 	size_t header_size = sizeof(struct Header);

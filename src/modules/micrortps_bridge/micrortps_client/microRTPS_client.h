@@ -64,6 +64,8 @@
 #define POLL_MS 1
 #define DEFAULT_RECV_PORT 2019
 #define DEFAULT_SEND_PORT 2020
+#define DEFAULT_BC_RECV_PORT 2021
+#define DEFAULT_BC_SEND_PORT 2022
 
 void *send(void *data);
 void micrortps_start_topics(struct timespec &begin, int &total_read, uint32_t &received, int &loop);
@@ -87,8 +89,12 @@ struct options {
 	int poll_ms = POLL_MS;
 	uint16_t recv_port = DEFAULT_RECV_PORT;
 	uint16_t send_port = DEFAULT_SEND_PORT;
+	uint16_t broadcast_recv_port = DEFAULT_BC_RECV_PORT;
+	uint16_t broadcast_send_port = DEFAULT_BC_SEND_PORT;
+	bool udp_rebroadcast = false;
 };
 
 extern struct options _options;
 extern bool _should_exit_task;
 extern Transport_node *transport_node;
+extern Transport_node *udp_rebroadcast_node;
