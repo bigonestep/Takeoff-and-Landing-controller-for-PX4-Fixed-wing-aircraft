@@ -7,9 +7,9 @@ px4_add_board(
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
-	IO px4_io-v2_default
+	#IO px4_io-v2_default
 	TESTING
-	UAVCAN_INTERFACES 2
+	#UAVCAN_INTERFACES 2
 
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0
@@ -49,7 +49,7 @@ px4_add_board(
 		pwm_input
 		pwm_out_sim
 		px4fmu
-		px4io
+		#px4io
 		rc_input
 		roboclaw
 		safety_button
@@ -60,7 +60,7 @@ px4_add_board(
 		telemetry # all available telemetry drivers
 		test_ppm
 		tone_alarm
-		uavcan
+		#uavcan
 
 	MODULES
 		attitude_estimator_q
@@ -88,7 +88,7 @@ px4_add_board(
 		airspeed_selector
 
 	SYSTEMCMDS
-		bl_update
+		#bl_update
 		config
 		dmesg
 		dumpfile

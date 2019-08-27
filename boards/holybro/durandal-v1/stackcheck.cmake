@@ -1,15 +1,15 @@
 
 px4_add_board(
 	PLATFORM nuttx
-	VENDOR px4
-	MODEL fmu-v5
+	VENDOR holybro
+	MODEL durandal-v1
 	LABEL stackcheck
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
-	#IO px4_io-v2_default
+#	IO px4_io-v2_default - Will not build yet in NuttX
 	TESTING
-	#UAVCAN_INTERFACES 2
+#	UAVCAN_INTERFACES 2  - No H7 or FD can support in UAVCAN
 
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0
@@ -26,39 +26,39 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		gps
 		#heater
-		#imu/adis16448
+		imu/adis16448
+		imu/adis16497
 		#imu # all available imu drivers
-		#imu/bmi055
+		imu/bmi055
 		imu/mpu6000
-		#imu/mpu9250
-		#irlock
-		#lights/blinkm
-		#lights/oreoled
+		imu/mpu9250
+		irlock
+		lights/blinkm
+		lights/oreoled
 		lights/pca8574
 		lights/rgbled
-		#lights/rgbled_ncp5623c
-		lights/rgbled_pwm
+		lights/rgbled_ncp5623c
 		magnetometer # all available magnetometer drivers
 		#md25
 		mkblctrl
 		optical_flow # all available optical flow drivers
 		pca9685
+		power_monitor/ina226
 		#protocol_splitter
-		pwm_input
+#		pwm_input  - Need to create arch/stm32 arch/stm32h7 arch/kinetis and reloacate
+#					   all arch dependant code there
 		pwm_out_sim
 		px4fmu
-		#px4io
-		rc_input
+#		px4io - will not build in NuttX yet
 		roboclaw
-		safety_button
 		stm32
-		stm32/adc
+		stm32h7/adc
 		stm32/tone_alarm
 		tap_esc
 		telemetry # all available telemetry drivers
 		test_ppm
 		tone_alarm
-		#uavcan
+#		uavcan - No H7 or FD can support in UAVCAN yet
 
 	MODULES
 		attitude_estimator_q
@@ -78,7 +78,6 @@ px4_add_board(
 		mavlink
 		mc_att_control
 		mc_pos_control
-		#micrortps_bridge
 		navigator
 		sensors
 		sih
@@ -87,7 +86,7 @@ px4_add_board(
 		airspeed_selector
 
 	SYSTEMCMDS
-		#bl_update
+		bl_update
 		config
 		dmesg
 		dumpfile
@@ -115,14 +114,15 @@ px4_add_board(
 		ver
 
 	EXAMPLES
-		#bottle_drop # OBC challenge
-		#fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
-		#hello
-		#hwtest # Hardware test
+		bottle_drop # OBC challenge
+		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
+		hello
+		hwtest # Hardware test
 		#matlab_csv_serial
-		#px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
-		#px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
-		#rover_steering_control # Rover example app
-		#segway
-		#uuv_example_app
+		px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
+		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
+		rover_steering_control # Rover example app
+		segway
+		uuv_example_app
+
 	)
