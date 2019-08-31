@@ -189,8 +189,10 @@ void PositionControl::_velocityController(const float &dt)
 
 	} else {
 		// Get maximum allowed horizontal thrust based on tilt and excess thrust
-		const float thrust_max_NE_tilt = fabsf(_thr_sp(2)) * tanf(_constraints.tilt);
-		float thrust_max_NE = sqrtf(_param_mpc_thr_max.get() * _param_mpc_thr_max.get() - _thr_sp(2) * _thr_sp(2));
+		const float thrust_max_NE_tilt = fabsf(thr_sp_velocity(2)) * tanf(_constraints.tilt);
+		const float max_thrust_squared = _param_mpc_thr_max.get() * _param_mpc_thr_max.get();
+		const float z_thrust_squared = thr_sp_velocity(2) * thr_sp_velocity(2);
+		float thrust_max_NE = sqrtf(max_thrust_squared - z_thrust_squared);
 		thrust_max_NE = math::min(thrust_max_NE_tilt, thrust_max_NE);
 
 		// Saturate thrust in horizontal direction.
