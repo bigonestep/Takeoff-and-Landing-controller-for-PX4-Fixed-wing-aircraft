@@ -103,9 +103,21 @@ MavlinkMissionManager::init_offboard_mission()
 		}
 
 		if (ret > 0) {
-			_dataman_id = (dm_item_t)mission_state.dataman_id;
-			_count[MAV_MISSION_TYPE_MISSION] = mission_state.count;
-			_current_seq = mission_state.current_seq;
+			if (mission_state.current_seq > mission_state.count) {
+				// invalid, wipe mission
+				PX4_ERR("invalid mission, wiping");
+				dm_lock(DM_KEY_MISSION_STATE);
+				dm_clear(DM_KEY_MISSION_STATE);
+				dm_unlock(DM_KEY_MISSION_STATE);
+
+				_count[MAV_MISSION_TYPE_MISSION] = 0;
+				_current_seq = 0;
+
+			} else {
+				_dataman_id = (dm_item_t)mission_state.dataman_id;
+				_count[MAV_MISSION_TYPE_MISSION] = mission_state.count;
+				_current_seq = mission_state.current_seq;
+			}
 
 		} else if (ret < 0) {
 			PX4_ERR("offboard mission init failed (%i)", ret);
