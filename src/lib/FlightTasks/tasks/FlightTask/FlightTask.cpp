@@ -89,7 +89,6 @@ void FlightTask::_evaluateVehicleLocalPosition()
 	if ((_time_stamp_current - _sub_attitude->get().timestamp) < _timeout) {
 		// yaw
 		_yaw = matrix::Eulerf(matrix::Quatf(_sub_attitude->get().q)).psi();
-		_yawspeed = _sub_attitude->get().yawspeed;
 	}
 
 	// Only use vehicle-local-position topic fields if the topic is received within a certain timestamp

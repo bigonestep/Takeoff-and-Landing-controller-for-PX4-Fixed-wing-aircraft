@@ -203,7 +203,6 @@ protected:
 	matrix::Vector3f _position; /**< current vehicle position */
 	matrix::Vector3f _velocity; /**< current vehicle velocity */
 	float _yaw = 0.f; /**< current vehicle yaw heading */
-	float _yawspeed = 0.f; /**< current vehicle rotational rate around yaw axis */
 	float _dist_to_bottom = 0.0f; /**< current height above ground level */
 
 	/**
@@ -219,8 +218,8 @@ protected:
 	matrix::Vector3f _acceleration_setpoint;
 	matrix::Vector3f _jerk_setpoint;
 	matrix::Vector3f _thrust_setpoint;
-	float _yaw_setpoint;
-	float _yawspeed_setpoint;
+	float _yaw_setpoint = 0.f;
+	float _yawspeed_setpoint = 0.f;
 
 	matrix::Vector3f _velocity_setpoint_feedback;
 	matrix::Vector3f _thrust_setpoint_feedback;
