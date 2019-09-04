@@ -44,8 +44,10 @@ using namespace time_literals;
  */
 extern "C" __EXPORT int fw_att_control_main(int argc, char *argv[]);
 
-FixedwingAttitudeControl::FixedwingAttitudeControl() :
+FixedwingAttitudeControl::FixedwingAttitudeControl(bool vtol) :
 	WorkItem(px4::wq_configurations::att_pos_ctrl),
+	_attitude_sp_pub(vtol ? ORB_ID(fw_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
+	_actuators_0_pub(vtol ? ORB_ID(actuator_controls_virtual_fw) : ORB_ID(actuator_controls_0)),
 	_loop_perf(perf_alloc(PC_ELAPSED, "fw_att_control: cycle")),
 	_loop_interval_perf(perf_alloc(PC_INTERVAL, "fw_att_control: interval"))
 {
@@ -312,14 +314,7 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					q.copyTo(_att_sp.q_d);
 					_att_sp.q_d_valid = true;
 
-					if (_attitude_sp_pub != nullptr) {
-						/* publish the attitude rates setpoint */
-						orb_publish(_attitude_setpoint_id, _attitude_sp_pub, &_att_sp);
-
-					} else if (_attitude_setpoint_id) {
-						/* advertise the attitude rates setpoint */
-						_attitude_sp_pub = orb_advertise(_attitude_setpoint_id, &_att_sp);
-					}
+					_attitude_sp_pub.publish(_att_sp);
 
 				} else if (_vcontrol_mode.flag_control_rates_enabled &&
 					   !_vcontrol_mode.flag_control_attitude_enabled) {
@@ -373,20 +368,11 @@ FixedwingAttitudeControl::vehicle_status_poll()
 {
 	if (_vehicle_status_sub.update(&_vehicle_status)) {
 		/* set correct uORB ID, depending on if vehicle is VTOL or not */
-		if (!_actuators_id) {
-			if (_vehicle_status.is_vtol) {
-				_actuators_id = ORB_ID(actuator_controls_virtual_fw);
-				_attitude_setpoint_id = ORB_ID(fw_virtual_attitude_setpoint);
+		if (_vehicle_status.is_vtol) {
+			int32_t vt_type = -1;
 
-				int32_t vt_type = -1;
-
-				if (param_get(param_find("VT_TYPE"), &vt_type) == PX4_OK) {
-					_is_tailsitter = (static_cast<vtol_type>(vt_type) == vtol_type::TAILSITTER);
-				}
-
-			} else {
-				_actuators_id = ORB_ID(actuator_controls_0);
-				_attitude_setpoint_id = ORB_ID(vehicle_attitude_setpoint);
+			if (param_get(param_find("VT_TYPE"), &vt_type) == PX4_OK) {
+				_is_tailsitter = (static_cast<vtol_type>(vt_type) == vtol_type::TAILSITTER);
 			}
 		}
 	}
@@ -794,14 +780,9 @@ void FixedwingAttitudeControl::Run()
 		if (_vcontrol_mode.flag_control_rates_enabled ||
 		    _vcontrol_mode.flag_control_attitude_enabled ||
 		    _vcontrol_mode.flag_control_manual_enabled) {
-			/* publish the actuator controls */
-			if (_actuators_0_pub != nullptr) {
-				orb_publish(_actuators_id, _actuators_0_pub, &_actuators);
 
-			} else if (_actuators_id) {
-				_actuators_0_pub = orb_advertise(_actuators_id, &_actuators);
-			}
-
+			// publish the actuator controls
+			_actuators_0_pub.publish(_actuators);
 			_actuators_2_pub.publish(_actuators_airframe);
 		}
 	}
@@ -868,7 +849,8 @@ void FixedwingAttitudeControl::control_flaps(const float dt)
 
 int FixedwingAttitudeControl::task_spawn(int argc, char *argv[])
 {
-	FixedwingAttitudeControl *instance = new FixedwingAttitudeControl();
+	bool vtol = false;
+	FixedwingAttitudeControl *instance = new FixedwingAttitudeControl(vtol);
 
 	if (instance) {
 		_object.store(instance);
