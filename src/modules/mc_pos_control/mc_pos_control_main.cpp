@@ -108,11 +108,10 @@ public:
 private:
 	Takeoff _takeoff; /**< state machine and ramp to bring the vehicle off the ground without jumps */
 
-	orb_advert_t	_att_sp_pub{nullptr};			/**< attitude setpoint publication */
+	orb_id_t _attitude_setpoint_id{nullptr}; ///< orb metadata to publish attitude setpoint dependent if VTOL or not
+	orb_advert_t _vehicle_attitude_setpoint_pub{nullptr}; ///< attitude setpoint publication handle
 	uORB::PublicationQueued<vehicle_command_s> _pub_vehicle_command{ORB_ID(vehicle_command)};	 /**< vehicle command publication */
 	orb_advert_t _mavlink_log_pub{nullptr};
-
-	orb_id_t _attitude_setpoint_id{nullptr};
 
 	uORB::Publication<landing_gear_s>			_landing_gear_pub{ORB_ID(landing_gear)};
 	uORB::Publication<vehicle_local_position_setpoint_s>	_local_pos_sp_pub{ORB_ID(vehicle_local_position_setpoint)};	/**< vehicle local position setpoint publication */
@@ -222,11 +221,6 @@ private:
 	 * @param str the message that has to be printed.
 	 */
 	void warn_rate_limited(const char *str);
-
-	/**
-	 * Publish attitude.
-	 */
-	void publish_attitude();
 
 	/**
 	 * Start flightasks based on navigation state.
@@ -659,13 +653,16 @@ MulticopterPositionControl::run()
 			_att_sp.yaw_sp_move_rate = local_pos_sp.yawspeed;
 			_att_sp.fw_control_yaw = false;
 			_att_sp.apply_flaps = false;
+			_att_sp.timestamp = hrt_absolute_time();
 
 			// publish attitude setpoint
 			// Note: this requires review. The reason for not sending
 			// an attitude setpoint is because for non-flighttask modes
 			// the attitude septoint should come from another source, otherwise
 			// they might conflict with each other such as in offboard attitude control.
-			publish_attitude();
+			if (_attitude_setpoint_id != nullptr) {
+				orb_publish_auto(_attitude_setpoint_id, &_vehicle_attitude_setpoint_pub, &_att_sp, nullptr, ORB_PRIO_DEFAULT);
+			}
 
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position
@@ -944,19 +941,6 @@ MulticopterPositionControl::reset_setpoint_to_nan(vehicle_local_position_setpoin
 	setpoint.yaw = setpoint.yawspeed = NAN;
 	setpoint.acceleration[0] = setpoint.acceleration[1] = setpoint.acceleration[2] = NAN;
 	setpoint.thrust[0] = setpoint.thrust[1] = setpoint.thrust[2] = NAN;
-}
-
-void
-MulticopterPositionControl::publish_attitude()
-{
-	_att_sp.timestamp = hrt_absolute_time();
-
-	if (_att_sp_pub != nullptr) {
-		orb_publish(_attitude_setpoint_id, _att_sp_pub, &_att_sp);
-
-	} else if (_attitude_setpoint_id) {
-		_att_sp_pub = orb_advertise(_attitude_setpoint_id, &_att_sp);
-	}
 }
 
 void MulticopterPositionControl::check_failure(bool task_failure, uint8_t nav_state)
