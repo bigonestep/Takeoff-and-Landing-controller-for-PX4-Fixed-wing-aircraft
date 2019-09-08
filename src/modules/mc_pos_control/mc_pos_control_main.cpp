@@ -139,7 +139,6 @@ private:
 		.maybe_landed = false,
 	};
 
-	vehicle_attitude_setpoint_s	_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s	_control_mode{};		/**< vehicle control mode */
 	vehicle_local_position_s _local_pos{};			/**< vehicle local position */
 	home_position_s	_home_pos{};			/**< home position */
@@ -191,6 +190,7 @@ private:
 	systemlib::Hysteresis _failsafe_land_hysteresis{false}; /**< becomes true if task did not update correctly for LOITER_TIME_BEFORE_DESCEND */
 
 	WeatherVane *_wv_controller{nullptr};
+	Vector3f _wv_dcm_z_sp_prev{0, 0, 1};
 
 	/**
 	 * Update our local parameter cache.
@@ -532,7 +532,7 @@ MulticopterPositionControl::run()
 				}
 			}
 
-			_wv_controller->update(matrix::Quatf(_att_sp.q_d).dcm_z(), _states.yaw);
+			_wv_controller->update(_wv_dcm_z_sp_prev, _states.yaw);
 		}
 
 		// an update is necessary here because otherwise the takeoff state doesn't get skiped with non-altitude-controlled modes
@@ -649,11 +649,12 @@ MulticopterPositionControl::run()
 			_flight_tasks.updateVelocityControllerIO(_control.getVelSp(), Vector3f(local_pos_sp.thrust));
 
 			// Fill attitude setpoint. Attitude is computed from yaw and thrust setpoint.
-			_att_sp = ControlMath::thrustToAttitude(matrix::Vector3f(local_pos_sp.thrust), local_pos_sp.yaw);
-			_att_sp.yaw_sp_move_rate = local_pos_sp.yawspeed;
-			_att_sp.fw_control_yaw = false;
-			_att_sp.apply_flaps = false;
-			_att_sp.timestamp = hrt_absolute_time();
+			vehicle_attitude_setpoint_s attitude_setpoint{};
+			attitude_setpoint = ControlMath::thrustToAttitude(matrix::Vector3f(local_pos_sp.thrust), local_pos_sp.yaw);
+			attitude_setpoint.yaw_sp_move_rate = local_pos_sp.yawspeed;
+			attitude_setpoint.fw_control_yaw = false;
+			attitude_setpoint.apply_flaps = false;
+			attitude_setpoint.timestamp = hrt_absolute_time();
 
 			// publish attitude setpoint
 			// Note: this requires review. The reason for not sending
@@ -661,8 +662,10 @@ MulticopterPositionControl::run()
 			// the attitude septoint should come from another source, otherwise
 			// they might conflict with each other such as in offboard attitude control.
 			if (_attitude_setpoint_id != nullptr) {
-				orb_publish_auto(_attitude_setpoint_id, &_vehicle_attitude_setpoint_pub, &_att_sp, nullptr, ORB_PRIO_DEFAULT);
+				orb_publish_auto(_attitude_setpoint_id, &_vehicle_attitude_setpoint_pub, &attitude_setpoint, nullptr, ORB_PRIO_DEFAULT);
 			}
+
+			_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
 
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position
@@ -675,18 +678,6 @@ MulticopterPositionControl::run()
 			}
 
 			_old_landing_gear_position = gear.landing_gear;
-
-		} else {
-			// no flighttask is active: set attitude setpoint to idle
-			_att_sp.roll_body = _att_sp.pitch_body = 0.0f;
-			_att_sp.yaw_body = _states.yaw;
-			_att_sp.yaw_sp_move_rate = 0.0f;
-			_att_sp.fw_control_yaw = false;
-			_att_sp.apply_flaps = false;
-			matrix::Quatf q_sp = matrix::Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body);
-			q_sp.copyTo(_att_sp.q_d);
-			_att_sp.q_d_valid = true;
-			_att_sp.thrust_body[2] = 0.0f;
 		}
 	}
 
