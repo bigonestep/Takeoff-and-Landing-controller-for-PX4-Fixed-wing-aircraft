@@ -40,8 +40,9 @@
 #include <matrix/matrix/math.hpp>
 
 #include <uORB/topics/vehicle_local_position.h>
-#include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_constraints.h>
+#include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <px4_module_params.h>
 #pragma once
 
@@ -120,7 +121,15 @@ public:
 	 * The acceleration or thrust setpoints can be used for attitude control.
 	 * @param local_position_setpoint reference to struct to fill up
 	 */
-	void getOutputSetpoint(vehicle_local_position_setpoint_s &local_position_setpoint);
+	void getLocalPositionSetpoint(vehicle_local_position_setpoint_s &local_position_setpoint);
+
+	/**
+	 * Get the controllers output attitude setpoint
+	 * This attitude setpoint was generated from the resulting acceleration setpoint after position and velocity control.
+	 * It needs to be executed by the attitude controller to achieve velocity and position tracking.
+	 * @param attitude_setpoint reference to struct to fill up
+	 */
+	void getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint);
 
 protected:
 

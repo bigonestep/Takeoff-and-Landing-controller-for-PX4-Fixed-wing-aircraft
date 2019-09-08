@@ -638,42 +638,33 @@ MulticopterPositionControl::run()
 			// Get position control output
 			vehicle_local_position_setpoint_s local_pos_sp{};
 			local_pos_sp.timestamp = hrt_absolute_time();
-			_control.getOutputSetpoint(local_pos_sp);
+			_control.getLocalPositionSetpoint(local_pos_sp);
+			vehicle_attitude_setpoint_s attitude_setpoint{};
+			attitude_setpoint.timestamp = hrt_absolute_time();
+			_control.getAttitudeSetpoint(attitude_setpoint);
 
 			// Publish local position setpoint
 			// This message will be used by other modules (such as Landdetector) to determine vehicle intention.
 			_local_pos_sp_pub.publish(local_pos_sp);
 
-			// Inform FlightTask about the input and output of the velocity controller
-			// This is used to properly initialize the velocity setpoint when onpening the position loop (position unlock)
-			_flight_tasks.updateVelocityControllerIO(_control.getVelSp(), Vector3f(local_pos_sp.thrust));
-
-			// Fill attitude setpoint. Attitude is computed from yaw and thrust setpoint.
-			vehicle_attitude_setpoint_s attitude_setpoint{};
-			attitude_setpoint = ControlMath::thrustToAttitude(matrix::Vector3f(local_pos_sp.thrust), local_pos_sp.yaw);
-			attitude_setpoint.yaw_sp_move_rate = local_pos_sp.yawspeed;
-			attitude_setpoint.fw_control_yaw = false;
-			attitude_setpoint.apply_flaps = false;
-			attitude_setpoint.timestamp = hrt_absolute_time();
-
-			// publish attitude setpoint
-			// Note: this requires review. The reason for not sending
-			// an attitude setpoint is because for non-flighttask modes
-			// the attitude septoint should come from another source, otherwise
-			// they might conflict with each other such as in offboard attitude control.
+			// Publish attitude setpoint
+			// Note: Only publish attitude setpoint when it's not coming from another source like
+			// stabilized mode direct attitude setpoint generation or offboard attitude commands.
 			if (_attitude_setpoint_id != nullptr) {
 				orb_publish_auto(_attitude_setpoint_id, &_vehicle_attitude_setpoint_pub, &attitude_setpoint, nullptr, ORB_PRIO_DEFAULT);
 			}
+
+			// Inform FlightTask about the input and output of the velocity controller
+			// This is used to properly initialize the velocity setpoint when onpening the position loop (position unlock)
+			_flight_tasks.updateVelocityControllerIO(_control.getVelSp(), Vector3f(local_pos_sp.thrust));
 
 			_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
 
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position
 			    && gear.landing_gear != landing_gear_s::GEAR_KEEP) {
-
-				_landing_gear.landing_gear = gear.landing_gear;
 				_landing_gear.timestamp = hrt_absolute_time();
-
+				_landing_gear.landing_gear = gear.landing_gear;
 				_landing_gear_pub.publish(_landing_gear);
 			}
 
