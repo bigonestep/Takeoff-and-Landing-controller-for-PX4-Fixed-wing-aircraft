@@ -424,7 +424,10 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 
 		const float yaw_rate = math::radians(_param_mpc_man_y_max.get());
 		attitude_setpoint.yaw_sp_move_rate = _manual_control_sp.r * yaw_rate;
-		_man_yaw_sp = wrap_pi(_man_yaw_sp + attitude_setpoint.yaw_sp_move_rate * dt);
+
+		if (fabsf(attitude_setpoint.yaw_sp_move_rate) > FLT_EPSILON) {
+			_man_yaw_sp = yaw;
+		}
 	}
 
 	/*
