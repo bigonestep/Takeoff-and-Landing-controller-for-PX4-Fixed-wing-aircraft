@@ -172,7 +172,7 @@ private:
 
 Radar::Radar(const char *port, uint8_t rotation) :
 	CDev(RANGE_FINDER0_DEVICE_PATH),
-	ScheduledWorkItem(px4::wq_configurations::hp_default),
+	ScheduledWorkItem(px4::serial_port_to_wq(port)),
 	_rotation(rotation)
 {
 	/* store port name */
