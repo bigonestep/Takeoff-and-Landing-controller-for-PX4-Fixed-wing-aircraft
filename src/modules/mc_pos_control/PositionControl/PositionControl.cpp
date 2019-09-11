@@ -112,6 +112,7 @@ void PositionControl::_positionController()
 	Vector3f vel_sp_position = (_pos_sp - _pos).emult(propotional_gain);
 	_addIfNotNanVector(_vel_sp, vel_sp_position);
 
+	_addIfNotNanVector(vel_sp_position, Vector3f());
 	// Constrain horizontal velocity by prioritizing the velocity component along the
 	// the desired position setpoint over the feed-forward term.
 	const Vector2f vel_sp_xy = ControlMath::constrainXY(Vector2f(vel_sp_position),
