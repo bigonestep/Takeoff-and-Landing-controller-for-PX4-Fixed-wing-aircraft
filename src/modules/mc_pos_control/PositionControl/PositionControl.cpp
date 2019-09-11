@@ -200,9 +200,9 @@ void PositionControl::_velocityController(const float &dt)
 		Vector2f thrust_sp_xy(thr_sp_velocity);
 
 		if (thrust_sp_xy.norm_squared() > thrust_max_NE * thrust_max_NE) {
-			const float mag = thrust_sp_xy.length();
-			thr_sp_velocity(0) = thrust_sp_xy(0) / mag * thrust_max_NE;
-			thr_sp_velocity(1) = thrust_sp_xy(1) / mag * thrust_max_NE;
+			thrust_sp_xy = thrust_sp_xy.normalized() * thrust_max_NE;
+			thr_sp_velocity(0) = thrust_sp_xy(0);
+			thr_sp_velocity(1) = thrust_sp_xy(1);
 		}
 
 		// Use tracking Anti-Windup for horizontal direction: during saturation, the integrator is used to unsaturate the output
