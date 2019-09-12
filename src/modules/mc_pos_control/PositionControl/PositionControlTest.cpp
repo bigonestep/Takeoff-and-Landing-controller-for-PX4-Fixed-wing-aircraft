@@ -33,6 +33,7 @@
 
 #include <gtest/gtest.h>
 #include <PositionControl.hpp>
+#include <px4_defines.h>
 
 using namespace matrix;
 
@@ -99,7 +100,7 @@ public:
 	{
 		_position_control.setConstraints(_contraints);
 		_position_control.setInputSetpoint(_input_setpoint);
-		_position_control.update(0.1f);
+		_position_control.update(.1f);
 		_position_control.getLocalPositionSetpoint(_output_setpoint);
 		_position_control.getAttitudeSetpoint(_attitude);
 	}
@@ -151,4 +152,24 @@ TEST_F(PositionControlBasicDirectionTest, AccelerationControlDirection)
 	Vector3f(1, 1, -1).copyTo(_input_setpoint.acceleration);
 	runController();
 	checkDirection();
+}
+
+TEST_F(PositionControlBasicTest, PositionControlMaxTilt)
+{
+	_input_setpoint.x = 100;
+	_input_setpoint.y = 100;
+	_input_setpoint.z = -0;
+
+	runController();
+	Vector3f body_z = Quatf(_attitude.q_d).dcm_z();
+	float angle = acosf(body_z.dot(Vector3f(0, 0, 1)));
+	EXPECT_GT(angle, 0.f);
+	EXPECT_LE(angle, 1.f);
+
+	_contraints.tilt = .5f;
+	runController();
+	body_z = Quatf(_attitude.q_d).dcm_z();
+	angle = acosf(body_z.dot(Vector3f(0, 0, 1)));
+	EXPECT_GT(angle, 0.f);
+	EXPECT_LE(angle, .50001f);
 }

@@ -77,10 +77,11 @@ void PositionControl::setInputSetpoint(const vehicle_local_position_setpoint_s &
 
 void PositionControl::setConstraints(const vehicle_constraints_s &constraints)
 {
+	_constraints = constraints;
+
 	// For safety check if adjustable constraints are below global constraints. If they are not stricter than global
 	// constraints, then just use global constraints for the limits.
-	if (!PX4_ISFINITE(constraints.tilt)
-	    || !(constraints.tilt < _lim_tilt)) {
+	if (!PX4_ISFINITE(constraints.tilt) || (constraints.tilt > _lim_tilt)) {
 		_constraints.tilt = _lim_tilt;
 	}
 }
