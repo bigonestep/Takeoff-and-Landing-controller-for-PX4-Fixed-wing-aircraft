@@ -46,26 +46,23 @@ static constexpr float A_GRAVITY = 9.80665f; // m/s^2 as defined by the SI stand
 
 namespace ControlMath
 {
-vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float yaw_sp)
+void thrustToAttitude(vehicle_attitude_setpoint_s &att_sp, const Vector3f &thr_sp, const float yaw_sp)
 {
-	vehicle_attitude_setpoint_s att_sp = {};
-	att_sp = bodyzToAttitude(-thr_sp, yaw_sp);
+	bodyzToAttitude(att_sp, -thr_sp, yaw_sp);
 	att_sp.thrust_body[2] = -thr_sp.length();
-	return att_sp;
 }
 
-vehicle_attitude_setpoint_s accelerationToAttitude(const Vector3f &acc_sp, const float yaw_sp, const float hover_thrust,
-		const float tilt_max)
+void accelerationToAttitude(vehicle_attitude_setpoint_s &att_sp, const Vector3f &acc_sp, const float yaw_sp,
+			    const float hover_thrust, const float tilt_max)
 {
 	// Assume standard acceleration due to gravity in vertical direction for attitude generation
 	Vector3f body_z_unit = Vector3f(-acc_sp(0), -acc_sp(1), A_GRAVITY).normalized();
 	limitTilt(body_z_unit, Vector3f(0, 0, 1), tilt_max);
-	vehicle_attitude_setpoint_s att_sp = bodyzToAttitude(body_z_unit, yaw_sp);
+	bodyzToAttitude(att_sp, body_z_unit, yaw_sp);
 	// Scale thrust assuming hover thrust produces standard gravity
 	att_sp.thrust_body[2] = acc_sp(2) * (hover_thrust / A_GRAVITY) - hover_thrust;
 	// Project thrust to planned body attitude
 	att_sp.thrust_body[2] = att_sp.thrust_body[2] / (Vector3f(0, 0, 1).dot(body_z_unit));
-	return att_sp;
 }
 
 void limitTilt(Vector3f &body_unit, const Vector3f &world_unit, const float max_angle)
@@ -77,9 +74,8 @@ void limitTilt(Vector3f &body_unit, const Vector3f &world_unit, const float max_
 	body_unit = cosf(angle) * world_unit + sinf(angle) * rejection.normalized();
 }
 
-vehicle_attitude_setpoint_s bodyzToAttitude(Vector3f body_z, const float yaw_sp)
+void bodyzToAttitude(vehicle_attitude_setpoint_s &att_sp, Vector3f body_z, const float yaw_sp)
 {
-	vehicle_attitude_setpoint_s att_sp = {};
 	att_sp.yaw_body = yaw_sp;
 
 	if (body_z.norm_squared() > 0.00001f) {
@@ -131,8 +127,6 @@ vehicle_attitude_setpoint_s bodyzToAttitude(Vector3f body_z, const float yaw_sp)
 	Eulerf euler = R_sp;
 	att_sp.roll_body = euler(0);
 	att_sp.pitch_body = euler(1);
-
-	return att_sp;
 }
 
 Vector2f constrainXY(const Vector2f &v0, const Vector2f &v1, const float &max)

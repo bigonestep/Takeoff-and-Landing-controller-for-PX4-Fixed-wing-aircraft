@@ -51,7 +51,7 @@ namespace ControlMath
  * @param yaw_sp the desired yaw
  * @return vehicle_attitude_setpoints_s structure
  */
-vehicle_attitude_setpoint_s thrustToAttitude(const matrix::Vector3f &thr_sp, const float yaw_sp);
+void thrustToAttitude(vehicle_attitude_setpoint_s &att_sp, const matrix::Vector3f &thr_sp, const float yaw_sp);
 
 /**
  * Converts acceleration vector and yaw set-point to a desired attitude.
@@ -60,8 +60,8 @@ vehicle_attitude_setpoint_s thrustToAttitude(const matrix::Vector3f &thr_sp, con
  * @param tilt_max maximum allowed tilt angle in radians
  * @return vehicle_attitude_setpoints_s struct for attitude controller
  */
-vehicle_attitude_setpoint_s accelerationToAttitude(const matrix::Vector3f &acc_sp, const float yaw_sp,
-		const float hover_thrust, const float tilt_max);
+void accelerationToAttitude(vehicle_attitude_setpoint_s &att_sp, const matrix::Vector3f &acc_sp, const float yaw_sp,
+			    const float hover_thrust, const float tilt_max);
 
 /**
  * Limits the tilt angle between two unit vectors
@@ -77,7 +77,7 @@ void limitTilt(matrix::Vector3f &body_unit, const matrix::Vector3f &world_unit, 
  * @param yaw_sp the desired yaw setpoint
  * @return vehicle_attitude_setpoints_s struct for attitude controller
  */
-vehicle_attitude_setpoint_s bodyzToAttitude(matrix::Vector3f body_z, const float yaw_sp);
+void bodyzToAttitude(vehicle_attitude_setpoint_s &att_sp, matrix::Vector3f body_z, const float yaw_sp);
 
 /**
  * Outputs the sum of two vectors but respecting the limits and priority.
