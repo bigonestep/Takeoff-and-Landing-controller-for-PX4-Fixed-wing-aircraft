@@ -70,45 +70,85 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_EQ(attitude.apply_flaps, 0);//vehicle_attitude_setpoint_s::FLAPS_OFF); // TODO why no reference?
 }
 
-TEST(PositionControlTest, BasicControl)
+class PositionControlBasicTest : public ::testing::Test
 {
-	PositionControl position_control;
-	position_control.setPositionGains(Vector3f(1, 1, 1));
-	position_control.setVelocityGains(Vector3f(1, 1, 1), Vector3f(1, 1, 1), Vector3f(1, 1, 1));
-	position_control.setVelocityLimits(1, 1, 1);
-	position_control.setTiltLimit(1);
-	position_control.setHoverThrust(.5f);
+public:
+	PositionControlBasicTest()
+	{
+		_position_control.setPositionGains(Vector3f(1, 1, 1));
+		_position_control.setVelocityGains(Vector3f(1, 1, 1), Vector3f(1, 1, 1), Vector3f(1, 1, 1));
+		_position_control.setVelocityLimits(1, 1, 1);
+		_position_control.setTiltLimit(1);
+		_position_control.setHoverThrust(.5f);
 
-	vehicle_constraints_s contraints{};
-	contraints.tilt = 1.f;
-	position_control.setConstraints(contraints);
+		_contraints.tilt = 1.f;
 
-	vehicle_local_position_setpoint_s input_setpoint{};
-	input_setpoint.x = 1;
-	input_setpoint.y = 1;
-	input_setpoint.z = -1;
-	input_setpoint.yaw = NAN;
-	input_setpoint.yawspeed = NAN;
-	input_setpoint.vx = NAN;
-	input_setpoint.vy = NAN;
-	input_setpoint.vz = NAN;
-	Vector3f(NAN, NAN, NAN).copyTo(input_setpoint.acceleration);
-	Vector3f(NAN, NAN, NAN).copyTo(input_setpoint.thrust);
-	position_control.setInputSetpoint(input_setpoint);
+		_input_setpoint.x = NAN;
+		_input_setpoint.y = NAN;
+		_input_setpoint.z = NAN;
+		_input_setpoint.yaw = NAN;
+		_input_setpoint.yawspeed = NAN;
+		_input_setpoint.vx = NAN;
+		_input_setpoint.vy = NAN;
+		_input_setpoint.vz = NAN;
+		Vector3f(NAN, NAN, NAN).copyTo(_input_setpoint.acceleration);
+		Vector3f(NAN, NAN, NAN).copyTo(_input_setpoint.thrust);
+	}
 
-	position_control.update(0.1f);
+	void runController()
+	{
+		_position_control.setConstraints(_contraints);
+		_position_control.setInputSetpoint(_input_setpoint);
+		_position_control.update(0.1f);
+		_position_control.getLocalPositionSetpoint(_output_setpoint);
+		_position_control.getAttitudeSetpoint(_attitude);
+	}
 
-	vehicle_local_position_setpoint_s output_setpoint{};
-	position_control.getLocalPositionSetpoint(output_setpoint);
-	Vector3f acceleration(output_setpoint.acceleration);
-	EXPECT_GT(acceleration(0), 0);
-	EXPECT_GT(acceleration(1), 0);
-	EXPECT_LT(acceleration(2), 0);
+	PositionControl _position_control;
+	vehicle_constraints_s _contraints{};
+	vehicle_local_position_setpoint_s _input_setpoint{};
+	vehicle_local_position_setpoint_s _output_setpoint{};
+	vehicle_attitude_setpoint_s _attitude{};
+};
 
-	vehicle_attitude_setpoint_s attitude{};
-	position_control.getAttitudeSetpoint(attitude);
-	Vector3f body_z = Quatf(attitude.q_d).dcm_z();
-	EXPECT_LT(body_z(0), 0);
-	EXPECT_LT(body_z(1), 0);
-	EXPECT_GT(body_z(2), 0);
+class PositionControlBasicDirectionTest : public PositionControlBasicTest
+{
+public:
+	void checkDirection()
+	{
+		Vector3f acceleration(_output_setpoint.acceleration);
+		EXPECT_GT(acceleration(0), 0);
+		EXPECT_GT(acceleration(1), 0);
+		EXPECT_LT(acceleration(2), 0);
+
+		Vector3f body_z = Quatf(_attitude.q_d).dcm_z();
+		EXPECT_LT(body_z(0), 0);
+		EXPECT_LT(body_z(1), 0);
+		EXPECT_GT(body_z(2), 0);
+	}
+};
+
+TEST_F(PositionControlBasicDirectionTest, PositionControlDirectionP)
+{
+	_input_setpoint.x = 1;
+	_input_setpoint.y = 1;
+	_input_setpoint.z = -1;
+	runController();
+	checkDirection();
+}
+
+TEST_F(PositionControlBasicDirectionTest, VelocityControlDirection)
+{
+	_input_setpoint.vx = 1;
+	_input_setpoint.vy = 1;
+	_input_setpoint.vz = -1;
+	runController();
+	checkDirection();
+}
+
+TEST_F(PositionControlBasicDirectionTest, AccelerationControlDirection)
+{
+	Vector3f(1, 1, -1).copyTo(_input_setpoint.acceleration);
+	runController();
+	checkDirection();
 }
