@@ -60,27 +60,10 @@
 
 #include <logger/messages.h>
 
-// for ekf2 replay
-#include <uORB/topics/airspeed.h>
-#include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/landing_target_pose.h>
-#include <uORB/topics/optical_flow.h>
-#include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/vehicle_air_data.h>
-#include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_gps_position.h>
-#include <uORB/topics/vehicle_land_detected.h>
-#include <uORB/topics/vehicle_local_position.h>
-#include <uORB/topics/vehicle_magnetometer.h>
-#include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/vehicle_odometry.h>
-
-#include "replay.hpp"
+#include "Replay.hpp"
+#include "ReplayEkf2.hpp"
 
 #define PARAMS_OVERRIDE_FILE PX4_ROOTFSDIR "/replay_params.txt"
-
-
-extern "C" __EXPORT int replay_main(int argc, char *argv[]);
 
 using namespace std;
 
@@ -88,32 +71,14 @@ namespace px4
 {
 class Replay;
 
-
 char *Replay::_replay_file = nullptr;
 
-Replay::CompatSensorCombinedDtType::CompatSensorCombinedDtType(int gyro_integral_dt_offset_log,
-		int gyro_integral_dt_offset_intern,
-		int accelerometer_integral_dt_offset_log, int accelerometer_integral_dt_offset_intern)
+Replay::CompatSensorCombinedDtType::CompatSensorCombinedDtType(int gyro_integral_dt_offset_log, int gyro_integral_dt_offset_intern, int accelerometer_integral_dt_offset_log, int accelerometer_integral_dt_offset_intern)
 	: _gyro_integral_dt_offset_log(gyro_integral_dt_offset_log),
 	  _gyro_integral_dt_offset_intern(gyro_integral_dt_offset_intern),
 	  _accelerometer_integral_dt_offset_log(accelerometer_integral_dt_offset_log),
 	  _accelerometer_integral_dt_offset_intern(accelerometer_integral_dt_offset_intern)
 {
-}
-
-void *Replay::CompatSensorCombinedDtType::apply(void *data)
-{
-	// the types have the same size so we can do the conversion in-place
-	uint8_t *ptr = (uint8_t *)data;
-	float gyro_integral_dt;
-	float accel_integral_dt;
-	memcpy(&gyro_integral_dt, ptr + _gyro_integral_dt_offset_log, sizeof(float));
-	memcpy(&accel_integral_dt, ptr + _accelerometer_integral_dt_offset_log, sizeof(float));
-	uint32_t igyro_integral_dt = (uint32_t)(gyro_integral_dt * 1e6f);
-	uint32_t iaccel_integral_dt = (uint32_t)(accel_integral_dt * 1e6f);
-	memcpy(ptr + _gyro_integral_dt_offset_intern, &igyro_integral_dt, sizeof(float));
-	memcpy(ptr + _accelerometer_integral_dt_offset_intern, &iaccel_integral_dt, sizeof(float));
-	return data;
 }
 
 Replay::~Replay()
@@ -125,7 +90,29 @@ Replay::~Replay()
 	_subscriptions.clear();
 }
 
-void Replay::setupReplayFile(const char *file_name)
+void *
+Replay::CompatSensorCombinedDtType::apply(void *data)
+{
+	// the types have the same size so we can do the conversion in-place
+	uint8_t *ptr = (uint8_t *)data;
+
+	float gyro_integral_dt;
+	memcpy(&gyro_integral_dt, ptr + _gyro_integral_dt_offset_log, sizeof(float));
+
+	float accel_integral_dt;
+	memcpy(&accel_integral_dt, ptr + _accelerometer_integral_dt_offset_log, sizeof(float));
+
+	uint32_t igyro_integral_dt = (uint32_t)(gyro_integral_dt * 1e6f);
+	memcpy(ptr + _gyro_integral_dt_offset_intern, &igyro_integral_dt, sizeof(float));
+
+	uint32_t iaccel_integral_dt = (uint32_t)(accel_integral_dt * 1e6f);
+	memcpy(ptr + _accelerometer_integral_dt_offset_intern, &iaccel_integral_dt, sizeof(float));
+
+	return data;
+}
+
+void
+Replay::setupReplayFile(const char *file_name)
 {
 	if (_replay_file) {
 		free(_replay_file);
@@ -134,9 +121,8 @@ void Replay::setupReplayFile(const char *file_name)
 	_replay_file = strdup(file_name);
 }
 
-
-
-void Replay::setUserParams(const char *filename)
+void
+Replay::setUserParams(const char *filename)
 {
 	string line, param_name, value_string;
 	ifstream myfile(filename);
@@ -177,7 +163,8 @@ void Replay::setUserParams(const char *filename)
 	}
 }
 
-bool Replay::readFileHeader(std::ifstream &file)
+bool
+Replay::readFileHeader(std::ifstream &file)
 {
 	file.seekg(0);
 	ulog_file_header_s msg_header;
@@ -200,7 +187,8 @@ bool Replay::readFileHeader(std::ifstream &file)
 	return memcmp(magic, msg_header.magic, 7) == 0;
 }
 
-bool Replay::readFileDefinitions(std::ifstream &file)
+bool
+Replay::readFileDefinitions(std::ifstream &file)
 {
 	PX4_INFO("Applying params from ULog file...");
 
@@ -256,7 +244,8 @@ bool Replay::readFileDefinitions(std::ifstream &file)
 	return true;
 }
 
-bool Replay::readFlagBits(std::ifstream &file, uint16_t msg_size)
+bool
+Replay::readFlagBits(std::ifstream &file, uint16_t msg_size)
 {
 	if (msg_size != 40) {
 		PX4_ERR("unsupported message length for FLAG_BITS message (%i)", msg_size);
@@ -302,7 +291,8 @@ bool Replay::readFlagBits(std::ifstream &file, uint16_t msg_size)
 	return true;
 }
 
-bool Replay::readFormat(std::ifstream &file, uint16_t msg_size)
+bool
+Replay::readFormat(std::ifstream &file, uint16_t msg_size)
 {
 	_read_buffer.reserve(msg_size + 1);
 	char *format = (char *)_read_buffer.data();
@@ -327,7 +317,8 @@ bool Replay::readFormat(std::ifstream &file, uint16_t msg_size)
 	return true;
 }
 
-bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
+bool
+Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 {
 	_read_buffer.reserve(msg_size + 1);
 	char *message = (char *)_read_buffer.data();
@@ -357,8 +348,8 @@ bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 
 	CompatBase *compat = nullptr;
 
-	//check the format: the field definitions must match
-	//FIXME: this should check recursively, all used nested types
+	// check the format: the field definitions must match
+	// FIXME: this should check recursively, all used nested types
 	string file_format = _file_formats[topic_name];
 
 	if (file_format != orb_meta->o_fields) {
@@ -370,6 +361,7 @@ bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 			    file_format == "uint64_t timestamp;float[3] gyro_rad;float gyro_integral_dt;"
 			    "int32_t accelerometer_timestamp_relative;float[3] accelerometer_m_s2;"
 			    "float accelerometer_integral_dt;") {
+
 				int gyro_integral_dt_offset_log;
 				int gyro_integral_dt_offset_intern;
 				int accelerometer_integral_dt_offset_log;
@@ -380,6 +372,7 @@ bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 				    findFieldOffset(orb_meta->o_fields, "gyro_integral_dt", gyro_integral_dt_offset_intern, unused) &&
 				    findFieldOffset(file_format, "accelerometer_integral_dt", accelerometer_integral_dt_offset_log, unused) &&
 				    findFieldOffset(orb_meta->o_fields, "accelerometer_integral_dt", accelerometer_integral_dt_offset_intern, unused)) {
+
 					compat = new CompatSensorCombinedDtType(gyro_integral_dt_offset_log, gyro_integral_dt_offset_intern,
 										accelerometer_integral_dt_offset_log, accelerometer_integral_dt_offset_intern);
 				}
@@ -398,7 +391,6 @@ bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 	subscription->orb_meta = orb_meta;
 	subscription->multi_id = multi_id;
 	subscription->compat = compat;
-
 
 	//find the timestamp offset
 	int field_size;
@@ -442,7 +434,8 @@ bool Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 	return true;
 }
 
-bool Replay::findFieldOffset(const string &format, const string &field_name, int &offset, int &field_size)
+bool
+Replay::findFieldOffset(const string &format, const string &field_name, int &offset, int &field_size)
 {
 	size_t prev_field_end = 0;
 	size_t field_end = format.find(';');
@@ -472,8 +465,8 @@ bool Replay::findFieldOffset(const string &format, const string &field_name, int
 	return false;
 }
 
-
-bool Replay::readAndHandleAdditionalMessages(std::ifstream &file, std::streampos end_position)
+bool
+Replay::readAndHandleAdditionalMessages(std::ifstream &file, std::streampos end_position)
 {
 	ulog_message_header_s message_header;
 
@@ -505,7 +498,8 @@ bool Replay::readAndHandleAdditionalMessages(std::ifstream &file, std::streampos
 	return true;
 }
 
-bool Replay::readAndApplyParameter(std::ifstream &file, uint16_t msg_size)
+bool
+Replay::readAndApplyParameter(std::ifstream &file, uint16_t msg_size)
 {
 	_read_buffer.reserve(msg_size);
 	uint8_t *message = (uint8_t *)_read_buffer.data();
@@ -546,7 +540,8 @@ bool Replay::readAndApplyParameter(std::ifstream &file, uint16_t msg_size)
 	return true;
 }
 
-bool Replay::readDropout(std::ifstream &file, uint16_t msg_size)
+bool
+Replay::readDropout(std::ifstream &file, uint16_t msg_size)
 {
 	uint16_t duration;
 	file.read((char *)&duration, sizeof(duration));
@@ -555,7 +550,8 @@ bool Replay::readDropout(std::ifstream &file, uint16_t msg_size)
 	return file.good();
 }
 
-bool Replay::nextDataMessage(std::ifstream &file, Subscription &subscription, int msg_id)
+bool
+Replay::nextDataMessage(std::ifstream &file, Subscription &subscription, int msg_id)
 {
 	ulog_message_header_s message_header;
 	file.seekg(subscription.next_read_pos);
@@ -639,7 +635,8 @@ bool Replay::nextDataMessage(std::ifstream &file, Subscription &subscription, in
 	return file.good();
 }
 
-const orb_metadata *Replay::findTopic(const std::string &name)
+const orb_metadata *
+Replay::findTopic(const std::string &name)
 {
 	const orb_metadata *const *topics = orb_get_topics();
 
@@ -652,7 +649,8 @@ const orb_metadata *Replay::findTopic(const std::string &name)
 	return nullptr;
 }
 
-std::string Replay::extractArraySize(const std::string &type_name_full, int &array_size)
+std::string
+Replay::extractArraySize(const std::string &type_name_full, int &array_size)
 {
 	size_t start_pos = type_name_full.find('[');
 	size_t end_pos = type_name_full.find(']');
@@ -666,7 +664,8 @@ std::string Replay::extractArraySize(const std::string &type_name_full, int &arr
 	return type_name_full.substr(0, start_pos);
 }
 
-size_t Replay::sizeOfType(const std::string &type_name)
+size_t
+Replay::sizeOfType(const std::string &type_name)
 {
 	if (type_name == "int8_t" || type_name == "uint8_t") {
 		return 1;
@@ -699,14 +698,17 @@ size_t Replay::sizeOfType(const std::string &type_name)
 	PX4_ERR("unknown type: %s", type_name.c_str());
 	return 0;
 }
-size_t Replay::sizeOfFullType(const std::string &type_name_full)
+
+size_t
+Replay::sizeOfFullType(const std::string &type_name_full)
 {
 	int array_size;
 	string type_name = extractArraySize(type_name_full, array_size);
 	return sizeOfType(type_name) * array_size;
 }
 
-bool Replay::readDefinitionsAndApplyParams(std::ifstream &file)
+bool
+Replay::readDefinitionsAndApplyParams(std::ifstream &file)
 {
 	// log reader currently assumes little endian
 	int num = 1;
@@ -736,7 +738,8 @@ bool Replay::readDefinitionsAndApplyParams(std::ifstream &file)
 	return true;
 }
 
-void Replay::run()
+void
+Replay::run()
 {
 	ifstream replay_file(_replay_file, ios::in | ios::binary);
 
@@ -760,7 +763,6 @@ void Replay::run()
 		PX4_ERR("Failed to read subscription");
 		return;
 	}
-
 
 	//we update the timestamps from the file by a constant offset to match
 	//the current replay time
@@ -804,18 +806,15 @@ void Replay::run()
 			continue;
 		}
 
-
 		//handle additional messages between last and next published data
 		replay_file.seekg(last_additional_message_pos);
 		streampos next_additional_message_pos = sub.next_read_pos;
 		readAndHandleAdditionalMessages(replay_file, next_additional_message_pos);
 		last_additional_message_pos = next_additional_message_pos;
 
-
 		const uint64_t publish_timestamp = handleTopicDelay(next_file_time, timestamp_offset);
 
-
-		//It's time to publish
+		// It's time to publish
 		readTopicDataToBuffer(sub, replay_file);
 		memcpy(_read_buffer.data() + sub.timestamp_offset, &publish_timestamp, sizeof(uint64_t)); //adjust the timestamp
 
@@ -825,7 +824,7 @@ void Replay::run()
 
 		nextDataMessage(replay_file, sub, next_msg_id);
 
-		//TODO: output status (eg. every sec), including total duration...
+		// TODO: output status (eg. every sec), including total duration...
 	}
 
 	for (auto &subscription : _subscriptions) {
@@ -856,7 +855,8 @@ void Replay::run()
 	onExitMainLoop();
 }
 
-void Replay::readTopicDataToBuffer(const Subscription &sub, std::ifstream &replay_file)
+void
+Replay::readTopicDataToBuffer(const Subscription &sub, std::ifstream &replay_file)
 {
 	const size_t msg_read_size = sub.orb_meta->o_size_no_padding;
 	const size_t msg_write_size = sub.orb_meta->o_size;
@@ -865,17 +865,18 @@ void Replay::readTopicDataToBuffer(const Subscription &sub, std::ifstream &repla
 	replay_file.read((char *)_read_buffer.data(), msg_read_size);
 }
 
-bool Replay::handleTopicUpdate(Subscription &sub, void *data, std::ifstream &replay_file)
+bool
+Replay::handleTopicUpdate(Subscription &sub, void *data, std::ifstream &replay_file)
 {
 	return publishTopic(sub, data);
 }
 
-uint64_t Replay::handleTopicDelay(uint64_t next_file_time, uint64_t timestamp_offset)
+uint64_t
+Replay::handleTopicDelay(uint64_t next_file_time, uint64_t timestamp_offset)
 {
-
 	const uint64_t publish_timestamp = next_file_time + timestamp_offset;
 
-	//wait if necessary
+	// wait if necessary
 	uint64_t cur_time = hrt_absolute_time();
 
 	// if some topics have a timestamp smaller than the log file start, publish them immediately
@@ -886,7 +887,8 @@ uint64_t Replay::handleTopicDelay(uint64_t next_file_time, uint64_t timestamp_of
 	return publish_timestamp;
 }
 
-bool Replay::publishTopic(Subscription &sub, void *data)
+bool
+Replay::publishTopic(Subscription &sub, void *data)
 {
 	bool published = false;
 
@@ -935,198 +937,8 @@ bool Replay::publishTopic(Subscription &sub, void *data)
 	return published;
 }
 
-bool ReplayEkf2::handleTopicUpdate(Subscription &sub, void *data, std::ifstream &replay_file)
-{
-	if (sub.orb_meta == ORB_ID(ekf2_timestamps)) {
-		ekf2_timestamps_s ekf2_timestamps;
-		memcpy(&ekf2_timestamps, data, sub.orb_meta->o_size);
-
-		if (!publishEkf2Topics(ekf2_timestamps, replay_file)) {
-			return false;
-		}
-
-		px4_pollfd_struct_t fds[1];
-		fds[0].fd = _vehicle_attitude_sub;
-		fds[0].events = POLLIN;
-		// wait for a response from the estimator
-		int pret = px4_poll(fds, 1, 1000);
-
-		// introduce some breaks to make sure the logger can keep up
-		if (++_topic_counter == 50) {
-			px4_usleep(1000);
-			_topic_counter = 0;
-		}
-
-		if (pret == 0) {
-			PX4_WARN("poll timeout");
-
-		} else if (pret < 0) {
-			PX4_ERR("poll failed (%i)", pret);
-
-		} else {
-			if (fds[0].revents & POLLIN) {
-				vehicle_attitude_s att;
-				// need to to an orb_copy so that poll will not return immediately
-				orb_copy(ORB_ID(vehicle_attitude), _vehicle_attitude_sub, &att);
-			}
-		}
-
-		return true;
-
-	} else if (sub.orb_meta == ORB_ID(vehicle_status) || sub.orb_meta == ORB_ID(vehicle_land_detected)
-		   || sub.orb_meta == ORB_ID(vehicle_gps_position)) {
-		return publishTopic(sub, data);
-	} // else: do not publish
-
-	return false;
-}
-
-void ReplayEkf2::onSubscriptionAdded(Subscription &sub, uint16_t msg_id)
-{
-	if (sub.orb_meta == ORB_ID(sensor_combined)) {
-		_sensor_combined_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(airspeed)) {
-		_airspeed_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(distance_sensor)) {
-		_distance_sensor_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(vehicle_gps_position)) {
-		if (sub.multi_id == 0) {
-			_gps_msg_id = msg_id;
-		}
-
-	} else if (sub.orb_meta == ORB_ID(optical_flow)) {
-		_optical_flow_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(vehicle_air_data)) {
-		_vehicle_air_data_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(vehicle_magnetometer)) {
-		_vehicle_magnetometer_msg_id = msg_id;
-
-	} else if (sub.orb_meta == ORB_ID(vehicle_visual_odometry)) {
-		_vehicle_visual_odometry_msg_id = msg_id;
-	}
-
-	// the main loop should only handle publication of the following topics, the sensor topics are
-	// handled separately in publishEkf2Topics()
-	sub.ignored = sub.orb_meta != ORB_ID(ekf2_timestamps) && sub.orb_meta != ORB_ID(vehicle_status)
-		      && sub.orb_meta != ORB_ID(vehicle_land_detected) &&
-		      (sub.orb_meta != ORB_ID(vehicle_gps_position) || sub.multi_id == 0);
-}
-
-bool ReplayEkf2::publishEkf2Topics(const ekf2_timestamps_s &ekf2_timestamps, std::ifstream &replay_file)
-{
-	auto handle_sensor_publication = [&](int16_t timestamp_relative, uint16_t msg_id) {
-		if (timestamp_relative != ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID) {
-			// timestamp_relative is already given in 0.1 ms
-			uint64_t t = timestamp_relative + ekf2_timestamps.timestamp / 100; // in 0.1 ms
-			findTimestampAndPublish(t, msg_id, replay_file);
-		}
-	};
-
-	handle_sensor_publication(ekf2_timestamps.airspeed_timestamp_rel, _airspeed_msg_id);
-	handle_sensor_publication(ekf2_timestamps.distance_sensor_timestamp_rel, _distance_sensor_msg_id);
-	handle_sensor_publication(ekf2_timestamps.gps_timestamp_rel, _gps_msg_id);
-	handle_sensor_publication(ekf2_timestamps.optical_flow_timestamp_rel, _optical_flow_msg_id);
-	handle_sensor_publication(ekf2_timestamps.vehicle_air_data_timestamp_rel, _vehicle_air_data_msg_id);
-	handle_sensor_publication(ekf2_timestamps.vehicle_magnetometer_timestamp_rel, _vehicle_magnetometer_msg_id);
-	handle_sensor_publication(ekf2_timestamps.visual_odometry_timestamp_rel, _vehicle_visual_odometry_msg_id);
-
-	// sensor_combined: publish last because ekf2 is polling on this
-	if (!findTimestampAndPublish(ekf2_timestamps.timestamp / 100, _sensor_combined_msg_id, replay_file)) {
-		if (_sensor_combined_msg_id == msg_id_invalid) {
-			// subscription not found yet or sensor_combined not contained in log
-			return false;
-
-		} else if (!_subscriptions[_sensor_combined_msg_id]->orb_meta) {
-			return false; // read past end of file
-
-		} else {
-			// we should publish a topic, just publish the same again
-			readTopicDataToBuffer(*_subscriptions[_sensor_combined_msg_id], replay_file);
-			publishTopic(*_subscriptions[_sensor_combined_msg_id], _read_buffer.data());
-		}
-	}
-
-	return true;
-
-}
-
-bool ReplayEkf2::findTimestampAndPublish(uint64_t timestamp, uint16_t msg_id, std::ifstream &replay_file)
-{
-	if (msg_id == msg_id_invalid) {
-		// could happen if a topic is not logged
-		return false;
-	}
-
-	Subscription &sub = *_subscriptions[msg_id];
-
-	while (sub.next_timestamp / 100 < timestamp && sub.orb_meta) {
-		nextDataMessage(replay_file, sub, msg_id);
-	}
-
-	if (!sub.orb_meta) { // no messages anymore
-		return false;
-	}
-
-	if (sub.next_timestamp / 100 != timestamp) {
-		// this can happen in beginning of the log or on a dropout
-		PX4_DEBUG("No timestamp match found for topic %s (%i, %i)", sub.orb_meta->o_name, (int)sub.next_timestamp / 100,
-			  timestamp);
-		++sub.error_counter;
-		return false;
-	}
-
-	readTopicDataToBuffer(sub, replay_file);
-	publishTopic(sub, _read_buffer.data());
-	return true;
-}
-
-void ReplayEkf2::onEnterMainLoop()
-{
-	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
-}
-
-void ReplayEkf2::onExitMainLoop()
-{
-	// print statistics
-	auto print_sensor_statistics = [this](uint16_t msg_id, const char *name) {
-		if (msg_id != msg_id_invalid) {
-			Subscription &sub = *_subscriptions[msg_id];
-
-			if (sub.publication_counter > 0 || sub.error_counter > 0) {
-				PX4_INFO("%s: %i, %i", name, sub.publication_counter, sub.error_counter);
-			}
-		}
-	};
-
-	PX4_INFO("");
-	PX4_INFO("Topic, Num Published, Num Error (no timestamp match found):");
-
-	print_sensor_statistics(_airspeed_msg_id, "airspeed");
-	print_sensor_statistics(_distance_sensor_msg_id, "distance_sensor");
-	print_sensor_statistics(_gps_msg_id, "vehicle_gps_position");
-	print_sensor_statistics(_optical_flow_msg_id, "optical_flow");
-	print_sensor_statistics(_sensor_combined_msg_id, "sensor_combined");
-	print_sensor_statistics(_vehicle_air_data_msg_id, "vehicle_air_data");
-	print_sensor_statistics(_vehicle_magnetometer_msg_id, "vehicle_magnetometer");
-	print_sensor_statistics(_vehicle_visual_odometry_msg_id, "vehicle_visual_odometry");
-
-	orb_unsubscribe(_vehicle_attitude_sub);
-	_vehicle_attitude_sub = -1;
-}
-
-uint64_t ReplayEkf2::handleTopicDelay(uint64_t next_file_time, uint64_t timestamp_offset)
-{
-	// no need for usleep
-	return next_file_time;
-}
-
-
-int Replay::custom_command(int argc, char *argv[])
+int
+Replay::custom_command(int argc, char *argv[])
 {
 	if (!strcmp(argv[0], "tryapplyparams")) {
 		return Replay::applyParams(true);
@@ -1139,7 +951,8 @@ int Replay::custom_command(int argc, char *argv[])
 	return print_usage("unknown command");
 }
 
-int Replay::print_usage(const char *reason)
+int
+Replay::print_usage(const char *reason)
 {
 	if (reason) {
 		PX4_WARN("%s\n", reason);
@@ -1174,7 +987,8 @@ page.
 	return 0;
 }
 
-int Replay::task_spawn(int argc, char *argv[])
+int
+Replay::task_spawn(int argc, char *argv[])
 {
 	// check if a log file was found
 	if (!isSetup()) {
@@ -1200,7 +1014,8 @@ int Replay::task_spawn(int argc, char *argv[])
 	return 0;
 }
 
-int Replay::applyParams(bool quiet)
+int
+Replay::applyParams(bool quiet)
 {
 	if (!isSetup()) {
 		if (quiet) {
@@ -1229,7 +1044,8 @@ int Replay::applyParams(bool quiet)
 	return ret;
 }
 
-Replay *Replay::instantiate(int argc, char *argv[])
+Replay *
+Replay::instantiate(int argc, char *argv[])
 {
 	// check the replay mode
 	const char *replay_mode = getenv(replay::ENV_MODE);
@@ -1250,7 +1066,8 @@ Replay *Replay::instantiate(int argc, char *argv[])
 
 using namespace px4;
 
-int replay_main(int argc, char *argv[])
+extern "C" __EXPORT int
+replay_main(int argc, char *argv[])
 {
 	//check for logfile env variable
 	const char *logfile = getenv(replay::ENV_FILENAME);
