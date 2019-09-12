@@ -37,14 +37,12 @@
  * A cascaded position controller for position/velocity control only.
  */
 
+#pragma once
 #include <matrix/matrix/math.hpp>
 
-#include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_constraints.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
-#include <px4_module_params.h>
-#pragma once
 
 struct PositionControlStates {
 	matrix::Vector3f position;
@@ -73,12 +71,46 @@ struct PositionControlStates {
  * 	If there is a position/velocity- and thrust-setpoint present, then
  *  the thrust-setpoint is ommitted and recomputed from position-velocity-PID-loop.
  */
-class PositionControl : public ModuleParams
+class PositionControl
 {
 public:
 
-	PositionControl(ModuleParams *parent);
+	PositionControl() = default;
 	~PositionControl() = default;
+
+	/**
+	 * Set the position control gains
+	 * @param P 3D vector of proportional gains for x,y,z axis
+	 */
+	void setPositionGains(const matrix::Vector3f &P) { _gain_pos_p = P; }
+
+	/**
+	 * Set the velocity control gains
+	 * @param P 3D vector of proportional gains for x,y,z axis
+	 * @param I 3D vector of integral gains
+	 * @param D 3D vector of derivative gains
+	 */
+	void setVelocityGains(const matrix::Vector3f &P, const matrix::Vector3f &I, const matrix::Vector3f &D);
+
+	/**
+	 * Set the maximum velocity to execute with feed forward and position control
+	 * @param vel_horizontal horizontal velocity limit
+	 * @param vel_up upwards velocity limit
+	 * @param vel_down downwards velocity limit
+	 */
+	void setVelocityLimits(float vel_horizontal, float vel_up, float vel_down);
+
+	/**
+	 * Set the maximum tilt angle in radians the output attitude is allowed to have
+	 * @param tilt angle from level orientation in radians
+	 */
+	void setTiltLimit(float tilt) { _lim_tilt = tilt; }
+
+	/**
+	 * Set the maximum tilt angle in radians the output attitude is allowed to have
+	 * @param thrust [0,1] with which the vehicle hovers not aacelerating down or up with level orientation
+	 */
+	void setHoverThrust(float thrust) { _hover_thrust = thrust; }
 
 	/**
 	 * Pass the current vehicle state to the controller
@@ -110,8 +142,8 @@ public:
 	bool update(const float dt);
 
 	/**
-	 * 	Set the integral term in xy to 0.
-	 * 	@see _thr_int
+	 * Set the integral term in xy to 0.
+	 * @see _vel_int
 	 */
 	void resetIntegral() { _vel_int = matrix::Vector3f(); }
 
@@ -131,15 +163,25 @@ public:
 	 */
 	void getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint);
 
-protected:
-
-	void updateParams() override;
-
 private:
 	void _positionController(); /** applies the P-position-controller */
 	void _velocityController(const float &dt); /** applies the PID-velocity-controller */
 	void _addIfNotNan(float &setpoint, const float addition); /** adds to the setpoint but handles NAN cases correctly */
 	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition); /** same but bulk for Vector3f */
+
+	// Gains
+	matrix::Vector3f _gain_pos_p; ///< Position control proportional gain
+	matrix::Vector3f _gain_vel_p; ///< Velocity control proportional gain
+	matrix::Vector3f _gain_vel_i; ///< Velocity control integral gain
+	matrix::Vector3f _gain_vel_d; ///< Velocity control derivative gain
+
+	// Limits
+	float _lim_vel_horizontal{0}; ///< Horizontal velocity limit with feed forward and position control
+	float _lim_vel_up{0}; ///< Upwards velocity limit with feed forward and position control
+	float _lim_vel_down{0}; ///< Downwards velocity limit with feed forward and position control
+	float _lim_tilt{0}; ///< Maximum tilt from level the output attitude is allowed to have
+
+	float _hover_thrust{0}; ///< Thrust [0,1] with which the vehicle hovers not aacelerating down or up with level orientation
 
 	// States
 	matrix::Vector3f _pos; /**< position */
@@ -157,26 +199,4 @@ private:
 	matrix::Vector3f _thr_sp; /**< desired thrust */
 	float _yaw_sp{}; /**< desired yaw */
 	float _yawspeed_sp{}; /** desired yaw-speed */
-
-	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,
-		(ParamFloat<px4::params::MPC_THR_HOVER>) _param_mpc_thr_hover,
-		(ParamFloat<px4::params::MPC_THR_MIN>) _param_mpc_thr_min,
-		(ParamFloat<px4::params::MPC_MANTHR_MIN>) _param_mpc_manthr_min,
-		(ParamFloat<px4::params::MPC_XY_VEL_MAX>) _param_mpc_xy_vel_max,
-		(ParamFloat<px4::params::MPC_Z_VEL_MAX_DN>) _param_mpc_z_vel_max_dn,
-		(ParamFloat<px4::params::MPC_Z_VEL_MAX_UP>) _param_mpc_z_vel_max_up,
-		(ParamFloat<px4::params::MPC_TILTMAX_AIR>)
-		_param_mpc_tiltmax_air, // maximum tilt for any position controlled mode in degrees
-		(ParamFloat<px4::params::MPC_MAN_TILT_MAX>)
-		_param_mpc_man_tilt_max, // maximum til for stabilized/altitude mode in degrees
-		(ParamFloat<px4::params::MPC_Z_P>) _param_mpc_z_p,
-		(ParamFloat<px4::params::MPC_Z_VEL_P>) _param_mpc_z_vel_p,
-		(ParamFloat<px4::params::MPC_Z_VEL_I>) _param_mpc_z_vel_i,
-		(ParamFloat<px4::params::MPC_Z_VEL_D>) _param_mpc_z_vel_d,
-		(ParamFloat<px4::params::MPC_XY_P>) _param_mpc_xy_p,
-		(ParamFloat<px4::params::MPC_XY_VEL_P>) _param_mpc_xy_vel_p,
-		(ParamFloat<px4::params::MPC_XY_VEL_I>) _param_mpc_xy_vel_i,
-		(ParamFloat<px4::params::MPC_XY_VEL_D>) _param_mpc_xy_vel_d
-	)
 };
