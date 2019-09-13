@@ -322,6 +322,7 @@ MulticopterPositionControl::parameters_update(bool force)
 					  Vector3f(_param_mpc_xy_vel_i.get(), _param_mpc_xy_vel_i.get(), _param_mpc_z_vel_i.get()),
 					  Vector3f(_param_mpc_xy_vel_d.get(), _param_mpc_xy_vel_d.get(), _param_mpc_z_vel_d.get()));
 		_control.setVelocityLimits(_param_mpc_xy_vel_max.get(), _param_mpc_z_vel_max_up.get(), _param_mpc_z_vel_max_dn.get());
+		_control.setThrustLimits(_param_mpc_thr_min.get(), _param_mpc_thr_max.get());
 		_control.setTiltLimit(M_DEG_TO_RAD_F * _param_mpc_tiltmax_air.get()); // convert to radians!
 		_control.setHoverThrust(_param_mpc_thr_hover.get());
 

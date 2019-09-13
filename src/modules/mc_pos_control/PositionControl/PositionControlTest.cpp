@@ -79,6 +79,7 @@ public:
 		_position_control.setPositionGains(Vector3f(1, 1, 1));
 		_position_control.setVelocityGains(Vector3f(1, 1, 1), Vector3f(1, 1, 1), Vector3f(1, 1, 1));
 		_position_control.setVelocityLimits(1, 1, 1);
+		_position_control.setThrustLimits(0.1f, 0.9f);
 		_position_control.setTiltLimit(1);
 		_position_control.setHoverThrust(.5f);
 
@@ -131,18 +132,18 @@ public:
 
 TEST_F(PositionControlBasicDirectionTest, PositionControlDirectionP)
 {
-	_input_setpoint.x = 1;
-	_input_setpoint.y = 1;
-	_input_setpoint.z = -1;
+	_input_setpoint.x = .1f;
+	_input_setpoint.y = .1f;
+	_input_setpoint.z = -.1f;
 	runController();
 	checkDirection();
 }
 
 TEST_F(PositionControlBasicDirectionTest, VelocityControlDirection)
 {
-	_input_setpoint.vx = 1;
-	_input_setpoint.vy = 1;
-	_input_setpoint.vz = -1;
+	_input_setpoint.vx = .1f;
+	_input_setpoint.vy = .1f;
+	_input_setpoint.vz = -.1f;
 	runController();
 	checkDirection();
 }
@@ -156,8 +157,8 @@ TEST_F(PositionControlBasicDirectionTest, AccelerationControlDirection)
 
 TEST_F(PositionControlBasicTest, PositionControlMaxTilt)
 {
-	_input_setpoint.x = 100;
-	_input_setpoint.y = 100;
+	_input_setpoint.x = 10;
+	_input_setpoint.y = 10;
 	_input_setpoint.z = -0;
 
 	runController();
@@ -172,4 +173,29 @@ TEST_F(PositionControlBasicTest, PositionControlMaxTilt)
 	angle = acosf(body_z.dot(Vector3f(0, 0, 1)));
 	EXPECT_GT(angle, 0.f);
 	EXPECT_LE(angle, .50001f);
+}
+
+TEST_F(PositionControlBasicTest, PositionControlMaxVelocity)
+{
+	_input_setpoint.x = 10;
+	_input_setpoint.y = 10;
+	_input_setpoint.z = -10;
+
+	runController();
+	Vector2f velocity_xy(_output_setpoint.vx, _output_setpoint.vy);
+	EXPECT_LE(velocity_xy.norm(), 1);
+	EXPECT_LE(abs(_output_setpoint.vz), 1);
+}
+
+TEST_F(PositionControlBasicTest, PositionControlThrust)
+{
+	_input_setpoint.x = 10;
+	_input_setpoint.y = 10;
+	_input_setpoint.z = -10;
+
+	runController();
+	EXPECT_EQ(_attitude.thrust_body[0], 0.f);
+	EXPECT_EQ(_attitude.thrust_body[1], 0.f);
+	EXPECT_LT(_attitude.thrust_body[2], -.1f);
+	EXPECT_GE(_attitude.thrust_body[2], -0.9f);
 }

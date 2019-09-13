@@ -153,8 +153,8 @@ void PositionControl::_velocityController(const float &dt)
 	Vector3f thr_sp_velocity = (_acc_sp / hover_scale) - Vector3f(0, 0, _hover_thrust);
 
 	// The Thrust limits are negated and swapped due to NED-frame.
-	const float uMax = math::min(-.1f, -10e-4f); // transition hack
-	const float uMin = -.9f; // transition hack
+	const float uMax = math::min(-_lim_thr_min, -10e-4f);
+	const float uMin = -_lim_thr_max;
 
 	// Apply Anti-Windup in vertical direction
 	const bool stop_integral_D = (thr_sp_velocity(2) >= uMax && vel_error(2) >= 0.0f) ||
@@ -164,7 +164,7 @@ void PositionControl::_velocityController(const float &dt)
 		_vel_int(2) += vel_error(2) * _gain_vel_i(2) * dt;
 
 		// limit thrust integral
-		_vel_int(2) = math::min(fabsf(_vel_int(2)), .9f) * math::sign(_vel_int(2)); // transition hack
+		_vel_int(2) = math::min(fabsf(_vel_int(2)), _lim_thr_max) * math::sign(_vel_int(2));
 	}
 
 	// Saturate thrust setpoint in vertical direction
@@ -181,7 +181,7 @@ void PositionControl::_velocityController(const float &dt)
 	} else {
 		// Get maximum allowed horizontal thrust based on tilt and excess thrust
 		const float thrust_max_NE_tilt = fabsf(thr_sp_velocity(2)) * tanf(_constraints.tilt);
-		const float max_thrust_squared = .81f; // transition hack
+		const float max_thrust_squared = _lim_thr_max * _lim_thr_max;
 		const float z_thrust_squared = thr_sp_velocity(2) * thr_sp_velocity(2);
 		float thrust_max_NE = sqrtf(max_thrust_squared - z_thrust_squared);
 		thrust_max_NE = math::min(thrust_max_NE_tilt, thrust_max_NE);
