@@ -90,6 +90,7 @@ set(msg_files
 	position_setpoint_triplet.msg
 	power_button_state.msg
 	power_monitor.msg
+	pozyx_report.msg
 	pwm_input.msg
 	qshell_req.msg
 	qshell_retval.msg
