@@ -36,39 +36,181 @@
 #include <px4_defines.h>
 
 using namespace matrix;
+using namespace ControlMath;
 
-TEST(ControlMathTest, TiltLimitUnchanged)
+TEST(ControlMathTest, LimitTiltUnchanged)
 {
 	Vector3f body = Vector3f(0, .1f, 1).normalized();
 	const Vector3f body_before = body;
-	ControlMath::limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
+	limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
 	EXPECT_EQ(body, body_before);
 }
 
-TEST(ControlMathTest, TiltLimit45degree)
+TEST(ControlMathTest, LimitTilt45degree)
 {
 	Vector3f body = Vector3f(1, 0, 0);
-	ControlMath::limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
+	limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
 	EXPECT_EQ(body, Vector3f(M_SQRT1_2_F, 0, M_SQRT1_2_F));
 
 	body = Vector3f(0, 1, 0);
-	ControlMath::limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
+	limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 45.f);
 	EXPECT_EQ(body, Vector3f(0, M_SQRT1_2_F, M_SQRT1_2_F));
 }
 
-TEST(ControlMathTest, TiltLimit10degree)
+TEST(ControlMathTest, LimitTilt10degree)
 {
 	Vector3f body = Vector3f(1, 1, .1f).normalized();
-	ControlMath::limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 10.f);
+	limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 10.f);
 	float angle = acosf(body.dot(Vector3f(0, 0, 1)));
 	EXPECT_NEAR(angle * M_RAD_TO_DEG_F, 10.f, 1e-4f);
 	EXPECT_FLOAT_EQ(body.length(), 1.f);
 	EXPECT_FLOAT_EQ(body(0), body(1));
 
 	body = Vector3f(1, 2, .2f);
-	ControlMath::limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 10.f);
+	limitTilt(body, Vector3f(0, 0, 1), M_DEG_TO_RAD_F * 10.f);
 	angle = acosf(body.dot(Vector3f(0, 0, 1)));
 	EXPECT_NEAR(angle * M_RAD_TO_DEG_F, 10.f, 1e-4f);
 	EXPECT_FLOAT_EQ(body.length(), 1.f);
 	EXPECT_FLOAT_EQ(2.f * body(0), body(1));
+}
+
+TEST(ControlMathTest, ThrottleAttitudeMapping)
+{
+	/* expected: zero roll, zero pitch, zero yaw, full thr mag
+	 * reasone: thrust pointing full upward */
+	Vector3f thr{0.0f, 0.0f, -1.0f};
+	float yaw = 0.0f;
+	vehicle_attitude_setpoint_s att{};
+	thrustToAttitude(att, thr, yaw);
+	EXPECT_EQ(att.roll_body, 0);
+	EXPECT_EQ(att.pitch_body, 0);
+	EXPECT_EQ(att.yaw_body, 0);
+	EXPECT_EQ(att.thrust_body[2], -1.f);
+
+	/* expected: same as before but with 90 yaw
+	 * reason: only yaw changed */
+	yaw = M_PI_2_F;
+	thrustToAttitude(att, thr, yaw);
+	EXPECT_EQ(att.roll_body, 0);
+	EXPECT_EQ(att.pitch_body, 0);
+	EXPECT_EQ(att.yaw_body, M_PI_2_F);
+	EXPECT_EQ(att.thrust_body[2], -1.f);
+
+	/* expected: same as before but roll 180
+	 * reason: thrust points straight down and order Euler
+	 * order is: 1. roll, 2. pitch, 3. yaw */
+	thr = Vector3f(0.0f, 0.0f, 1.0f);
+	thrustToAttitude(att, thr, yaw);
+	EXPECT_NEAR(abs(att.roll_body), M_PI_F, 1e4f);
+	EXPECT_EQ(att.pitch_body, 0);
+	EXPECT_EQ(att.yaw_body, M_PI_2_F);
+	EXPECT_EQ(att.thrust_body[2], -1.f);
+}
+
+TEST(ControlMathTest, ConstrainXYPriorities)
+{
+	float max = 5.0f;
+	// v0 already at max
+	Vector2f v0(max, 0);
+	Vector2f v1(v0(1), -v0(0));
+
+	Vector2f v_r = constrainXY(v0, v1, max);
+	EXPECT_EQ(v_r(0), max);
+	EXPECT_GT(v_r(0), 0);
+	EXPECT_EQ(v_r(1), 0);
+
+	// v1 exceeds max but v0 is zero
+	v0.zero();
+	v_r = constrainXY(v0, v1, max);
+	EXPECT_EQ(v_r(1), -max);
+	EXPECT_LT(v_r(1), 0);
+	EXPECT_EQ(v_r(0), 0);
+
+	v0 = Vector2f(0.5f, 0.5f);
+	v1 = Vector2f(0.5f, -0.5f);
+	v_r = constrainXY(v0, v1, max);
+	float diff = Vector2f(v_r - (v0 + v1)).length();
+	EXPECT_EQ(diff, 0);
+
+	// v0 and v1 exceed max and are perpendicular
+	v0 = Vector2f(4.0f, 0.0f);
+	v1 = Vector2f(0.0f, -4.0f);
+	v_r = constrainXY(v0, v1, max);
+	EXPECT_EQ(v_r(0), v0(0));
+	EXPECT_GT(v_r(0), 0);
+	float remaining = sqrtf(max * max - (v0(0) * v0(0)));
+	EXPECT_EQ(v_r(1), -remaining);
+}
+
+TEST(ControlMathTest, CrossSphereLine)
+{
+	/* Testing 9 positions (+) around waypoints (o):
+	 *
+	 * Far             +              +              +
+	 *
+	 * Near            +              +              +
+	 * On trajectory --+----o---------+---------o----+--
+	 *                    prev                curr
+	 *
+	 * Expected targets (1, 2, 3):
+	 * Far             +              +              +
+	 *
+	 *
+	 * On trajectory -------1---------2---------3-------
+	 *
+	 *
+	 * Near            +              +              +
+	 * On trajectory -------o---1---------2-----3-------
+	 *
+	 *
+	 * On trajectory --+----o----1----+--------2/3---+-- */
+	Vector3f prev = Vector3f(0.0f, 0.0f, 0.0f);
+	Vector3f curr = Vector3f(0.0f, 0.0f, 2.0f);
+	Vector3f res;
+	bool retval = false;
+
+	// on line, near, before previous waypoint
+	retval = cross_sphere_line(Vector3f(0.0f, 0.0f, -0.5f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 0.5f));
+
+	// on line, near, before target waypoint
+	retval = cross_sphere_line(Vector3f(0.0f, 0.0f, 1.0f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 2.f));
+
+	// on line, near, after target waypoint
+	retval = cross_sphere_line(Vector3f(0.0f, 0.0f, 2.5f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 2.f));
+
+	// near, before previous waypoint
+	retval = cross_sphere_line(Vector3f(0.0f, 0.5f, -0.5f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 0.366025388f));
+
+	// near, before target waypoint
+	retval = cross_sphere_line(Vector3f(0.0f, 0.5f, 1.0f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 1.866025448f));
+
+	// near, after target waypoint
+	retval = ControlMath::cross_sphere_line(matrix::Vector3f(0.0f, 0.5f, 2.5f), 1.0f, prev, curr, res);
+	EXPECT_TRUE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 2.f));
+
+	// far, before previous waypoint
+	retval = ControlMath::cross_sphere_line(matrix::Vector3f(0.0f, 2.0f, -0.5f), 1.0f, prev, curr, res);
+	EXPECT_FALSE(retval);
+	EXPECT_EQ(res, Vector3f());
+
+	// far, before target waypoint
+	retval = ControlMath::cross_sphere_line(matrix::Vector3f(0.0f, 2.0f, 1.0f), 1.0f, prev, curr, res);
+	EXPECT_FALSE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 1.f));
+
+	// far, after target waypoint
+	retval = ControlMath::cross_sphere_line(matrix::Vector3f(0.0f, 2.0f, 2.5f), 1.0f, prev, curr, res);
+	EXPECT_FALSE(retval);
+	EXPECT_EQ(res, Vector3f(0.f, 0.f, 2.f));
 }
