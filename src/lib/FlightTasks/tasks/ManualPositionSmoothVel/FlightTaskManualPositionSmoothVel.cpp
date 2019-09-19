@@ -49,7 +49,7 @@ bool FlightTaskManualPositionSmoothVel::activate(vehicle_local_position_setpoint
 	const Vector2f pos_prev(last_setpoint.x, last_setpoint.y);
 
 	_smoothing_xy.reset(accel_prev, vel_prev, pos_prev);
-	_smoothing_z.reset(last_setpoint.acc_z, last_setpoint.vz, last_setpoint.z);
+	_smoothing_z.reset(last_setpoint.acceleration[2], last_setpoint.vz, last_setpoint.z);
 
 	_initEkfResetCounters();
 
