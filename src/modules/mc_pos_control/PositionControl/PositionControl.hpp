@@ -98,26 +98,26 @@ public:
 	 * @param vel_up upwards velocity limit
 	 * @param vel_down downwards velocity limit
 	 */
-	void setVelocityLimits(float vel_horizontal, float vel_up, float vel_down);
+	void setVelocityLimits(const float vel_horizontal, const float vel_up, float vel_down);
 
 	/**
 	 * Set the minimum and maximum collective normalized thrust [0,1] that can be output by the controller
 	 * @param min minimum thrust e.g. 0.1 or 0
 	 * @param max maximum thrust e.g. 0.9 or 1
 	 */
-	void setThrustLimits(float min, float max) { _lim_thr_min = min; _lim_thr_max = max; };
+	void setThrustLimits(const float min, const float max);
 
 	/**
 	 * Set the maximum tilt angle in radians the output attitude is allowed to have
 	 * @param tilt angle from level orientation in radians
 	 */
-	void setTiltLimit(float tilt) { _lim_tilt = tilt; }
+	void setTiltLimit(const float tilt) { _lim_tilt = tilt; }
 
 	/**
 	 * Set the maximum tilt angle in radians the output attitude is allowed to have
 	 * @param thrust [0,1] with which the vehicle hovers not aacelerating down or up with level orientation
 	 */
-	void setHoverThrust(float thrust) { _hover_thrust = thrust; }
+	void setHoverThrust(const float thrust) { _hover_thrust = thrust; }
 
 	/**
 	 * Pass the current vehicle state to the controller
@@ -127,12 +127,14 @@ public:
 
 	/**
 	 * Pass the desired setpoints
+	 * Note: NAN value means no feed forward/leave state uncontrolled if there's no higher order setpoint.
 	 * @param setpoint a vehicle_local_position_setpoint_s structure
 	 */
 	void setInputSetpoint(const vehicle_local_position_setpoint_s &setpoint);
 
 	/**
 	 * Pass constraints that are stricter than the global limits
+	 * Note: NAN value means no constraint, take maximum limit of controller.
 	 * @param constraints a PositionControl structure with supported constraints
 	 */
 	void setConstraints(const vehicle_constraints_s &constraints);
@@ -170,11 +172,14 @@ public:
 	 */
 	void getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint);
 
+	/** adds to the setpoint but handles NAN cases correctly */
+	void _addIfNotNan(float &setpoint, const float addition) const;
+	/** same but bulk for Vector3f */
+	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition) const;
 private:
-	void _positionController(); /** applies the P-position-controller */
-	void _velocityController(const float &dt); /** applies the PID-velocity-controller */
-	void _addIfNotNan(float &setpoint, const float addition); /** adds to the setpoint but handles NAN cases correctly */
-	void _addIfNotNanVector(matrix::Vector3f &setpoint, const matrix::Vector3f &addition); /** same but bulk for Vector3f */
+	void _positionControl(); ///< Position proportional control
+	void _velocityControl(const float dt); ///< Velocity PID control
+	void _accelerationControl(); ///< Acceleration setpoint processing
 
 	// Gains
 	matrix::Vector3f _gain_pos_p; ///< Position control proportional gain
