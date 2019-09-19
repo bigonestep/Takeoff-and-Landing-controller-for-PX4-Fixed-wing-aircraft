@@ -43,6 +43,8 @@
 #include <matrix/matrix/math.hpp>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 
+static constexpr float A_GRAVITY = 9.80665f; // m/s^2 as defined by the SI standard
+
 namespace ControlMath
 {
 /**
