@@ -1118,27 +1118,12 @@ void Ekf2::run()
 		}
 
 		if (_range_finder_sub_index >= 0) {
-			bool range_finder_updated = _range_finder_subs[_range_finder_sub_index].updated();
 
-			if (range_finder_updated) {
+			if (_range_finder_subs[_range_finder_sub_index].updated()) {
 				distance_sensor_s range_finder;
 
 				if (_range_finder_subs[_range_finder_sub_index].copy(&range_finder)) {
-					// check distance sensor data quality
-					// TODO - move this check inside the ecl library
-					if (range_finder.signal_quality == 0) {
-						// use rng_gnd_clearance if on ground
-						if (_ekf.get_in_air_status()) {
-							range_finder_updated = false;
-
-						} else {
-							range_finder.current_distance = _param_ekf2_min_rng.get();
-						}
-					}
-
-					if (range_finder_updated) {
-						_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
-					}
+					_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance, range_finder.signal_quality);
 
 					// Save sensor limits reported by the rangefinder
 					_ekf.set_rangefinder_limits(range_finder.min_distance, range_finder.max_distance);
@@ -1323,8 +1308,7 @@ void Ekf2::run()
 				}
 
 				// The rotation of the tangent plane vs. geographical north
-				matrix::Quatf q;
-				_ekf.copy_quaternion(q.data());
+				matrix::Quatf q = _ekf.get_quaternion();
 
 				lpos.yaw = matrix::Eulerf(q).psi();
 
@@ -1787,8 +1771,7 @@ const Vector3f Ekf2::get_vel_body_wind()
 {
 	// Used to correct baro data for positional errors
 
-	matrix::Quatf q;
-	_ekf.copy_quaternion(q.data());
+	matrix::Quatf q = _ekf.get_quaternion();
 	matrix::Dcmf R_to_body(q.inversed());
 
 	// Calculate wind-compensated velocity in body frame
