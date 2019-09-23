@@ -49,6 +49,23 @@ bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s la
 
 bool FlightTaskManualAcceleration::update()
 {
+	// maximum commanded acceleration and velocity
+	Vector3f acceleration_scale;
+	Vector3f velocity_scale;
+	acceleration_scale(0) = acceleration_scale(1) = _param_mpc_acc_hor.get();
+	velocity_scale(0) = velocity_scale(1) = _param_mpc_vel_manual.get();
+
+	if (_velocity(2) < 0) {
+		acceleration_scale(2) = _param_mpc_acc_up_max.get();
+		velocity_scale(2) = _param_mpc_z_vel_max_up.get();
+
+	} else {
+		acceleration_scale(2) = _param_mpc_acc_down_max.get();
+		velocity_scale(2) = _param_mpc_z_vel_max_dn.get();
+	}
+
+	acceleration_scale *= 2.f; // because of drag the average aceleration is half
+
 	// Yaw
 	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint,
 					  _sticks_expo(3) * math::radians(_param_mpc_man_y_max.get()), _yaw, _deltatime);
@@ -60,11 +77,12 @@ bool FlightTaskManualAcceleration::update()
 	_position_lock.limitStickUnitLengthXY(stick_xy);
 	_position_lock.rotateIntoHeadingFrameXY(stick_xy, _yaw, _yaw_setpoint);
 
-	_acceleration_setpoint = Vector3f(stick_xy(0), stick_xy(1), _sticks_expo(2));
-	_acceleration_setpoint *= 10;
+
+	_acceleration_setpoint = Vector3f(stick_xy(0), stick_xy(1), _sticks_expo(2)).emult(acceleration_scale);
 
 	// Add drag to limit speed and brake again
-	_acceleration_setpoint -= 2.f * _velocity;
+	Vector3f cv = acceleration_scale.edivide(velocity_scale);
+	_acceleration_setpoint -= cv.emult(_velocity);
 
 	lockAltitude();
 	lockPosition(stick_xy.length());

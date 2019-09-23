@@ -59,9 +59,11 @@ protected:
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTaskManual,
 					(ParamFloat<px4::params::MPC_VEL_MANUAL>) _param_mpc_vel_manual,
-					(ParamFloat<px4::params::MPC_ACC_HOR_MAX>) _param_mpc_acc_hor_max,
-					(ParamFloat<px4::params::MPC_HOLD_MAX_XY>) _param_mpc_hold_max_xy,
-					(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _param_mpc_acc_hor_estm,
+					(ParamFloat<px4::params::MPC_Z_VEL_MAX_UP>) _param_mpc_z_vel_max_up,
+					(ParamFloat<px4::params::MPC_Z_VEL_MAX_DN>) _param_mpc_z_vel_max_dn,
+					(ParamFloat<px4::params::MPC_ACC_HOR>) _param_mpc_acc_hor,
+					(ParamFloat<px4::params::MPC_ACC_UP_MAX>) _param_mpc_acc_up_max,
+					(ParamFloat<px4::params::MPC_ACC_DOWN_MAX>) _param_mpc_acc_down_max,
 					(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max
 				       )
 private:
