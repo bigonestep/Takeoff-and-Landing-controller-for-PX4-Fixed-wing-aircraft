@@ -303,7 +303,6 @@ void FlightTaskManualAltitude::_updateSetpoints()
 	_position_lock.limitStickUnitLengthXY(stick_xy);
 	_position_lock.rotateIntoHeadingFrameXY(stick_xy, _yaw, _yaw_setpoint);
 	_thrust_setpoint = Vector3f(stick_xy(0), stick_xy(1), NAN);
-	_acceleration_setpoint = 10.f * _thrust_setpoint;
 
 	_updateAltitudeLock();
 	_respectGroundSlowdown();
