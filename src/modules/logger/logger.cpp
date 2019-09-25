@@ -580,15 +580,8 @@ void Logger::add_default_topics()
 void Logger::add_high_rate_topics()
 {
 	// maximum rate to analyze fast maneuvers (e.g. for racing)
-	add_topic("actuator_controls_0");
-	add_topic("actuator_outputs");
-	add_topic("manual_control_setpoint");
-	add_topic("rate_ctrl_status");
-	add_topic("sensor_combined");
 	add_topic("vehicle_angular_velocity");
-	add_topic("vehicle_attitude");
-	add_topic("vehicle_attitude_setpoint");
-	add_topic("vehicle_rates_setpoint");
+	add_topic("vehicle_acceleration");
 }
 
 void Logger::add_debug_topics()

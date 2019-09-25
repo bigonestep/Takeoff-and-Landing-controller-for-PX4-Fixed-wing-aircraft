@@ -138,7 +138,7 @@ PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 
 	if (publish_control) {
 		control.timestamp_sample = timestamp;
-		val_filtered.copyTo(control.xyz);
+		val_calibrated.copyTo(control.xyz);
 		control.timestamp = hrt_absolute_time();
 		_sensor_gyro_control_pub.update();	// publish
 	}

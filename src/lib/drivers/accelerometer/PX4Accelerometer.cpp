@@ -120,28 +120,39 @@ PX4Accelerometer::update(hrt_abstime timestamp, float x, float y, float z)
 	// Filtered values
 	const matrix::Vector3f val_filtered{_filter.apply(val_calibrated)};
 
-	// Integrated values
-	matrix::Vector3f integrated_value;
-	uint32_t integral_dt = 0;
-
-	if (_integrator.put(timestamp, val_calibrated, integrated_value, integral_dt)) {
-
-		// Raw values (ADC units 0 - 65535)
-		report.x_raw = x;
-		report.y_raw = y;
-		report.z_raw = z;
-
-		report.x = val_filtered(0);
-		report.y = val_filtered(1);
-		report.z = val_filtered(2);
-
-		report.integral_dt = integral_dt;
-		report.x_integral = integrated_value(0);
-		report.y_integral = integrated_value(1);
-		report.z_integral = integrated_value(2);
-
+	if (true) {
+		report.x = val_calibrated(0);
+		report.y = val_calibrated(1);
+		report.z = val_calibrated(2);
+		report.timestamp = hrt_absolute_time();
 		poll_notify(POLLIN);
 		_sensor_accel_pub.update();
+
+	} else {
+
+		// Integrated values
+		matrix::Vector3f integrated_value;
+		uint32_t integral_dt = 0;
+
+		if (_integrator.put(timestamp, val_calibrated, integrated_value, integral_dt)) {
+
+			// Raw values (ADC units 0 - 65535)
+			report.x_raw = x;
+			report.y_raw = y;
+			report.z_raw = z;
+
+			report.x = val_filtered(0);
+			report.y = val_filtered(1);
+			report.z = val_filtered(2);
+
+			report.integral_dt = integral_dt;
+			report.x_integral = integrated_value(0);
+			report.y_integral = integrated_value(1);
+			report.z_integral = integrated_value(2);
+
+			poll_notify(POLLIN);
+			_sensor_accel_pub.update();
+		}
 	}
 }
 
