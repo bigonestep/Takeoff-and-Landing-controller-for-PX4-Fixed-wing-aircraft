@@ -38,7 +38,6 @@
 #include "FlightTaskAutoLineSmoothVel.hpp"
 #include <mathlib/mathlib.h>
 #include <float.h>
-#include "TrajMath.hpp"
 
 using namespace matrix;
 
@@ -57,7 +56,6 @@ bool FlightTaskAutoLineSmoothVel::activate(vehicle_local_position_setpoint_s las
 
 	_yaw_sp_prev = last_setpoint.yaw;
 	_updateTrajConstraints();
-	_initEkfResetCounters();
 
 	return ret;
 }
@@ -70,7 +68,6 @@ void FlightTaskAutoLineSmoothVel::reActivate()
 	}
 
 	_trajectory[2].reset(0.f, 0.7f, _position(2));
-	_initEkfResetCounters();
 }
 
 void FlightTaskAutoLineSmoothVel::checkSetpoints(vehicle_local_position_setpoint_s &setpoints)
@@ -97,6 +94,38 @@ void FlightTaskAutoLineSmoothVel::checkSetpoints(vehicle_local_position_setpoint
 	if (!PX4_ISFINITE(setpoints.acc_z)) { setpoints.acc_z = 0.f; }
 
 	if (!PX4_ISFINITE(setpoints.yaw)) { setpoints.yaw = _yaw; }
+}
+
+/**
+ * EKF reset handling functions
+ * Those functions are called by the base FlightTask in
+ * case of an EKF reset event
+ */
+void FlightTaskAutoLineSmoothVel::_ekfResetHandlerPositionXY()
+{
+	_trajectory[0].setCurrentPosition(_position(0));
+	_trajectory[1].setCurrentPosition(_position(1));
+}
+
+void FlightTaskAutoLineSmoothVel::_ekfResetHandlerVelocityXY()
+{
+	_trajectory[0].setCurrentVelocity(_velocity(0));
+	_trajectory[1].setCurrentVelocity(_velocity(1));
+}
+
+void FlightTaskAutoLineSmoothVel::_ekfResetHandlerPositionZ()
+{
+	_trajectory[2].setCurrentPosition(_position(2));
+}
+
+void FlightTaskAutoLineSmoothVel::_ekfResetHandlerVelocityZ()
+{
+	_trajectory[2].setCurrentVelocity(_velocity(2));
+}
+
+void FlightTaskAutoLineSmoothVel::_ekfResetHandlerHeading(float delta_psi)
+{
+	_yaw_sp_prev += delta_psi;
 }
 
 void FlightTaskAutoLineSmoothVel::_generateSetpoints()
@@ -152,40 +181,6 @@ float FlightTaskAutoLineSmoothVel::_constrainAbs(float val, float min, float max
 	return math::sign(val) * math::constrain(fabsf(val), fabsf(min), fabsf(max));
 }
 
-void FlightTaskAutoLineSmoothVel::_initEkfResetCounters()
-{
-	_reset_counters.xy = _sub_vehicle_local_position->get().xy_reset_counter;
-	_reset_counters.vxy = _sub_vehicle_local_position->get().vxy_reset_counter;
-	_reset_counters.z = _sub_vehicle_local_position->get().z_reset_counter;
-	_reset_counters.vz = _sub_vehicle_local_position->get().vz_reset_counter;
-}
-
-void FlightTaskAutoLineSmoothVel::_checkEkfResetCounters()
-{
-	// Check if a reset event has happened.
-	if (_sub_vehicle_local_position->get().xy_reset_counter != _reset_counters.xy) {
-		_trajectory[0].setCurrentPosition(_position(0));
-		_trajectory[1].setCurrentPosition(_position(1));
-		_reset_counters.xy = _sub_vehicle_local_position->get().xy_reset_counter;
-	}
-
-	if (_sub_vehicle_local_position->get().vxy_reset_counter != _reset_counters.vxy) {
-		_trajectory[0].setCurrentVelocity(_velocity(0));
-		_trajectory[1].setCurrentVelocity(_velocity(1));
-		_reset_counters.vxy = _sub_vehicle_local_position->get().vxy_reset_counter;
-	}
-
-	if (_sub_vehicle_local_position->get().z_reset_counter != _reset_counters.z) {
-		_trajectory[2].setCurrentPosition(_position(2));
-		_reset_counters.z = _sub_vehicle_local_position->get().z_reset_counter;
-	}
-
-	if (_sub_vehicle_local_position->get().vz_reset_counter != _reset_counters.vz) {
-		_trajectory[2].setCurrentVelocity(_velocity(2));
-		_reset_counters.vz = _sub_vehicle_local_position->get().vz_reset_counter;
-	}
-}
-
 float FlightTaskAutoLineSmoothVel::_getSpeedAtTarget()
 {
 	// Compute the maximum allowed speed at the waypoint assuming that we want to
@@ -212,9 +207,10 @@ float FlightTaskAutoLineSmoothVel::_getSpeedAtTarget()
 		// We choose a maximum centripetal acceleration of MPC_ACC_HOR * MPC_XY_TRAJ_P to take in account
 		// that there is a jerk limit (a direct transition from line to circle is not possible)
 		// MPC_XY_TRAJ_P should be between 0 and 1.
-		const float max_speed_in_turn = trajmath::computeMaxSpeedInWaypoint(alpha,
-						_param_mpc_xy_traj_p.get() * _param_mpc_acc_hor.get(),
-						_target_acceptance_radius);
+		float accel_tmp = _param_mpc_xy_traj_p.get() * _param_mpc_acc_hor.get();
+		float max_speed_in_turn = math::trajectory::computeMaxSpeedInWaypoint(alpha,
+					  accel_tmp,
+					  _target_acceptance_radius);
 		speed_at_target = math::min(math::min(max_speed_in_turn, max_speed_current_next), _mc_cruise_speed);
 	}
 
@@ -223,7 +219,7 @@ float FlightTaskAutoLineSmoothVel::_getSpeedAtTarget()
 
 float FlightTaskAutoLineSmoothVel::_getMaxSpeedFromDistance(float braking_distance)
 {
-	float max_speed = trajmath::computeMaxSpeedFromBrakingDistance(_param_mpc_jerk_auto.get(),
+	float max_speed = math::trajectory::computeMaxSpeedFromBrakingDistance(_param_mpc_jerk_auto.get(),
 			  _param_mpc_acc_hor.get(),
 			  braking_distance);
 	// To avoid high gain at low distance due to the sqrt, we take the minimum
@@ -239,7 +235,6 @@ void FlightTaskAutoLineSmoothVel::_prepareSetpoints()
 	// that one is used as a velocity limit.
 	// If the position setpoints are set to NAN, the values in the velocity setpoints are used as velocity targets: nothing to do here.
 
-	_checkEkfResetCounters();
 	_want_takeoff = false;
 
 	if (_param_mpc_yaw_mode.get() == 4 && !_yaw_sp_aligned) {
