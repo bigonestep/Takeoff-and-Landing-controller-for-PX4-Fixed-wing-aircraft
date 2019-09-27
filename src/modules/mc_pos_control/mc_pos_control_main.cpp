@@ -497,7 +497,7 @@ MulticopterPositionControl::run()
 	hrt_abstime time_stamp_last_loop = hrt_absolute_time(); // time stamp of last loop iteration
 
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
-	orb_set_interval(_local_pos_sub, 20); // 50 Hz updates
+	//orb_set_interval(_local_pos_sub, 20); // 50 Hz updates
 
 	// get initial values for all parameters and subscribtions
 	parameters_update(true);
