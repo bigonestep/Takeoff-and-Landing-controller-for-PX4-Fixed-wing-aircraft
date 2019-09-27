@@ -553,6 +553,7 @@ void Logger::add_default_topics()
 	add_topic_multi("actuator_outputs", 100);
 	add_topic_multi("battery_status", 500);
 	add_topic_multi("distance_sensor", 100);
+	add_topic_multi("multirotor_motor_limits", 200);
 	add_topic_multi("telemetry_status");
 	add_topic_multi("vehicle_gps_position");
 	add_topic_multi("wind_estimate", 200);
@@ -567,9 +568,14 @@ void Logger::add_default_topics()
 	add_topic("position_controller_status");
 	add_topic("time_offset");
 	add_topic("vehicle_angular_velocity", 10);
+	add_topic("vehicle_attitude");			// unlimited rate
 	add_topic("vehicle_attitude_groundtruth", 10);
+	add_topic("vehicle_attitude_setpoint");		// unlimited rate
 	add_topic("vehicle_global_position_groundtruth", 100);
+	add_topic("vehicle_local_position");		// unlimited rate
 	add_topic("vehicle_local_position_groundtruth", 100);
+	add_topic("vehicle_local_position_setpoint");	// unlimited rate
+	add_topic("vehicle_rates_setpoint");		// unlimited rate
 	add_topic("vehicle_roi");
 
 	add_topic_multi("multirotor_motor_limits");
