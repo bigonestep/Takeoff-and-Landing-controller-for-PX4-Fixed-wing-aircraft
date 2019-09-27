@@ -44,31 +44,33 @@
 using namespace matrix;
 namespace ControlMath
 {
-vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float yaw_sp)
+vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp_f, const float yaw_sp_in)
 {
-	vehicle_attitude_setpoint_s att_sp = {};
-	att_sp.yaw_body = yaw_sp;
+	matrix::Vector3<double> thr_sp{thr_sp_f(0), thr_sp_f(1), thr_sp_f(2)};
+	const double yaw_sp = yaw_sp_in;
+
+
 
 	// desired body_z axis = -normalize(thrust_vector)
-	Vector3f body_x, body_z;
+	matrix::Vector3<double> body_x, body_z;
 
-	if (thr_sp.length() > 0.00001f) {
+	if (thr_sp.length() > 0.00001) {
 		body_z = -thr_sp.normalized();
 
 	} else {
 		// no thrust, set Z axis to safe value
-		body_z = Vector3f(0.f, 0.f, 1.f);
+		body_z = Vector3<double>(0, 0, 1);
 	}
 
 	// vector of desired yaw direction in XY plane, rotated by PI/2
-	const Vector3f y_C(-sinf(yaw_sp), cosf(yaw_sp), 0.0f);
+	const matrix::Vector3<double> y_C(-sin(yaw_sp), cos(yaw_sp), 0.0);
 
-	if (fabsf(body_z(2)) > 0.000001f) {
+	if (fabs(body_z(2)) > 0.000001) {
 		// desired body_x axis, orthogonal to body_z
 		body_x = y_C % body_z;
 
 		// keep nose to front while inverted upside down
-		if (body_z(2) < 0.0f) {
+		if (body_z(2) < 0) {
 			body_x = -body_x;
 		}
 
@@ -77,15 +79,15 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	} else {
 		// desired thrust is in XY plane, set X downside to construct correct matrix,
 		// but yaw component will not be used actually
-		body_x(0) = 0.0f;
-		body_x(1) = 0.0f;
-		body_x(2) = 1.0f;
+		body_x(0) = 0.0;
+		body_x(1) = 0.0;
+		body_x(2) = 1.0;
 	}
 
 	// desired body_y axis
-	const Vector3f body_y = body_z % body_x;
+	const matrix::Vector3<double> body_y = body_z % body_x;
 
-	Dcmf R_sp;
+	matrix::Dcm<double> R_sp;
 
 	// fill rotation matrix
 	for (int i = 0; i < 3; i++) {
@@ -95,14 +97,20 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	}
 
 	//copy quaternion setpoint to attitude setpoint topic
-	const Quatf q_sp = R_sp;
-	q_sp.copyTo(att_sp.q_d);
-	att_sp.q_d_valid = true;
+	const matrix::Quaternion<double> q_sp = R_sp;
 
 	// calculate euler angles, for logging only, must not be used for control
-	Eulerf euler = R_sp;
+	const matrix::Euler<double> euler = R_sp;
+
+	vehicle_attitude_setpoint_s att_sp{};
+	att_sp.q_d[0] = q_sp(0);
+	att_sp.q_d[1] = q_sp(1);
+	att_sp.q_d[2] = q_sp(2);
+	att_sp.q_d[3] = q_sp(3);
+	att_sp.q_d_valid = true;
 	att_sp.roll_body = euler(0);
 	att_sp.pitch_body = euler(1);
+	att_sp.yaw_body = yaw_sp;
 	att_sp.thrust_body[2] = -thr_sp.length();
 
 	return att_sp;
