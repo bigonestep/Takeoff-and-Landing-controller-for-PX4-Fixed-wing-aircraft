@@ -50,7 +50,7 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	att_sp.yaw_body = yaw_sp;
 
 	// desired body_z axis = -normalize(thrust_vector)
-	Vector3f body_x, body_y, body_z;
+	Vector3f body_x, body_z;
 
 	if (thr_sp.length() > 0.00001f) {
 		body_z = -thr_sp.normalized();
@@ -61,7 +61,7 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	}
 
 	// vector of desired yaw direction in XY plane, rotated by PI/2
-	Vector3f y_C(-sinf(att_sp.yaw_body), cosf(att_sp.yaw_body), 0.0f);
+	const Vector3f y_C(-sinf(yaw_sp), cosf(yaw_sp), 0.0f);
 
 	if (fabsf(body_z(2)) > 0.000001f) {
 		// desired body_x axis, orthogonal to body_z
@@ -77,12 +77,13 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	} else {
 		// desired thrust is in XY plane, set X downside to construct correct matrix,
 		// but yaw component will not be used actually
-		body_x.zero();
+		body_x(0) = 0.0f;
+		body_x(1) = 0.0f;
 		body_x(2) = 1.0f;
 	}
 
 	// desired body_y axis
-	body_y = body_z % body_x;
+	const Vector3f body_y = body_z % body_x;
 
 	Dcmf R_sp;
 
@@ -94,7 +95,7 @@ vehicle_attitude_setpoint_s thrustToAttitude(const Vector3f &thr_sp, const float
 	}
 
 	//copy quaternion setpoint to attitude setpoint topic
-	Quatf q_sp = R_sp;
+	const Quatf q_sp = R_sp;
 	q_sp.copyTo(att_sp.q_d);
 	att_sp.q_d_valid = true;
 
