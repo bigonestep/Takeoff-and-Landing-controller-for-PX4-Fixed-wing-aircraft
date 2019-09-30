@@ -41,6 +41,7 @@
 #include <px4_defines.h>
 #include <systemlib/err.h>
 #include <uORB/uORB.h>
+#include <drivers/drv_hrt.h>
 
 namespace uORB
 {
@@ -65,8 +66,10 @@ public:
 	 * Publish the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool publish(const T &data)
+	bool publish(T &data)
 	{
+		data.timestamp = hrt_absolute_time();
+
 		if (_handle != nullptr) {
 			return (orb_publish(_meta, _handle, &data) == PX4_OK);
 
