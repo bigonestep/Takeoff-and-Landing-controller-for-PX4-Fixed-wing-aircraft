@@ -638,6 +638,7 @@ MulticopterPositionControl::run()
 
 			// Update states, setpoints and constraints.
 			_control.updateConstraints(constraints);
+			poll_subscriptions();
 			_control.updateState(_states);
 
 			// update position controller setpoints
