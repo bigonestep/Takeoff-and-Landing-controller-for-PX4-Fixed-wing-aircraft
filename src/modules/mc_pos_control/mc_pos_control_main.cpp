@@ -915,16 +915,12 @@ MulticopterPositionControl::failsafe(vehicle_local_position_setpoint_s &setpoint
 			// descend downwards with landspeed.
 			setpoint.vz = _param_mpc_land_speed.get();
 			setpoint.acceleration[0] = setpoint.acceleration[1] = 0.0f;
-			setpoint.thrust[0] = setpoint.thrust[1] = 0.0f;
 
 			if (warn) {
 				PX4_WARN("Failsafe: Descend with land-speed.");
 			}
 
 		} else {
-			const float failsafe_thrust = -(_param_mpc_thr_min.get() + (_param_mpc_thr_hover.get() - _param_mpc_thr_min.get()) *
-							0.7f);
-			Vector3f(0, 0, failsafe_thrust).copyTo(setpoint.thrust);
 			Vector3f(0, 0, 0.3).copyTo(setpoint.acceleration);
 
 			// Use the failsafe from the PositionController.
