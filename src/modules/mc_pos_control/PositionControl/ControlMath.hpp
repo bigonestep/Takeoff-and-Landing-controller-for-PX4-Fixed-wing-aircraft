@@ -73,6 +73,8 @@ void accelerationToAttitude(vehicle_attitude_setpoint_s &att_sp, const matrix::V
  */
 void limitTilt(matrix::Vector3f &body_unit, const matrix::Vector3f &world_unit, const float max_angle);
 
+void bodyzToQuaternion(matrix::Quatf &q, matrix::Vector3f body_z, const float yaw_sp);
+
 /**
  * Converts a body z vector and yaw set-point to a desired attitude.
  * @param body_z a world frame 3D vector in direction of the desired body z axis

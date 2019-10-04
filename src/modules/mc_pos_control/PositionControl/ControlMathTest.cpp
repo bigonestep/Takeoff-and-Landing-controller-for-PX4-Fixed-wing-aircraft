@@ -38,6 +38,14 @@
 using namespace matrix;
 using namespace ControlMath;
 
+TEST(ControlMathTest, ThrustToAttitude)
+{
+	Vector3f body = Vector3f(0, 0, 1).normalized();
+	Quatf q;
+	bodyzToQuaternion(q, body, 0);
+	EXPECT_EQ(body, q.dcm_z());
+}
+
 TEST(ControlMathTest, LimitTiltUnchanged)
 {
 	Vector3f body = Vector3f(0, 0, 1).normalized();

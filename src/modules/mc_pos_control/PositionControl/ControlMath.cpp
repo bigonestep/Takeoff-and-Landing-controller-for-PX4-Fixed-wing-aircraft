@@ -80,7 +80,7 @@ void limitTilt(Vector3f &body_unit, const Vector3f &world_unit, const float max_
 	body_unit = cosf(angle) * world_unit + sinf(angle) * rejection.unit();
 }
 
-void bodyzToAttitude(vehicle_attitude_setpoint_s &att_sp, Vector3f body_z, const float yaw_sp)
+void bodyzToQuaternion(Quatf &q, Vector3f body_z, const float yaw_sp)
 {
 	// zero vector, no direction, set safe level value
 	if (body_z.norm_squared() < FLT_EPSILON) {
@@ -88,46 +88,33 @@ void bodyzToAttitude(vehicle_attitude_setpoint_s &att_sp, Vector3f body_z, const
 	}
 
 	body_z.normalize();
+	float angle = acosf(Vector3f(0, 0, 1).dot(body_z));
+	Vector3f axis = Vector3f(0, 0, 1).cross(body_z);
+	axis.normalize();
 
-	// vector of desired yaw direction in XY plane, rotated by PI/2
-	Vector3f y_C(-sinf(yaw_sp), cosf(yaw_sp), 0.0f);
-
-	// desired body_x axis, orthogonal to body_z
-	Vector3f body_x = y_C % body_z;
-
-	// keep nose to front while inverted upside down
-	if (body_z(2) < 0.0f) {
-		body_x = -body_x;
+	if (angle > FLT_EPSILON) {
+		float magnitude = sinf(angle / 2.f);
+		q(0) = cosf(angle / 2.f);
+		q(1) = axis(0) * magnitude;
+		q(2) = axis(1) * magnitude;
+		q(3) = axis(2) * magnitude;
 	}
 
-	if (fabsf(body_z(2)) < 0.000001f) {
-		// desired thrust is in XY plane, set X downside to construct correct matrix,
-		// but yaw component will not be used actually
-		body_x.zero();
-		body_x(2) = 1.0f;
-	}
+	Quatf q_yaw(cosf(yaw_sp / 2.f), 0, 0, sinf(yaw_sp / 2.f));
+	q = q_yaw * q;
+}
 
-	body_x.normalize();
-
-	// desired body_y axis
-	Vector3f body_y = body_z % body_x;
-
-	Dcmf R_sp;
-
-	// fill rotation matrix
-	for (int i = 0; i < 3; i++) {
-		R_sp(i, 0) = body_x(i);
-		R_sp(i, 1) = body_y(i);
-		R_sp(i, 2) = body_z(i);
-	}
+void bodyzToAttitude(vehicle_attitude_setpoint_s &att_sp, Vector3f body_z, const float yaw_sp)
+{
+	Quatf q;
+	bodyzToQuaternion(q, body_z, yaw_sp);
 
 	// copy quaternion setpoint to attitude setpoint topic
-	Quatf q_sp = R_sp;
-	q_sp.copyTo(att_sp.q_d);
+	q.copyTo(att_sp.q_d);
 	att_sp.q_d_valid = true;
 
 	// calculate euler angles, for logging only, must not be used for control
-	Eulerf euler = R_sp;
+	Eulerf euler(q);
 	att_sp.roll_body = euler(0);
 	att_sp.pitch_body = euler(1);
 	att_sp.yaw_body = euler(2);

@@ -93,7 +93,6 @@ public:
 	bool init();
 
 private:
-
 	/**
 	 * initialize some vectors/matrices from parameters
 	 */
@@ -123,7 +122,6 @@ private:
 	 * @return vehicle_attitude_setpoint_s::LANDING_GEAR_UP or vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN
 	 */
 	float		get_landing_gear_state();
-
 
 	/**
 	 * Attitude controller.
@@ -282,6 +280,5 @@ private:
 
 	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
 	float _man_tilt_max;			/**< maximum tilt allowed for manual flight [rad] */
-
 };
 
