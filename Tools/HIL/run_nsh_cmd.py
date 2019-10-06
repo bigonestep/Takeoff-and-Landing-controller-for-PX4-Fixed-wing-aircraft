@@ -5,6 +5,7 @@ import subprocess
 from subprocess import call, Popen
 from argparse import ArgumentParser
 import re
+import sys
 
 def do_nsh_cmd(port, baudrate, cmd):
     databits = serial.EIGHTBITS
@@ -50,6 +51,11 @@ def do_nsh_cmd(port, baudrate, cmd):
             continue
         elif "nsh>" in serial_line:
             finished = 1
+            break
+        elif "ERROR" in serial_line:
+            finished = 1
+            print("Exiting")
+            exit(1)
             break
 
         if time.time() > timeout_start + timeout:
