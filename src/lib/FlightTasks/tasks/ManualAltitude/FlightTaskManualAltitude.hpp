@@ -40,7 +40,7 @@
 #pragma once
 
 #include "FlightTaskManual.hpp"
-#include "PositionLock.hpp"
+#include <PositionLock.hpp>
 #include <uORB/topics/home_position.h>
 
 class FlightTaskManualAltitude : public FlightTaskManual

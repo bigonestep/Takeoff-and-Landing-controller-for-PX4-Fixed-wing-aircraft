@@ -38,6 +38,7 @@
 #include "FlightTaskManualAcceleration.hpp"
 #include <mathlib/mathlib.h>
 #include <float.h>
+#include <ecl/geo/geo.h>
 
 using namespace matrix;
 
@@ -45,6 +46,7 @@ bool FlightTaskManualAcceleration::activate(vehicle_local_position_setpoint_s la
 {
 	bool ret = FlightTaskManual::activate(last_setpoint);
 	_velocity_setpoint.zero();
+	_jerk_limit.setForcedValue(Vector3f());
 	return ret;
 }
 
@@ -53,7 +55,7 @@ bool FlightTaskManualAcceleration::update()
 	// maximum commanded acceleration and velocity
 	Vector3f acceleration_scale;
 	Vector3f velocity_scale;
-	acceleration_scale(0) = acceleration_scale(1) = _param_mpc_acc_hor.get();
+	acceleration_scale(0) = acceleration_scale(1) = tanf(M_DEG_TO_RAD_F * _param_mpc_man_tilt_max.get()) * CONSTANTS_ONE_G;
 	velocity_scale(0) = velocity_scale(1) = _param_mpc_vel_manual.get();
 
 	if (_velocity(2) < 0.f) {
@@ -64,8 +66,6 @@ bool FlightTaskManualAcceleration::update()
 		acceleration_scale(2) = _param_mpc_acc_down_max.get();
 		velocity_scale(2) = _param_mpc_z_vel_max_dn.get();
 	}
-
-	acceleration_scale *= 2.f; // because of drag the average aceleration is half
 
 	// Yaw
 	_position_lock.updateYawFromStick(_yawspeed_setpoint, _yaw_setpoint,
@@ -81,6 +81,10 @@ bool FlightTaskManualAcceleration::update()
 	// Add drag to limit speed and brake again
 	Vector3f cv = acceleration_scale.edivide(velocity_scale);
 	_acceleration_setpoint -= cv.emult(_velocity);
+
+	// jerk limit
+	_jerk_limit.setSlewRate(Vector3f(6, 6, 10));
+	//_acceleration_setpoint = _jerk_limit.update(_acceleration_setpoint, _deltatime);
 
 	lockAltitude();
 	lockPosition(stick_xy.length());

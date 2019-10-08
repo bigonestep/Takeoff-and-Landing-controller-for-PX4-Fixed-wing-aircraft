@@ -41,7 +41,9 @@
 #pragma once
 
 #include "FlightTaskManual.hpp"
-#include "PositionLock.hpp"
+#include <PositionLock.hpp>
+#include <SlewRate.hpp>
+
 
 class FlightTaskManualAcceleration : public FlightTaskManual
 {
@@ -52,7 +54,8 @@ public:
 	bool update() override;
 
 protected:
-	PositionLock _position_lock; /**< object taking care of altitude and yaw lock logic */
+	PositionLock _position_lock; ///< object for altitude and yaw lock logic
+	SlewRate<Vector3f> _jerk_limit; ///< object for limiting the change of acceleration
 
 	void lockAltitude();
 	void lockPosition(const float stick_input_xy);
@@ -62,7 +65,7 @@ protected:
 					(ParamFloat<px4::params::MPC_VEL_MANUAL>) _param_mpc_vel_manual,
 					(ParamFloat<px4::params::MPC_Z_VEL_MAX_UP>) _param_mpc_z_vel_max_up,
 					(ParamFloat<px4::params::MPC_Z_VEL_MAX_DN>) _param_mpc_z_vel_max_dn,
-					(ParamFloat<px4::params::MPC_ACC_HOR>) _param_mpc_acc_hor,
+					(ParamFloat<px4::params::MPC_MAN_TILT_MAX>) _param_mpc_man_tilt_max,
 					(ParamFloat<px4::params::MPC_ACC_UP_MAX>) _param_mpc_acc_up_max,
 					(ParamFloat<px4::params::MPC_ACC_DOWN_MAX>) _param_mpc_acc_down_max,
 					(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max
