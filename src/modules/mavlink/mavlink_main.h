@@ -532,6 +532,8 @@ public:
 	 */
 	struct ping_statistics_s &get_ping_statistics() { return _ping_stats; }
 
+	static hrt_abstime &get_first_start_time() { return _first_start_time; }
+
 protected:
 	Mavlink			*next{nullptr};
 
@@ -546,7 +548,7 @@ private:
 
 	uORB::PublicationQueued<telemetry_status_s>	_telem_status_pub{ORB_ID(telemetry_status)};
 
-	bool			_task_running{false};
+	bool			_task_running{true};
 	static bool		_boot_complete;
 	static constexpr int	MAVLINK_MAX_INSTANCES{4};
 	static constexpr int	MAVLINK_MIN_INTERVAL{1500};
@@ -687,6 +689,8 @@ private:
 	static constexpr unsigned RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE = 25;
 	static constexpr unsigned RADIO_BUFFER_LOW_PERCENTAGE = 35;
 	static constexpr unsigned RADIO_BUFFER_HALF_PERCENTAGE = 50;
+
+	static hrt_abstime _first_start_time;
 
 	/**
 	 * Configure a single stream.

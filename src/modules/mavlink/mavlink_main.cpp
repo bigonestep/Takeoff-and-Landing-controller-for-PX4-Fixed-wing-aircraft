@@ -159,6 +159,8 @@ mavlink_message_t *mavlink_get_channel_buffer(uint8_t channel)
 
 static void usage();
 
+hrt_abstime Mavlink::_first_start_time = {0};
+
 bool Mavlink::_boot_complete = false;
 
 Mavlink::Mavlink() :
@@ -179,13 +181,14 @@ Mavlink::Mavlink() :
 	if (comp_id > 0 && comp_id < 255) {
 		mavlink_system.compid = comp_id;
 	}
+
+	if (_first_start_time == 0) {
+		_first_start_time = hrt_absolute_time();
+	}
 }
 
 Mavlink::~Mavlink()
 {
-	perf_free(_loop_perf);
-	perf_free(_loop_interval_perf);
-
 	if (_task_running) {
 		/* task wakes up every 10ms or so at the longest */
 		_task_should_exit = true;
@@ -205,6 +208,9 @@ Mavlink::~Mavlink()
 			}
 		} while (_task_running);
 	}
+
+	perf_free(_loop_perf);
+	perf_free(_loop_interval_perf);
 }
 
 void
@@ -586,7 +592,7 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const bool for
 	}
 
 	/* back off 1800 ms to avoid running into the USB setup timing */
-	while (_mode == MAVLINK_MODE_CONFIG &&
+	while (_is_usb_uart &&
 	       hrt_absolute_time() < 1800U * 1000U) {
 		px4_usleep(50000);
 	}
@@ -595,7 +601,7 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const bool for
 	_uart_fd = ::open(uart_name, O_RDWR | O_NOCTTY);
 
 	/* if this is a config link, stay here and wait for it to open */
-	if (_uart_fd < 0 && _mode == MAVLINK_MODE_CONFIG) {
+	if (_uart_fd < 0 && _is_usb_uart) {
 
 		uORB::SubscriptionData<actuator_armed_s> armed_sub{ORB_ID(actuator_armed)};
 
@@ -628,7 +634,6 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const bool for
 	/* Try to set baud rate */
 	struct termios uart_config;
 	int termios_state;
-	_is_usb_uart = false;
 
 	/* Initialize the uart config */
 	if ((termios_state = tcgetattr(_uart_fd, &uart_config)) < 0) {
@@ -640,8 +645,7 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const bool for
 	/* Clear ONLCR flag (which appends a CR for every LF) */
 	uart_config.c_oflag &= ~ONLCR;
 
-	/* USB serial is indicated by /dev/ttyACM0*/
-	if (strcmp(uart_name, "/dev/ttyACM0") != OK && strcmp(uart_name, "/dev/ttyACM1") != OK) {
+	if (!_is_usb_uart) {
 
 		/* Set baud rate */
 		if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {
@@ -651,7 +655,6 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const bool for
 		}
 
 	} else {
-		_is_usb_uart = true;
 
 		/* USB has no baudrate, but use a magic number for 'fast' */
 		_baudrate = 2000000;
@@ -1835,7 +1838,7 @@ Mavlink::task_main(int argc, char *argv[])
 	int ch;
 	_baudrate = 57600;
 	_datarate = 0;
-	_mode = MAVLINK_MODE_NORMAL;
+	_mode = MAVLINK_MODE_COUNT;
 	bool _force_flow_control = false;
 
 	_interface_name = nullptr;
@@ -2059,6 +2062,24 @@ Mavlink::task_main(int argc, char *argv[])
 		return PX4_ERROR;
 	}
 
+	/* USB serial is indicated by /dev/ttyACM0*/
+	if (strcmp(_device_name, "/dev/ttyACM0") == OK || strcmp(_device_name, "/dev/ttyACM1") == OK) {
+		if (_datarate == 0) {
+			_datarate = 800000;
+		}
+
+		if (_mode == MAVLINK_MODE_COUNT) {
+			_mode = MAVLINK_MODE_CONFIG;
+		}
+
+		_ftp_on = true;
+		_is_usb_uart = true;
+	}
+
+	if (_mode == MAVLINK_MODE_COUNT) {
+		_mode = MAVLINK_MODE_NORMAL;
+	}
+
 	if (_datarate == 0) {
 		/* convert bits to bytes and use 1/2 of bandwidth by default */
 		_datarate = _baudrate / 20;
@@ -2083,11 +2104,11 @@ Mavlink::task_main(int argc, char *argv[])
 		/* default values for arguments */
 		_uart_fd = mavlink_open_uart(_baudrate, _device_name, _force_flow_control);
 
-		if (_uart_fd < 0 && _mode != MAVLINK_MODE_CONFIG) {
+		if (_uart_fd < 0 && !_is_usb_uart) {
 			PX4_ERR("could not open %s", _device_name);
 			return PX4_ERROR;
 
-		} else if (_uart_fd < 0 && _mode == MAVLINK_MODE_CONFIG) {
+		} else if (_uart_fd < 0 && _is_usb_uart) {
 			/* the config link is optional */
 			return OK;
 		}
@@ -2126,9 +2147,9 @@ Mavlink::task_main(int argc, char *argv[])
 		pthread_mutex_init(&_message_buffer_mutex, nullptr);
 	}
 
+	uORB::Subscription parameter_update_sub{ORB_ID(parameter_update)};
+
 	MavlinkOrbSubscription *cmd_sub = add_orb_subscription(ORB_ID(vehicle_command), 0, true);
-	MavlinkOrbSubscription *param_sub = add_orb_subscription(ORB_ID(parameter_update));
-	uint64_t param_time = 0;
 	MavlinkOrbSubscription *status_sub = add_orb_subscription(ORB_ID(vehicle_status));
 	uint64_t status_time = 0;
 	MavlinkOrbSubscription *ack_sub = add_orb_subscription(ORB_ID(vehicle_command_ack), 0, true);
@@ -2224,9 +2245,13 @@ Mavlink::task_main(int argc, char *argv[])
 
 		update_rate_mult();
 
-		parameter_update_s param_update;
+		// check for parameter updates
+		if (parameter_update_sub.updated()) {
+			// clear update
+			parameter_update_s pupdate;
+			parameter_update_sub.copy(&pupdate);
 
-		if (param_sub->update(&param_time, &param_update)) {
+			// update parameters from storage
 			mavlink_update_parameters();
 
 #if defined(CONFIG_NET)
@@ -2235,7 +2260,7 @@ Mavlink::task_main(int argc, char *argv[])
 				_src_addr_initialized = false;
 			}
 
-#endif
+#endif // CONFIG_NET
 		}
 
 		check_radio_config();
@@ -2458,9 +2483,6 @@ Mavlink::task_main(int argc, char *argv[])
 		}
 
 		perf_end(_loop_perf);
-
-		/* confirm task running only once fully initialized */
-		_task_running = true;
 	}
 
 	/* first wait for threads to complete before tearing down anything */

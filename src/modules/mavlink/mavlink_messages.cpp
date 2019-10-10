@@ -2966,12 +2966,12 @@ public:
 
 	unsigned get_size()
 	{
-		return _att_ctrl_sub->is_published() ? (MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
+		return _act_ctrl_sub->is_published() ? (MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
 	}
 
 private:
-	MavlinkOrbSubscription *_att_ctrl_sub;
-	uint64_t _att_ctrl_time;
+	MavlinkOrbSubscription *_act_ctrl_sub;
+	uint64_t _act_ctrl_time;
 
 	/* do not allow top copying this class */
 	MavlinkStreamActuatorControlTarget(MavlinkStreamActuatorControlTarget &) = delete;
@@ -2979,41 +2979,41 @@ private:
 
 protected:
 	explicit MavlinkStreamActuatorControlTarget(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_att_ctrl_sub(nullptr),
-		_att_ctrl_time(0)
+		_act_ctrl_sub(nullptr),
+		_act_ctrl_time(0)
 	{
 		// XXX this can be removed once the multiplatform system remaps topics
 		switch (N) {
 		case 0:
-			_att_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_0));
+			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_0));
 			break;
 
 		case 1:
-			_att_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_1));
+			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_1));
 			break;
 
 		case 2:
-			_att_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_2));
+			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_2));
 			break;
 
 		case 3:
-			_att_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_3));
+			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_3));
 			break;
 		}
 	}
 
 	bool send(const hrt_abstime t)
 	{
-		actuator_controls_s att_ctrl;
+		actuator_controls_s act_ctrl;
 
-		if (_att_ctrl_sub->update(&_att_ctrl_time, &att_ctrl)) {
+		if (_act_ctrl_sub->update(&_act_ctrl_time, &act_ctrl)) {
 			mavlink_actuator_control_target_t msg = {};
 
-			msg.time_usec = att_ctrl.timestamp;
+			msg.time_usec = act_ctrl.timestamp;
 			msg.group_mlx = N;
 
 			for (unsigned i = 0; i < sizeof(msg.controls) / sizeof(msg.controls[0]); i++) {
-				msg.controls[i] = att_ctrl.control[i];
+				msg.controls[i] = act_ctrl.control[i];
 			}
 
 			mavlink_msg_actuator_control_target_send_struct(_mavlink->get_channel(), &msg);
@@ -3533,23 +3533,6 @@ protected:
 			msg.rssi = (rc.channel_count > 0) ? rc.rssi : 0;
 
 			mavlink_msg_rc_channels_send_struct(_mavlink->get_channel(), &msg);
-
-			/* send override message - harmless if connected to GCS, allows to connect a board to a Linux system */
-			/* http://mavlink.org/messages/common#RC_CHANNELS_OVERRIDE */
-			mavlink_rc_channels_override_t over = {};
-			over.target_system = mavlink_system.sysid;
-			over.target_component = 0;
-			over.chan1_raw = msg.chan1_raw;
-			over.chan2_raw = msg.chan2_raw;
-			over.chan3_raw = msg.chan3_raw;
-			over.chan4_raw = msg.chan4_raw;
-			over.chan5_raw = msg.chan5_raw;
-			over.chan6_raw = msg.chan6_raw;
-			over.chan7_raw = msg.chan7_raw;
-			over.chan8_raw = msg.chan8_raw;
-
-			mavlink_msg_rc_channels_override_send_struct(_mavlink->get_channel(), &over);
-
 			return true;
 		}
 

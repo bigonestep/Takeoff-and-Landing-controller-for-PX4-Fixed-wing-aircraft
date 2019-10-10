@@ -61,8 +61,8 @@ class OutputModuleInterface : public px4::ScheduledWorkItem, public ModuleParams
 public:
 	static constexpr int MAX_ACTUATORS = DIRECT_PWM_OUTPUT_CHANNELS;
 
-	OutputModuleInterface(const px4::wq_config_t &config)
-		: px4::ScheduledWorkItem(config), ModuleParams(nullptr) {}
+	OutputModuleInterface(const char *name, const px4::wq_config_t &config)
+		: px4::ScheduledWorkItem(name, config), ModuleParams(nullptr) {}
 
 	virtual void updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 				   unsigned num_outputs, unsigned num_control_groups_updated) = 0;
@@ -233,10 +233,9 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MC_AIRMODE>) _param_mc_airmode,   ///< multicopter air-mode
 		(ParamFloat<px4::params::MOT_SLEW_MAX>) _param_mot_slew_max,
-		(ParamFloat<px4::params::THR_MDL_FAC>) _param_thr_mdl_fac, ///< thrust to pwm modelling factor
+		(ParamFloat<px4::params::THR_MDL_FAC>) _param_thr_mdl_fac, ///< thrust to motor control signal modelling factor
 		(ParamInt<px4::params::MOT_ORDERING>) _param_mot_ordering,
 		(ParamInt<px4::params::CBRK_IO_SAFETY>) _param_cbrk_io_safety
 
 	)
 };
-

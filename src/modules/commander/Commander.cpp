@@ -87,7 +87,6 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/mavlink_log.h>
 #include <uORB/topics/mission.h>
-#include <uORB/topics/parameter_update.h>
 #include <uORB/topics/power_button_state.h>
 #include <uORB/topics/safety.h>
 #include <uORB/topics/subsystem_info.h>
@@ -214,7 +213,7 @@ static int power_button_state_notification_cb(board_power_button_state_notificat
 	// on the main thread of commander.
 	power_button_state_s button_state{};
 	button_state.timestamp = hrt_absolute_time();
-	int ret = PWR_BUTTON_RESPONSE_SHUT_DOWN_PENDING;
+	const int ret = PWR_BUTTON_RESPONSE_SHUT_DOWN_PENDING;
 
 	switch (request) {
 	case PWR_BUTTON_IDEL:
@@ -431,10 +430,10 @@ int commander_main(int argc, char *argv[])
 
 	if (!strcmp(argv[1], "transition")) {
 
-		bool ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_VTOL_TRANSITION,
-						(float)(status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ?
-							vtol_vehicle_status_s::VEHICLE_VTOL_STATE_FW :
-							vtol_vehicle_status_s::VEHICLE_VTOL_STATE_MC));
+		const bool ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_VTOL_TRANSITION,
+						      (float)(status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ?
+								      vtol_vehicle_status_s::VEHICLE_VTOL_STATE_FW :
+								      vtol_vehicle_status_s::VEHICLE_VTOL_STATE_MC));
 
 		return (ret ? 0 : 1);
 	}
@@ -1297,7 +1296,6 @@ Commander::run()
 	uORB::Subscription cpuload_sub{ORB_ID(cpuload)};
 	uORB::Subscription geofence_result_sub{ORB_ID(geofence_result)};
 	uORB::Subscription land_detector_sub{ORB_ID(vehicle_land_detected)};
-	uORB::Subscription param_changed_sub{ORB_ID(parameter_update)};
 	uORB::Subscription safety_sub{ORB_ID(safety)};
 	uORB::Subscription sp_man_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription subsys_sub{ORB_ID(subsystem_info)};
@@ -1418,14 +1416,14 @@ Commander::run()
 		transition_result_t arming_ret = TRANSITION_NOT_CHANGED;
 
 		/* update parameters */
-		bool params_updated = param_changed_sub.updated();
+		bool params_updated = _parameter_update_sub.updated();
 
 		if (params_updated || param_init_forced) {
+			// clear update
+			parameter_update_s update;
+			_parameter_update_sub.copy(&update);
 
-			/* parameters changed */
-			parameter_update_s param_changed;
-			param_changed_sub.copy(&param_changed);
-
+			// update parameters from storage
 			updateParams();
 
 			/* update parameters */
@@ -1913,7 +1911,7 @@ Commander::run()
 
 				// revert to position control in any case
 				main_state_transition(status, commander_state_s::MAIN_STATE_POSCTL, status_flags, &internal_state);
-				mavlink_log_critical(&mavlink_log_pub, "Autopilot off! Returning control to pilot");
+				mavlink_log_critical(&mavlink_log_pub, "Autonomy off! Returned control to pilot");
 			}
 		}
 
@@ -2641,8 +2639,7 @@ Commander::set_main_state(const vehicle_status_s &status_local, bool *changed)
 transition_result_t
 Commander::set_main_state_override_on(const vehicle_status_s &status_local, bool *changed)
 {
-	transition_result_t res = main_state_transition(status_local, commander_state_s::MAIN_STATE_MANUAL, status_flags,
-				  &internal_state);
+	const transition_result_t res = main_state_transition(status_local, commander_state_s::MAIN_STATE_MANUAL, status_flags, &internal_state);
 	*changed = (res == TRANSITION_CHANGED);
 
 	return res;
@@ -3705,7 +3702,7 @@ bool Commander::preflight_check(bool report)
 {
 	const bool checkGNSS = (arm_requirements & ARM_REQ_GPS_BIT);
 
-	bool success = Preflight::preflightCheck(&mavlink_log_pub, status, status_flags, checkGNSS, report, false,
+	const bool success = Preflight::preflightCheck(&mavlink_log_pub, status, status_flags, checkGNSS, report, false,
 			hrt_elapsed_time(&commander_boot_timestamp));
 
 	if (success) {
