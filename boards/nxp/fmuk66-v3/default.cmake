@@ -49,6 +49,7 @@ px4_add_board(
 		#test_ppm # NOT Portable YET
 		tone_alarm
 		uavcan
+		uwb
 
 	MODULES
 		attitude_estimator_q
