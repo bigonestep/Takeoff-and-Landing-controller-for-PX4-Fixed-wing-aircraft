@@ -232,7 +232,7 @@ void LandingTargetEstimator::_update_topics()
 
 	_sensorBias_valid = _sensorBiasSub.update(&_sensorBias);
 
-	//TODO: Uncomment this so it still works with both IRLock and Pozyx
+	//TODO: Uncomment this so it still works with both IRLock and uwb
 
 	if (_irlockReportSub.update(&_irlockReport)) {
 		_new_irlockReport = true;
@@ -274,15 +274,15 @@ void LandingTargetEstimator::_update_topics()
 		_sensor_report.rel_pos_z = _uncertainty_scale;
 	}
 
-	if (_pozyxReportSub.update(&_pozyxReport)) {
+	if (_uwbReportSub.update(&_uwbReport)) {
 		if (!_vehicleAttitude_valid || !_vehicleLocalPosition_valid) {
 			// don't have the data needed for an update
 			//PX4_INFO("Attitude: %d, Local pos: %d", _vehicleAttitude_valid, _vehicleLocalPosition_valid);
 			return;
 		}
 
-		if (!PX4_ISFINITE(_pozyxReport.pos_y) || !PX4_ISFINITE(_pozyxReport.pos_x) ||
-		    !PX4_ISFINITE(_pozyxReport.pos_z)) {
+		if (!PX4_ISFINITE(_uwbReport.pos_y) || !PX4_ISFINITE(_uwbReport.pos_x) ||
+		    !PX4_ISFINITE(_uwbReport.pos_z)) {
 			return;
 		}
 
@@ -291,12 +291,12 @@ void LandingTargetEstimator::_update_topics()
 
 		// we're assuming the coordinate system is NEU
 		// to get the position relative to use we just need to negate x and y
-		_sensor_report.timestamp = _pozyxReport.timestamp;
-		_sensor_report.rel_pos_x = -_pozyxReport.pos_x;
-		_sensor_report.rel_pos_y = -_pozyxReport.pos_y;
-		_sensor_report.rel_pos_z = _pozyxReport.pos_z;
+		_sensor_report.timestamp = _uwbReport.timestamp;
+		_sensor_report.rel_pos_x = -_uwbReport.pos_x;
+		_sensor_report.rel_pos_y = -_uwbReport.pos_y;
+		_sensor_report.rel_pos_z = _uwbReport.pos_z;
 
-		//PX4_WARN("data from pozyx x: %.2f, y: %.2f", (double)_sensor_report.rel_pos_x,
+		//PX4_WARN("data from uwb x: %.2f, y: %.2f", (double)_sensor_report.rel_pos_x,
 		//	 (double)_sensor_report.rel_pos_y);
 	}
 }

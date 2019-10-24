@@ -262,7 +262,7 @@ rtps:
     id: 114
   - msg: airspeed_validated
     id: 115
-  - msg: pozyx_report
+  - msg: uwb_report
     id: 116
   ########## multi topics: begin ##########
   - msg: actuator_controls_0
