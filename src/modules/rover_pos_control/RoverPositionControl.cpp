@@ -369,7 +369,7 @@ RoverPositionControl::run()
 	px4_pollfd_struct_t fds[3];
 
 	/* Setup of loop */
-	fds[0].fd = _global_pos_sub;
+	fds[0].fd = _vehicle_attitude_sub;
 	fds[0].events = POLLIN;
 	fds[1].fd = _manual_control_sub;
 	fds[1].events = POLLIN;
