@@ -22,6 +22,8 @@ px4_add_board(
 		camera_trigger
 		distance_sensor # all available distance sensor drivers
 		dshot
+		volz
+
 		gps
 		imu/mpu6000
 		imu/mpu9250

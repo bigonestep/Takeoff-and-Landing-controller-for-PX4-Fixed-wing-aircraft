@@ -1,0 +1,36 @@
+module_name: DShot Driver
+serial_config:
+    - command: dshot telemetry ${SERIAL_DEV}
+      port_config_param:
+        name: VOLZ_TEL_CFG
+        group: Volz
+
+parameters:
+    - group: Volz
+      definitions:
+        VOLZ_CONFIG:
+            description:
+                short: Configure Volz
+                long: |
+
+            type: enum
+            values:
+                0: Disable
+            reboot_required: true
+            default: 0
+        VOLZ_MIN:
+            description:
+                short: Minimum DShot Motor Output
+                long: |
+                    Minimum Output Value for DShot in percent. The value depends on the ESC. Make
+                    sure to set this high enough so that the motors are always spinning while
+                    armed.
+            type: float
+            unit: '%'
+            min: 0
+            max: 1
+            decimal: 2
+            increment: 0.01
+            default: 0.055
+
+

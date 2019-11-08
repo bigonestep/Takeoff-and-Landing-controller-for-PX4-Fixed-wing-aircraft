@@ -20,6 +20,8 @@ px4_add_board(
 		adc
 		barometer/bmp280
 		dshot
+		volz
+
 		gps
 		imu/mpu6000
 		magnetometer
