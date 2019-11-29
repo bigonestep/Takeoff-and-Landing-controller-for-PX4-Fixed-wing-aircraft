@@ -300,13 +300,16 @@ bool StateMachineHelperTest::armingStateTransitionTest()
 		armed.armed = test->current_state.armed;
 		armed.ready_to_arm = test->current_state.ready_to_arm;
 
+		PreFlightCheck pre_flicht_check;
+
 		// Attempt transition
 		transition_result_t result = arming_state_transition(&status, safety, test->requested_state, &armed,
 					     true /* enable pre-arm checks */,
 					     nullptr /* no mavlink_log_pub */,
 					     &status_flags,
 					     (check_gps ? PreFlightCheck::ARM_REQ_GPS_BIT : 0),
-					     2e6 /* 2 seconds after boot, everything should be checked */
+					     2e6, /* 2 seconds after boot, everything should be checked */
+					     pre_flicht_check
 								    );
 
 		// Validate result of transition

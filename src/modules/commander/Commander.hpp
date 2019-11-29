@@ -37,6 +37,7 @@
 #include "state_machine_helper.h"
 #include "failure_detector/FailureDetector.hpp"
 
+// system libraries
 #include <lib/controllib/blocks.hpp>
 #include <lib/mathlib/mathlib.h>
 #include <px4_platform_common/module.h>
@@ -277,7 +278,6 @@ private:
 	uORB::Publication<test_motor_s>				_test_motor_pub{ORB_ID(test_motor)};
 
 	uORB::PublicationData<home_position_s>			_home_pub{ORB_ID(home_position)};
-
 };
 
 #endif /* COMMANDER_HPP_ */
