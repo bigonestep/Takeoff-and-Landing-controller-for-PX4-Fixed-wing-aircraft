@@ -54,7 +54,7 @@ bool PreFlightCheck::magnetometerCheck(orb_advert_t *mavlink_log_pub, vehicle_st
 
 		uORB::SubscriptionData<sensor_mag_s> magnetometer{ORB_ID(sensor_mag), instance};
 
-		mag_valid = (hrt_elapsed_time(&magnetometer.get().timestamp) < 1_s);
+		//mag_valid = (hrt_elapsed_time(&magnetometer.get().timestamp) < 1_s);
 
 		if (!mag_valid) {
 			if (report_fail) {
@@ -64,7 +64,7 @@ bool PreFlightCheck::magnetometerCheck(orb_advert_t *mavlink_log_pub, vehicle_st
 
 		device_id = magnetometer.get().device_id;
 
-		calibration_valid = check_calibration("CAL_MAG%u_ID", device_id);
+		//calibration_valid = check_calibration("CAL_MAG%u_ID", device_id);
 
 		if (!calibration_valid) {
 			if (report_fail) {

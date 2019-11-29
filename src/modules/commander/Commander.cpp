@@ -1458,8 +1458,8 @@ Commander::run()
 
 	arm_auth_init(&mavlink_log_pub, &status.system_id);
 
-	// run preflight immediately to find all relevant parameters, but don't report
-	preflight_check(false);
+	// // run preflight immediately to find all relevant parameters, but don't report
+	// preflight_check(false);
 
 	while (!should_exit()) {
 
@@ -3450,6 +3450,8 @@ void *commander_low_prio_loop(void *arg)
 	while (!thread_should_exit) {
 		/* wait for up to 1000ms for data */
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 1000);
+
+		Commander::preflight_check(false);
 
 		if (pret < 0) {
 			/* this is undesirable but not much we can do - might want to flag unhappy status */

@@ -52,7 +52,7 @@ bool PreFlightCheck::baroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 	if (exists) {
 		uORB::SubscriptionData<sensor_baro_s> baro{ORB_ID(sensor_baro), instance};
 
-		baro_valid = (hrt_elapsed_time(&baro.get().timestamp) < 1_s);
+		// baro_valid = (hrt_elapsed_time(&baro.get().timestamp) < 1_s);
 
 		if (!baro_valid) {
 			if (report_fail) {

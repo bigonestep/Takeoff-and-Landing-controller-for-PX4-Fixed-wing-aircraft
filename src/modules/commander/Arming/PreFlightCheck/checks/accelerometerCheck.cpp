@@ -55,7 +55,7 @@ bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_s
 
 		uORB::SubscriptionData<sensor_accel_s> accel{ORB_ID(sensor_accel), instance};
 
-		accel_valid = (hrt_elapsed_time(&accel.get().timestamp) < 1_s);
+		accel_valid = false;//(hrt_elapsed_time(&accel.get().timestamp) < 1_s);
 
 		if (!accel_valid) {
 			if (report_fail) {
@@ -65,7 +65,7 @@ bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_s
 
 		device_id = accel.get().device_id;
 
-		calibration_valid = check_calibration("CAL_ACC%u_ID", device_id);
+		// calibration_valid = check_calibration("CAL_ACC%u_ID", device_id);
 
 		if (!calibration_valid) {
 			if (report_fail) {

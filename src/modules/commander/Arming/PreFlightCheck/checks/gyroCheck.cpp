@@ -54,7 +54,7 @@ bool PreFlightCheck::gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 		uORB::SubscriptionData<sensor_gyro_s> gyro{ORB_ID(sensor_gyro), instance};
 
-		gyro_valid = (hrt_elapsed_time(&gyro.get().timestamp) < 1_s);
+		// gyro_valid = (hrt_elapsed_time(&gyro.get().timestamp) < 1_s);
 
 		if (!gyro_valid) {
 			if (report_fail) {
@@ -64,7 +64,7 @@ bool PreFlightCheck::gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 		device_id = gyro.get().device_id;
 
-		calibration_valid = check_calibration("CAL_GYRO%u_ID", device_id);
+		// calibration_valid = check_calibration("CAL_GYRO%u_ID", device_id);
 
 		if (!calibration_valid) {
 			if (report_fail) {

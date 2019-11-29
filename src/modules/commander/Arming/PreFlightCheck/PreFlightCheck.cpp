@@ -84,6 +84,11 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 	reportFailures = (reportFailures && status_flags.condition_system_hotplug_timeout
 			  && !status_flags.condition_calibration_enabled);
 
+	if (reportFailures) {
+		// reset all report flags
+		_reported = {};
+	}
+
 	bool failed = false;
 
 	/* ---- MAG ---- */
@@ -96,16 +101,12 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 		int32_t sys_has_mag = 1;
 		param_get(param_find("SYS_HAS_MAG"), &sys_has_mag);
 
-		bool mag_fail_reported = false;
-
 		/* check all sensors individually, but fail only for mandatory ones */
 		for (unsigned i = 0; i < max_optional_mag_count; i++) {
 			const bool required = (i < max_mandatory_mag_count) && (sys_has_mag == 1);
-			const bool report_fail = (reportFailures && !failed && !mag_fail_reported);
-
 			int32_t device_id = -1;
 
-			if (magnetometerCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
+			if (magnetometerCheck(mavlink_log_pub, status, i, !required, device_id, !_reported.magnetometer)) {
 
 				if ((prime_id > 0) && (device_id == prime_id)) {
 					prime_found = true;
@@ -114,8 +115,9 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			} else {
 				if (required) {
 					failed = true;
-					mag_fail_reported = true;
 				}
+
+				_reported.magnetometer = true;
 			}
 		}
 
@@ -143,16 +145,13 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 		int32_t prime_id = -1;
 		param_get(param_find("CAL_ACC_PRIME"), &prime_id);
 
-		bool accel_fail_reported = false;
-
 		/* check all sensors individually, but fail only for mandatory ones */
 		for (unsigned i = 0; i < max_optional_accel_count; i++) {
 			const bool required = (i < max_mandatory_accel_count);
-			const bool report_fail = (reportFailures && !failed && !accel_fail_reported);
 
 			int32_t device_id = -1;
 
-			if (accelerometerCheck(mavlink_log_pub, status, i, !required, checkDynamic, device_id, report_fail)) {
+			if (accelerometerCheck(mavlink_log_pub, status, i, !required, checkDynamic, device_id, !_reported.accelerometer)) {
 
 				if ((prime_id > 0) && (device_id == prime_id)) {
 					prime_found = true;
@@ -161,8 +160,9 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			} else {
 				if (required) {
 					failed = true;
-					accel_fail_reported = true;
 				}
+
+				_reported.accelerometer = true;
 			}
 		}
 
@@ -183,16 +183,13 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 		int32_t prime_id = -1;
 		param_get(param_find("CAL_GYRO_PRIME"), &prime_id);
 
-		bool gyro_fail_reported = false;
-
 		/* check all sensors individually, but fail only for mandatory ones */
 		for (unsigned i = 0; i < max_optional_gyro_count; i++) {
 			const bool required = (i < max_mandatory_gyro_count);
-			const bool report_fail = (reportFailures && !failed && !gyro_fail_reported);
 
 			int32_t device_id = -1;
 
-			if (gyroCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
+			if (gyroCheck(mavlink_log_pub, status, i, !required, device_id, !_reported.gyroscope)) {
 
 				if ((prime_id > 0) && (device_id == prime_id)) {
 					prime_found = true;
@@ -201,8 +198,9 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			} else {
 				if (required) {
 					failed = true;
-					gyro_fail_reported = true;
 				}
+
+				_reported.gyroscope = true;
 			}
 		}
 
@@ -227,16 +225,13 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 		int32_t sys_has_baro = 1;
 		param_get(param_find("SYS_HAS_BARO"), &sys_has_baro);
 
-		bool baro_fail_reported = false;
-
 		/* check all sensors, but fail only for mandatory ones */
 		for (unsigned i = 0; i < max_optional_baro_count; i++) {
 			const bool required = (i < max_mandatory_baro_count) && (sys_has_baro == 1);
-			const bool report_fail = (reportFailures && !failed && !baro_fail_reported);
 
 			int32_t device_id = -1;
 
-			if (baroCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
+			if (baroCheck(mavlink_log_pub, status, i, !required, device_id, !_reported.barometer)) {
 				if ((prime_id > 0) && (device_id == prime_id)) {
 					//prime_found = true;
 				}
@@ -244,8 +239,9 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			} else {
 				if (required) {
 					failed = true;
-					baro_fail_reported = true;
 				}
+
+				_reported.barometer = true;
 			}
 		}
 
@@ -264,8 +260,9 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 	/* ---- IMU CONSISTENCY ---- */
 	// To be performed after the individual sensor checks have completed
 	if (checkSensors) {
-		if (!imuConsistencyCheck(mavlink_log_pub, status, (reportFailures && !failed))) {
+		if (!imuConsistencyCheck(mavlink_log_pub, status, !_reported.imu_consistency)) {
 			failed = true;
+			_reported.imu_consistency = true;
 		}
 	}
 
@@ -274,15 +271,15 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 		int32_t optional = 0;
 		param_get(param_find("FW_ARSP_MODE"), &optional);
 
-		if (!airspeedCheck(mavlink_log_pub, status, (bool)optional, reportFailures && !failed, prearm) && !(bool)optional) {
+		if (!airspeedCheck(mavlink_log_pub, status, (bool)optional, !_reported.airspeed, prearm) && !(bool)optional) {
 			failed = true;
 		}
 	}
 
 	/* ---- RC CALIBRATION ---- */
 	if (checkRC) {
-		if (rcCalibrationCheck(mavlink_log_pub, reportFailures && !failed, status.is_vtol) != OK) {
-			if (reportFailures) {
+		if (rcCalibrationCheck(mavlink_log_pub, !_reported.rc_calibration, status.is_vtol) != OK) {
+			if (!_reported.rc_calibration) {
 				mavlink_log_critical(mavlink_log_pub, "RC calibration check failed");
 			}
 
@@ -301,7 +298,7 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 
 	/* ---- SYSTEM POWER ---- */
 	if (checkPower) {
-		if (!powerCheck(mavlink_log_pub, status, (reportFailures && !failed), prearm)) {
+		if (!powerCheck(mavlink_log_pub, status, !_reported., prearm)) {
 			failed = true;
 		}
 	}
