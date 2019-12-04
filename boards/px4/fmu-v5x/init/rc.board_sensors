@@ -13,7 +13,7 @@ ina226 -b 2 start
 mpu6000 -R 8 -s -T 20602 start
 
 # Internal SPI bus ISM300DLC
-ism330dlc start
+#ism330dlc start currently not used, driver uses too much cpu.
 
 # Internal SPI bus BMI088 accel
 bmi088 -A -R 12 start
