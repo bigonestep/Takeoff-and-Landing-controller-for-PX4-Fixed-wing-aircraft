@@ -67,7 +67,7 @@ px4_add_module(
 	SRCS
 		${SIMULATOR_SRCS}
 	DEPENDS
-		git_mavlink_v2
+		git_mavlink
 		battery
 		conversion
 		drivers__ledsim

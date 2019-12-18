@@ -142,6 +142,8 @@ function(px4_add_board)
 			IO
 			BOOTLOADER
 			UAVCAN_INTERFACES
+			MAVLINK_GIT_REPO
+			MAVLINK_GIT_TAG
 		MULTI_VALUE
 			DRIVERS
 			MODULES
@@ -219,6 +221,16 @@ function(px4_add_board)
 
 	if(UAVCAN_INTERFACES)
 		set(config_uavcan_num_ifaces ${UAVCAN_INTERFACES} CACHE INTERNAL "UAVCAN interfaces" FORCE)
+	endif()
+
+	if(MAVLINK_GIT_REPO)
+		set(config_mavlink_git_repo ${MAVLINK_GIT_REPO} CACHE INTERNAL "Mavlink (custom) git repository" FORCE)
+
+		if(MAVLINK_GIT_TAG)
+			set(config_mavlink_git_tag ${MAVLINK_GIT_TAG} CACHE INTERNAL "Mavlink (custom) git tag" FORCE)
+		else()
+			set(config_mavlink_git_tag "master" CACHE INTERNAL "Mavlink (custom) git tag" FORCE)
+		endif()
 	endif()
 
 	# OPTIONS

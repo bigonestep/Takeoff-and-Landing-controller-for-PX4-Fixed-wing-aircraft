@@ -49,7 +49,7 @@
 
 #include "timestamped_list.h"
 #include "mavlink_bridge_header.h"
-#include <v2.0/mavlink_types.h>
+#include <mavlink_types.h>
 
 /**
  * @class MavlinkCommandSender

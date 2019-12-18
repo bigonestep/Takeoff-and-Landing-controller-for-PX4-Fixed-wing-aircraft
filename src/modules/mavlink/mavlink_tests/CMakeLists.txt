@@ -31,12 +31,12 @@
 #
 ############################################################################
 
-include_directories(${PX4_SOURCE_DIR}/mavlink/include/mavlink)
-
 px4_add_module(
 	MODULE modules__mavlink__mavlink_tests
 	MAIN mavlink_tests
 	STACK_MAIN 5000
+	INCLUDES
+		${MAVLINK_INCLUDE_PATH}
 	COMPILE_FLAGS
 		-DMAVLINK_FTP_UNIT_TEST
 		#-DMAVLINK_FTP_DEBUG

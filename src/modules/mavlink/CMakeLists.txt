@@ -31,7 +31,36 @@
 #
 ############################################################################
 
-px4_add_git_submodule(TARGET git_mavlink_v2 PATH "${PX4_SOURCE_DIR}/mavlink/include/mavlink/v2.0")
+set(MAVLINK_INCLUDE_PATH)
+
+if(config_mavlink_git_repo)
+	include(FetchContent)
+	FetchContent_Declare(
+		mavlink
+		GIT_REPOSITORY ${config_mavlink_git_repo}
+		GIT_TAG        ${config_mavlink_git_tag}
+	)
+
+	FetchContent_GetProperties(mavlink)
+	if(NOT mavlink_POPULATED)
+		FetchContent_Populate(mavlink)
+	endif()
+
+	set(MAVLINK_INCLUDE_PATH ${CMAKE_CURRENT_BINARY_DIR}/mavlink)
+	add_custom_command(
+		OUTPUT ${MAVLINK_INCLUDE_PATH}/standard/mavlink.h
+		COMMAND ${PYTHON_EXECUTABLE} ${mavlink_SOURCE_DIR}/pymavlink/tools/mavgen.py
+			--output ${MAVLINK_INCLUDE_PATH}
+			--lang C
+			--wire-protocol 2.0
+			${mavlink_SOURCE_DIR}/message_definitions/v1.0/standard.xml
+	)
+	add_custom_target(git_mavlink DEPENDS ${MAVLINK_INCLUDE_PATH}/standard/mavlink.h)
+
+else()
+	px4_add_git_submodule(TARGET git_mavlink PATH "${PX4_SOURCE_DIR}/mavlink/include/mavlink/v2.0")
+	set(MAVLINK_INCLUDE_PATH "${PX4_SOURCE_DIR}/mavlink/include/mavlink/v2.0")
+endif()
 
 px4_add_module(
 	MODULE modules__mavlink
@@ -40,8 +69,10 @@ px4_add_module(
 		-Wno-cast-align # TODO: fix and enable
 		-Wno-address-of-packed-member # TODO: fix in c_library_v2
 	INCLUDES
-		${PX4_SOURCE_DIR}/mavlink/include/mavlink
+		${MAVLINK_INCLUDE_PATH}
 	SRCS
+		${MAVLINK_INCLUDE_PATH}/standard/mavlink.h
+
 		mavlink.c
 		mavlink_command_sender.cpp
 		mavlink_ftp.cpp
@@ -63,7 +94,7 @@ px4_add_module(
 		module.yaml
 	DEPENDS
 		airspeed
-		git_mavlink_v2
+		git_mavlink
 		conversion
 		git_ecl
 		ecl_geo

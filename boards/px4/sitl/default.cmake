@@ -5,6 +5,8 @@ px4_add_board(
 	MODEL sitl
 	LABEL default
 	TESTING
+	MAVLINK_GIT_REPO
+		https://github.com/mavlink/mavlink.git
 	DRIVERS
 		#barometer # all available barometer drivers
 		#batt_smbus
