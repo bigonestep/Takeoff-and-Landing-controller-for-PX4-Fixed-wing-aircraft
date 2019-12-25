@@ -315,3 +315,39 @@ PARAM_DEFINE_INT32(VT_FW_DIFTHR_EN, 0);
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_SC, 0.1f);
+
+/**
+ * Scale for roll acutation using fixed-wing actuators in hover.
+ *
+ * Determines how much the roll controlling surfaces (e.g. ailerons or elevons) are used to assist the multicopter motors in hover.
+ * Applies to standard and tiltrotor VTOL.
+ *
+ * @min 0
+ * @max 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_MC_AILE_GAIN, 0.0f);
+
+/**
+ * Scale for pitch acutation using fixed-wing actuators in hover.
+ *
+ * Determines how much the pitch controlling surfaces (e.g. elevator or elevons) are used to assist the multicopter motors in hover.
+ * Applies to standard and tiltrotor VTOL.
+ *
+ * @min 0
+ * @max 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_MC_ELEV_GAIN, 1.0f);
+
+/**
+ * Scale for yaw acutation using fixed-wing actuators in hover.
+ *
+ * Determines how much the yaw controlling surface (rudder) is used to assist the multicopter motors in hover.
+ * Applies to standard and tiltrotor VTOL.
+ *
+ * @min 0
+ * @max 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_MC_RUD_GAIN, 0.0f);

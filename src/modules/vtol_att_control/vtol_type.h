@@ -70,6 +70,9 @@ struct Params {
 	int32_t fw_motors_off;			/**< bitmask of all motors that should be off in fixed wing mode */
 	int32_t diff_thrust;
 	float diff_thrust_scale;
+	float hover_fw_gain_roll;
+	float hover_fw_gain_pitch;
+	float hover_fw_gain_yaw;
 };
 
 // Has to match 1:1 msg/vtol_vehicle_status.msg
