@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017-2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,16 +53,6 @@ if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_t
 		set(config_rtps_receive_topics "${config_rtps_receive_topics};${config_rtps_receive_alias_topics}")
 	endif()
 
-	foreach(topic ${config_rtps_send_topics})
-		list(APPEND topic_bridge_files_out ${msg_out_path}/micrortps_agent/${topic}_Publisher.cpp)
-		list(APPEND topic_bridge_files_out ${msg_out_path}/micrortps_agent/${topic}_Publisher.h)
-	endforeach()
-
-	foreach(topic ${config_rtps_receive_topics})
-		list(APPEND topic_bridge_files_out ${msg_out_path}/micrortps_agent/${topic}_Subscriber.cpp)
-		list(APPEND topic_bridge_files_out ${msg_out_path}/micrortps_agent/${topic}_Subscriber.h)
-	endforeach()
-
 	list(APPEND topic_bridge_files_out
 		${msg_out_path}/micrortps_client/microRTPS_client.cpp
 		${msg_out_path}/micrortps_client/microRTPS_transport.cpp
@@ -72,20 +62,17 @@ if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_t
 	add_custom_command(OUTPUT ${topic_bridge_files_out}
 		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/generate_microRTPS_bridge.py
 			--fastrtpsgen-dir $ENV{FASTRTPSGEN_DIR}
-			--generate-idl
 			--mkdir-build
-			--generate-cmakelists
 			--topic-msg-dir ${PX4_SOURCE_DIR}/msg
 			--uorb-templates-dir templates/uorb_microcdr
 			--urtps-templates-dir templates/urtps
-			--agent-outdir ${CMAKE_CURRENT_BINARY_DIR}/micrortps_agent
+			--client
 			--client-outdir ${CMAKE_CURRENT_BINARY_DIR}/micrortps_client
-			--idl-dir ${CMAKE_CURRENT_BINARY_DIR}/micrortps_agent/idl
 			>micrortps_bridge.log >/dev/null
 		DEPENDS ${send_topic_files} ${receive_topic_files}
-		COMMENT "Generating RTPS topic bridge"
+		COMMENT "Generating micro-RTPS Client"
 	)
-	add_custom_target(topic_bridge_files DEPENDS ${topic_bridge_files_out})
+	add_custom_target(client_topic_bridge_files DEPENDS ${topic_bridge_files_out})
 
 	px4_add_module(
 		MODULE modules__micrortps_bridge__micrortps_client
@@ -101,7 +88,7 @@ if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_t
 		MODULE_CONFIG
 			module.yaml
 		DEPENDS
-			topic_bridge_files
+			client_topic_bridge_files
 	)
 	target_link_libraries(modules__micrortps_bridge__micrortps_client PRIVATE uorb_msgs_microcdr)
 endif()

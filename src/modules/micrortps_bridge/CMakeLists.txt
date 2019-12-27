@@ -87,7 +87,11 @@ if (FASTRTPSGEN AND (config_rtps_send_topics OR config_rtps_receive_topics))
 endif()
 
 if (GENERATE_RTPS_BRIDGE)
+	# build client
 	add_subdirectory(micrortps_client)
+
+	# generate agent
+	add_subdirectory(micrortps_agent)
 
 	###############################################################################
 	# micro-cdr serialization

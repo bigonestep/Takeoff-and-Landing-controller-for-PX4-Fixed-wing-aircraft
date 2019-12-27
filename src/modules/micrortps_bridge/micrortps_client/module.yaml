@@ -14,4 +14,3 @@ serial_config:
         name: RTPS_CONFIG
         group: RTPS
       label: FastRTPS
-
