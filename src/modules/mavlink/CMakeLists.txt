@@ -55,10 +55,11 @@ px4_add_module(
 		mavlink_rate_limiter.cpp
 		mavlink_receiver.cpp
 		mavlink_shell.cpp
+		mavlink_simulator.cpp
 		mavlink_simple_analyzer.cpp
 		mavlink_stream.cpp
-		mavlink_ulog.cpp
 		mavlink_timesync.cpp
+		mavlink_ulog.cpp
 	MODULE_CONFIG
 		module.yaml
 	DEPENDS
