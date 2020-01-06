@@ -76,12 +76,12 @@ TEST(ControlMathTest, ConstrainXYPriorities)
 {
 	const float max = 5.f;
 	// v0 already at max
-	Vector2f v0(max, 0);
+	Vector2f v0(max, 0.f);
 	Vector2f v1(v0(1), -v0(0));
 
 	Vector2f v_r = constrainXY(v0, v1, max);
 	EXPECT_FLOAT_EQ(v_r(0), max);
-	EXPECT_FLOAT_EQ(v_r(1), 0);
+	EXPECT_FLOAT_EQ(v_r(1), 0.f);
 
 	// norm of v1 exceeds max but v0 is zero
 	v0.zero();
@@ -100,7 +100,7 @@ TEST(ControlMathTest, ConstrainXYPriorities)
 	v1 = Vector2f(0.f, -4.f);
 	v_r = constrainXY(v0, v1, max);
 	EXPECT_FLOAT_EQ(v_r(0), v0(0));
-	EXPECT_GT(v_r(0), 0);
+	EXPECT_GT(v_r(0), 0.f);
 	const float remaining = sqrtf(max * max - (v0(0) * v0(0)));
 	EXPECT_FLOAT_EQ(v_r(1), -remaining);
 }
