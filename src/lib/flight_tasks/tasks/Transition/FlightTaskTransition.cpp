@@ -44,12 +44,13 @@ bool FlightTaskTransition::updateInitialize()
 
 bool FlightTaskTransition::activate(vehicle_local_position_setpoint_s last_setpoint)
 {
+	const bool ret = FlightTask::activate(last_setpoint);
 	checkSetpoints(last_setpoint);
 	_transition_altitude = last_setpoint.z;
 	_transition_yaw = last_setpoint.yaw;
 	_acceleration_setpoint.setAll(0.f);
 	_velocity_prev = _velocity;
-	return FlightTask::activate(last_setpoint);
+	return ret;
 }
 
 void FlightTaskTransition::checkSetpoints(vehicle_local_position_setpoint_s &setpoints)
