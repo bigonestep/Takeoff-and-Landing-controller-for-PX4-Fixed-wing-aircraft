@@ -126,7 +126,11 @@ RCInput::task_spawn(int argc, char *argv[])
 	int myoptind = 1;
 	int ch;
 	const char *myoptarg = nullptr;
-	const char *device = RC_SERIAL_PORT;
+	const char *device = nullptr;
+
+#if defined(RC_SERIAL_PORT)
+	device = RC_SERIAL_PORT;
+#endif // RC_SERIAL_PORT
 
 	while ((ch = px4_getopt(argc, argv, "td:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
@@ -153,6 +157,10 @@ RCInput::task_spawn(int argc, char *argv[])
 		return -1;
 	}
 
+	if (device == nullptr) {
+		PX4_ERR("device required");
+		return -1;
+	}
 
 	if (!run_as_task) {
 
@@ -283,10 +291,9 @@ RCInput::fill_rc_in(uint16_t raw_rc_count_local,
 	_rc_in.rc_total_frame_count = 0;
 }
 
-#ifdef RC_SERIAL_PORT
 void RCInput::set_rc_scan_state(RC_SCAN newState)
 {
-//    PX4_WARN("RCscan: %s failed, trying %s", RCInput::RC_SCAN_STRING[_rc_scan_state], RCInput::RC_SCAN_STRING[newState]);
+	PX4_DEBUG("RCscan: %s failed, trying %s", RCInput::RC_SCAN_STRING[_rc_scan_state], RCInput::RC_SCAN_STRING[newState]);
 	_rc_scan_begin = 0;
 	_rc_scan_state = newState;
 }
@@ -296,10 +303,11 @@ void RCInput::rc_io_invert(bool invert)
 	// First check if the board provides a board-specific inversion method (e.g. via GPIO),
 	// and if not use an IOCTL
 	if (!board_rc_invert_input(_device, invert)) {
+#if defined(TIOCSINVERT)
 		ioctl(_rcs_fd, TIOCSINVERT, invert ? (SER_INVERT_ENABLED_RX | SER_INVERT_ENABLED_TX) : 0);
+#endif // TIOCSINVERT
 	}
 }
-#endif
 
 void
 RCInput::run()
@@ -387,7 +395,6 @@ RCInput::cycle()
 
 		bool rc_updated = false;
 
-#ifdef RC_SERIAL_PORT
 		// This block scans for a supported serial RC input and locks onto the first one found
 		// Scan for 300 msec, then switch protocol
 		constexpr hrt_abstime rc_scan_max = 300_ms;
@@ -651,21 +658,6 @@ RCInput::cycle()
 
 			break;
 		}
-
-#else  // RC_SERIAL_PORT not defined
-#ifdef HRT_PPM_CHANNEL
-
-		// see if we have new PPM input data
-		if ((ppm_last_valid_decode != _rc_in.timestamp_last_signal) && ppm_decoded_channels > 3) {
-			// we have a new PPM frame. Publish it.
-			rc_updated = true;
-			fill_rc_in(ppm_decoded_channels, ppm_buffer, cycle_timestamp, false, false, 0);
-			_rc_in.rc_ppm_frame_length = ppm_frame_length;
-			_rc_in.timestamp_last_signal = ppm_last_valid_decode;
-		}
-
-#endif  // HRT_PPM_CHANNEL
-#endif  // RC_SERIAL_PORT
 
 		perf_end(_cycle_perf);
 

@@ -60,6 +60,9 @@
 #define PX4_SPI_BUS_SENSORS    1
 #define PX4_SPIDEV_MPU         PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 1) // spi-1 - mpu9250
 
+// RC Serial port
+#define RC_SERIAL_PORT               "/dev/tty-3" // Snapdraogon: use J12 (next to J13, power module side)
+
 // Battery ADC channels
 
 #include <system_config.h>

@@ -68,5 +68,8 @@
 #define ADC_BATTERY_VOLTAGE_CHANNEL 2
 #define ADC_BATTERY_CURRENT_CHANNEL 3
 
+#define DIRECT_PWM_OUTPUT_CHANNELS	14
+#define BOARD_HAS_PWM	DIRECT_PWM_OUTPUT_CHANNELS
+
 #include <system_config.h>
 #include <px4_platform_common/board_common.h>

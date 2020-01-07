@@ -89,8 +89,6 @@ void rc_cleaning(void);
 
 #define rc_adc_read_raw		rc_adc_raw
 
-#define rc_servo_send_pulse_us			rc_send_servo_pulse_us
-
 #define rc_filter_empty					rc_empty_filter
 #define rc_filter_march					rc_march_filter
 #define rc_filter_prefill_inputs		rc_prefill_filter_inputs

@@ -41,10 +41,8 @@
 #include <math.h>
 
 #include <board_config.h>
-#include <drivers/device/device.h>
-#include <drivers/device/i2c.h>
+#include <lib/drivers/device/device.h>
 #include <drivers/drv_hrt.h>
-#include <drivers/drv_input_capture.h>
 #include <drivers/drv_mixer.h>
 #include <drivers/drv_pwm_output.h>
 #include <lib/cdev/CDev.hpp>
@@ -66,6 +64,10 @@
 #include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 
+#if defined(BOARD_HAS_CAPTURE)
+#include <drivers/drv_input_capture.h>
+#endif // BOARD_HAS_CAPTURE
+
 using namespace time_literals;
 
 /** Mode given via CLI */
@@ -80,12 +82,14 @@ enum PortMode {
 	PORT_PWM3,
 	PORT_PWM2,
 	PORT_PWM1,
+#if defined(BOARD_HAS_CAPTURE)
 	PORT_PWM3CAP1,
 	PORT_PWM4CAP1,
 	PORT_PWM4CAP2,
 	PORT_PWM5CAP1,
 	PORT_PWM2CAP2,
 	PORT_CAPTURE,
+#endif // BOARD_HAS_CAPTURE
 };
 
 #if !defined(BOARD_HAS_PWM)
@@ -137,22 +141,20 @@ public:
 	/** change the FMU mode of the running module */
 	static int fmu_new_mode(PortMode new_mode);
 
-	static int test();
-
-	static int fake(int argc, char *argv[]);
-
-	virtual int	ioctl(file *filp, int cmd, unsigned long arg);
+	virtual int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 	virtual int	init();
 
 	int		set_mode(Mode mode);
 	Mode		get_mode() { return _mode; }
 
-	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
+#if defined(BOARD_HAS_CAPTURE)
+	static int test();
 
 	static void	capture_trampoline(void *context, uint32_t chan_index,
 					   hrt_abstime edge_time, uint32_t edge_state,
 					   uint32_t overflow);
+#endif // BOARD_HAS_CAPTURE
 
 	void update_pwm_trims();
 
@@ -175,7 +177,6 @@ private:
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 
-
 	unsigned	_num_outputs{0};
 	int		_class_instance{-1};
 
@@ -188,23 +189,18 @@ private:
 
 	perf_counter_t	_cycle_perf;
 
-	void		capture_callback(uint32_t chan_index,
-					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
 	void		update_current_rate();
-	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
-	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
+	int		set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
+	int		pwm_ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 	void		update_pwm_rev_mask();
 	void		update_pwm_out_state(bool on);
 
 	void		update_params();
 
-	static void		sensor_reset(int ms);
-	static void		peripheral_reset(int ms);
-
-	int		capture_ioctl(file *filp, int cmd, unsigned long arg);
-
-	PX4FMU(const PX4FMU &) = delete;
-	PX4FMU operator=(const PX4FMU &) = delete;
+#if defined(BOARD_HAS_CAPTURE)
+	int		capture_ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
+	void		capture_callback(uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
+#endif // BOARD_HAS_CAPTURE
 
 };
 
@@ -557,12 +553,6 @@ PX4FMU::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_rate
 	return OK;
 }
 
-int
-PX4FMU::set_i2c_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	return device::I2C::set_bus_clock(bus, clock_hz);
-}
-
 void
 PX4FMU::update_current_rate()
 {
@@ -688,6 +678,7 @@ PX4FMU::task_spawn(int argc, char *argv[])
 	return PX4_ERROR;
 }
 
+#if defined(BOARD_HAS_CAPTURE)
 void
 PX4FMU::capture_trampoline(void *context, uint32_t chan_index,
 			   hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
@@ -702,6 +693,7 @@ PX4FMU::capture_callback(uint32_t chan_index,
 {
 	fprintf(stdout, "FMU: Capture chan:%d time:%lld state:%d overflow:%d\n", chan_index, edge_time, edge_state, overflow);
 }
+#endif // BOARD_HAS_CAPTURE
 
 void
 PX4FMU::update_pwm_out_state(bool on)
@@ -792,16 +784,19 @@ void PX4FMU::update_params()
 }
 
 int
-PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
+PX4FMU::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
-	int ret;
+	int ret = -ENOTTY;
 
+#if defined(BOARD_HAS_CAPTURE)
 	/* try it as a Capture ioctl next */
 	ret = capture_ioctl(filp, cmd, arg);
 
 	if (ret != -ENOTTY) {
 		return ret;
 	}
+
+#endif // BOARD_HAS_CAPTURE
 
 	/* if we are in valid PWM mode, try it as a PWM ioctl as well */
 	switch (_mode) {
@@ -810,11 +805,13 @@ PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
 	case MODE_3PWM:
 	case MODE_4PWM:
 	case MODE_5PWM:
+#if defined(BOARD_HAS_CAPTURE)
 	case MODE_2PWM2CAP:
 	case MODE_3PWM1CAP:
 	case MODE_4PWM1CAP:
 	case MODE_4PWM2CAP:
 	case MODE_5PWM1CAP:
+#endif // BOARD_HAS_CAPTURE
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
 	case MODE_6PWM:
 #endif
@@ -841,7 +838,7 @@ PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
 }
 
 int
-PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
+PX4FMU::pwm_ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret = OK;
 
@@ -1117,6 +1114,8 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	case PWM_SERVO_SET(11):
 	case PWM_SERVO_SET(10):
 	case PWM_SERVO_SET(9):
+
+	// FALLTHROUGH
 	case PWM_SERVO_SET(8):
 		if (_mode < MODE_14PWM) {
 			ret = -EINVAL;
@@ -1126,6 +1125,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 
+	// FALLTHROUGH
 	case PWM_SERVO_SET(7):
 
 	/* FALLTHROUGH */
@@ -1490,32 +1490,10 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	return ret;
 }
 
-void
-PX4FMU::sensor_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 1;
-	}
-
-	board_spi_reset(ms);
-}
-
-void
-PX4FMU::peripheral_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 10;
-	}
-
-	board_peripheral_reset(ms);
-}
-
-int
-PX4FMU::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	int	ret = -EINVAL;
-
 #if defined(BOARD_HAS_CAPTURE)
+int PX4FMU::capture_ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
+{
+	int ret = -EINVAL;
 
 	lock();
 
@@ -1656,11 +1634,9 @@ PX4FMU::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	unlock();
 
-#else
-	ret = -ENOTTY;
-#endif
 	return ret;
 }
+#endif // BOARD_HAS_CAPTURE
 
 int
 PX4FMU::fmu_new_mode(PortMode new_mode)
@@ -1669,9 +1645,7 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 		return -1;
 	}
 
-	PX4FMU::Mode servo_mode;
-
-	servo_mode = PX4FMU::MODE_NONE;
+	PX4FMU::Mode servo_mode = PX4FMU::MODE_NONE;
 
 	switch (new_mode) {
 	case PORT_FULL_GPIO:
@@ -1794,19 +1768,8 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 	return OK;
 }
 
-
-namespace
-{
-
-int fmu_new_i2c_speed(unsigned bus, unsigned clock_hz)
-{
-	return PX4FMU::set_i2c_bus_clock(bus, clock_hz);
-}
-
-} // namespace
-
-int
-PX4FMU::test()
+#if defined(BOARD_HAS_CAPTURE)
+int PX4FMU::test()
 {
 	int	 fd;
 	unsigned servo_count = 0;
@@ -1819,7 +1782,7 @@ PX4FMU::test()
 	struct input_capture_t {
 		bool valid;
 		input_capture_config_t  chan;
-	} capture_conf[INPUT_CAPTURE_MAX_CHANNELS];
+	} capture_conf[INPUT_CAPTURE_MAX_CHANNELS] {};
 
 	fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
 
@@ -1848,7 +1811,6 @@ PX4FMU::test()
 	}
 
 	PX4_INFO("Testing %u servos and %u input captures", (unsigned)servo_count, capture_count);
-	memset(capture_conf, 0, sizeof(capture_conf));
 
 	if (capture_count != 0) {
 		for (unsigned i = 0; i < capture_count; i++) {
@@ -1877,7 +1839,7 @@ PX4FMU::test()
 		}
 	}
 
-	struct pollfd fds;
+	struct pollfd fds {};
 
 	fds.fd = 0; /* stdin */
 
@@ -1996,98 +1958,12 @@ err_out_no_test:
 	::close(fd);
 	return rv;
 }
-
-int
-PX4FMU::fake(int argc, char *argv[])
-{
-	if (argc < 5) {
-		print_usage("not enough arguments");
-		return -1;
-	}
-
-	actuator_controls_s ac;
-
-	ac.control[0] = strtol(argv[1], 0, 0) / 100.0f;
-
-	ac.control[1] = strtol(argv[2], 0, 0) / 100.0f;
-
-	ac.control[2] = strtol(argv[3], 0, 0) / 100.0f;
-
-	ac.control[3] = strtol(argv[4], 0, 0) / 100.0f;
-
-	orb_advert_t handle = orb_advertise(ORB_ID_VEHICLE_ATTITUDE_CONTROLS, &ac);
-
-	if (handle == nullptr) {
-		PX4_ERR("advertise failed");
-		return -1;
-	}
-
-	orb_unadvertise(handle);
-
-	actuator_armed_s aa;
-
-	aa.armed = true;
-	aa.lockdown = false;
-
-	handle = orb_advertise(ORB_ID(actuator_armed), &aa);
-
-	if (handle == nullptr) {
-		PX4_ERR("advertise failed 2");
-		return -1;
-	}
-
-	orb_unadvertise(handle);
-	return 0;
-}
+#endif // BOARD_HAS_CAPTURE
 
 int PX4FMU::custom_command(int argc, char *argv[])
 {
 	PortMode new_mode = PORT_MODE_UNSET;
 	const char *verb = argv[0];
-
-	/* does not operate on a FMU instance */
-	if (!strcmp(verb, "i2c")) {
-		if (argc > 2) {
-			int bus = strtol(argv[1], 0, 0);
-			int clock_hz = strtol(argv[2], 0, 0);
-			int ret = fmu_new_i2c_speed(bus, clock_hz);
-
-			if (ret) {
-				PX4_ERR("setting I2C clock failed");
-			}
-
-			return ret;
-		}
-
-		return print_usage("not enough arguments");
-	}
-
-	if (!strcmp(verb, "sensor_reset")) {
-		if (argc > 1) {
-			int reset_time = strtol(argv[1], nullptr, 0);
-			sensor_reset(reset_time);
-
-		} else {
-			sensor_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-	if (!strcmp(verb, "peripheral_reset")) {
-		if (argc > 2) {
-			int reset_time = strtol(argv[2], 0, 0);
-			peripheral_reset(reset_time);
-
-		} else {
-			peripheral_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
 
 	/* start the FMU if not running */
 	if (!is_running()) {
@@ -2175,13 +2051,13 @@ int PX4FMU::custom_command(int argc, char *argv[])
 		return PX4FMU::fmu_new_mode(new_mode);
 	}
 
+#if defined(BOARD_HAS_CAPTURE)
+
 	if (!strcmp(verb, "test")) {
 		return test();
 	}
 
-	if (!strcmp(verb, "fake")) {
-		return fake(argc - 1, argv + 1);
-	}
+#endif // BOARD_HAS_CAPTURE
 
 	return print_usage("unknown command");
 }
@@ -2199,31 +2075,33 @@ int PX4FMU::print_status()
 
 	case MODE_2PWM: mode_str = "pwm2"; break;
 
-	case MODE_2PWM2CAP: mode_str = "pwm2cap2"; break;
-
 	case MODE_3PWM: mode_str = "pwm3"; break;
 
-	case MODE_3PWM1CAP: mode_str = "pwm3cap1"; break;
-
 	case MODE_4PWM: mode_str = "pwm4"; break;
+
+	case MODE_5PWM: mode_str = "pwm5"; break;
+
+	case MODE_6PWM: mode_str = "pwm6"; break;
+
+	case MODE_8PWM: mode_str = "pwm8"; break;
+#if defined(BOARD_HAS_CAPTURE)
+
+	case MODE_2PWM2CAP: mode_str = "pwm2cap2"; break;
+
+	case MODE_3PWM1CAP: mode_str = "pwm3cap1"; break;
 
 	case MODE_4PWM1CAP: mode_str = "pwm4cap1"; break;
 
 	case MODE_4PWM2CAP: mode_str = "pwm4cap2"; break;
 
-	case MODE_5PWM: mode_str = "pwm5"; break;
-
 	case MODE_5PWM1CAP: mode_str = "pwm5cap1"; break;
-
-	case MODE_6PWM: mode_str = "pwm6"; break;
-
-	case MODE_8PWM: mode_str = "pwm8"; break;
 
 	case MODE_4CAP: mode_str = "cap4"; break;
 
 	case MODE_5CAP: mode_str = "cap5"; break;
 
 	case MODE_6CAP: mode_str = "cap6"; break;
+#endif // BOARD_HAS_CAPTURE
 
 	default:
 		break;
@@ -2287,28 +2165,22 @@ mixer files.
   PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm4");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap1");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm2cap2");
+#if defined(BOARD_HAS_CAPTURE)
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm5cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap2");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm3cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm2cap2");
+#endif // BOARD_HAS_CAPTURE
 #endif
 #if defined(BOARD_HAS_PWM)
   PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
 #endif
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("sensor_reset", "Do a sensor reset (SPI bus)");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-	PRINT_MODULE_USAGE_COMMAND_DESCR("peripheral_reset", "Reset board peripherals");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("i2c", "Configure I2C clock rate");
-	PRINT_MODULE_USAGE_ARG("<bus_id> <rate>", "Specify the bus id (>=0) and rate in Hz", false);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test inputs and outputs");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("fake", "Arm and send an actuator controls command");
