@@ -30,6 +30,7 @@ then
 
 	# EKF2 parameters
 	param set EKF2_AID_MASK 35
+	param set EKF2_BARO_NOISE 6.0
 	param set EKF2_IMU_POS_X 0.02
 	param set EKF2_GPS_POS_X 0.055
 	param set EKF2_GPS_POS_Z -0.15
@@ -47,7 +48,8 @@ then
 	param set EKF2_RNG_POS_X 0.055
 	param set EKF2_RNG_POS_Y -0.01
 	param set EKF2_RNG_POS_Z 0.065
-	param set EKF2_PCOEF_XP -0.25
+	param set EKF2_PCOEF_XN -0.35
+	param set EKF2_PCOEF_XP -0.35
 	param set EKF2_PCOEF_YN -0.55
 	param set EKF2_PCOEF_YP -0.55
 
@@ -82,6 +84,7 @@ then
 	param set MPC_ACC_DOWN_MAX 5
 	param set MPC_ACC_HOR_MAX 10
 	param set MPC_ACC_UP_MAX 4
+	param set MPC_LAND_SPEED 0.5
 	param set MPC_MANTHR_MIN 0
 	param set MPC_MAN_Y_MAX 120
 	param set MPC_TILTMAX_AIR 45
