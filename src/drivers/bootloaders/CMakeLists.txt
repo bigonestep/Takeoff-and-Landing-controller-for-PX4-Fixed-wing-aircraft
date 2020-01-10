@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-add_library(drivers_bootloaders boot_app_shared.c)
+add_library(drivers_bootloaders boot_app_shared.cpp)
 add_dependencies(drivers_bootloaders prebuild_targets)
 
 include_directories(include)

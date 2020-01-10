@@ -50,10 +50,9 @@ endif()
 
 add_library(px4_layer
 	px4_posix_impl.cpp
-	px4_posix_tasks.cpp
+	tasks.cpp
 	px4_sem.cpp
 	px4_init.cpp
-	lib_crc32.c
 	drv_hrt.cpp
 	${SHMEM_SRCS}
 )

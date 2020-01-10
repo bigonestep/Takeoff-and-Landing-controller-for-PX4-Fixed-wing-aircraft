@@ -33,32 +33,29 @@
  ****************************************************************************/
 
 /**
- * @file px4_posix_tasks.c
+ * @file tasks.cpp
  * Implementation of existing task API for Linux
  */
 
-#include <px4_platform_common/log.h>
-#include <px4_platform_common/defines.h>
-#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <sched.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <unistd.h>
 #include <string.h>
-#include <pthread.h>
-#include <limits.h>
-
+#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <string>
+#include <unistd.h>
 
-#include <px4_platform_common/tasks.h>
+#include <px4_platform_common/defines.h>
+#include <px4_platform_common/log.h>
 #include <px4_platform_common/posix.h>
-#include <systemlib/err.h>
+#include <px4_platform_common/tasks.h>
 
 #define MAX_CMD_LEN 100
 

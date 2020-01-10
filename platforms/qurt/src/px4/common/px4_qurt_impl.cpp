@@ -42,7 +42,7 @@
 #include <px4_platform_common/init.h>
 #include <px4_platform_common/tasks.h>
 #include <px4_platform_common/workqueue.h>
-#include <dataman/dataman.h>
+
 #include <stdint.h>
 #include <stdio.h>
 #include <signal.h>
@@ -50,6 +50,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <parameters/param.h>
+
 #include "hrt_work.h"
 
 //extern pthread_t _shell_task_id;
@@ -113,31 +114,6 @@ void init(int argc, char *argv[], const char *app_name)
 	PX4_DEBUG("App name: %s\n", app_name);
 }
 
-}
-
-/** Retrieve from the data manager store */
-ssize_t
-dm_read(
-	dm_item_t item,                 /* The item type to retrieve */
-	unsigned index,                 /* The index of the item */
-	void *buffer,                   /* Pointer to caller data buffer */
-	size_t buflen                   /* Length in bytes of data to retrieve */
-)
-{
-	return 0;
-}
-
-/** write to the data manager store */
-ssize_t
-dm_write(
-	dm_item_t  item,                /* The item type to store */
-	unsigned index,                 /* The index of the item */
-	dm_persitence_t persistence,    /* The persistence level of this item */
-	const void *buffer,             /* Pointer to caller data buffer */
-	size_t buflen                   /* Length in bytes of data to retrieve */
-)
-{
-	return 0;
 }
 
 size_t strnlen(const char *s, size_t maxlen)

@@ -48,7 +48,8 @@
 
 #include <errno.h>
 #include "boot_app_shared.h"
-#include "systemlib/crc.h"
+
+#include <lib/crc/crc64.hpp>
 
 /****************************************************************************
  * Pre-processor Definitions

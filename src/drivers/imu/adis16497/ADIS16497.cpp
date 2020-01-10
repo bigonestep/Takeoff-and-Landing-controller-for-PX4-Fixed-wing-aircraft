@@ -33,6 +33,8 @@
 
 #include "ADIS16497.hpp"
 
+#include <lib/crc/crc32.hpp>
+
 #define DIR_READ				0x00
 #define DIR_WRITE				0x80
 

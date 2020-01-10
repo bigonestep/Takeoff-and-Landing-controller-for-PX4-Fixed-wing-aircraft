@@ -32,39 +32,32 @@
  ****************************************************************************/
 
 /**
- * @file px4_qurt_tasks.c
+ * @file tasks.cpp
  * Implementation of existing task API for QURT.
  *
  * @author Mark Charlebois <charlebm@gmail.com>
  */
 
-#include <px4_platform_common/log.h>
-#include <px4_platform_common/posix.h>
-#include <px4_platform_common/workqueue.h>
-#include <px4_platform_common/time.h>
-#include <hrt_work.h>
-#include <drivers/drv_hrt.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdbool.h>
-
-#if !defined(__PX4_QURT)
-#include <signal.h>
-#endif
-
 #include <fcntl.h>
 #include <sched.h>
-#include <unistd.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
+#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <string>
+#include <unistd.h>
 
+#include <hrt_work.h>
+#include <drivers/drv_hrt.h>
+
+#include <px4_platform_common/log.h>
+#include <px4_platform_common/posix.h>
 #include <px4_platform_common/tasks.h>
-#include <systemlib/err.h>
+#include <px4_platform_common/time.h>
+#include <px4_platform_common/workqueue.h>
 
 #define MAX_CMD_LEN 100
 

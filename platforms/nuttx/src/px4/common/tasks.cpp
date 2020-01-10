@@ -33,25 +33,25 @@
  ****************************************************************************/
 
 /**
- * @file px4_nuttx_tasks.c
+ * @file tasks.cpp
  * Implementation of existing task API for NuttX
  */
 
 #include <nuttx/config.h>
 
-#include <sys/wait.h>
+#include <errno.h>
+#include <sched.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <string.h>
-#include <sched.h>
-#include <errno.h>
-#include <stdbool.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/log.h>
+#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/tasks.h>
 
 void
@@ -66,7 +66,8 @@ px4_systemreset(bool to_bootloader)
 #endif
 }
 
-int px4_task_spawn_cmd(const char *name, int scheduler, int priority, int stack_size, main_t entry, char *const argv[])
+px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int stack_size, main_t entry,
+			      char *const argv[])
 {
 	int pid;
 
@@ -98,7 +99,7 @@ int px4_task_spawn_cmd(const char *name, int scheduler, int priority, int stack_
 	return pid;
 }
 
-int px4_task_delete(int pid)
+int px4_task_delete(px4_task_t pid)
 {
 	return task_delete(pid);
 }

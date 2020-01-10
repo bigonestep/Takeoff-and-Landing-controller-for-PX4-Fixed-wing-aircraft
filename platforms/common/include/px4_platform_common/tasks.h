@@ -91,11 +91,6 @@ typedef int px4_task_t;
 
 typedef int px4_task_t;
 
-typedef struct {
-	int argc;
-	char **argv;
-} px4_task_args_t;
-
 #else
 #error "No target OS defined"
 #endif
