@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,158 +33,114 @@
 
 #include "PAW3902.hpp"
 
-/**
- * Local functions in support of the shell command.
- */
-namespace pmw3902
+#include <px4_platform_common/getopt.h>
+#include <matrix/math.hpp>
+#include <mathlib/mathlib.h>
+
+#include <stdlib.h>
+
+namespace paw3902
 {
+PAW3902 *g_dev{nullptr};
 
-PAW3902	*g_dev;
-
-void	start(int spi_bus);
-void	stop();
-void	test();
-void	reset();
-void	info();
-void	usage();
-
-
-/**
- * Start the driver.
- */
-void
-start(int spi_bus)
+static int start(float yaw_rotation_degrees)
 {
 	if (g_dev != nullptr) {
-		errx(1, "already started");
+		PX4_WARN("already started");
+		return 0;
 	}
 
-	/* create the driver */
-	g_dev = new PAW3902(spi_bus, (enum Rotation)0);
+	// create the driver
+#if defined(PX4_SPI_BUS_EXPANSION) && defined(PX4_SPIDEV_EXPANSION_2) // crazyflie flow deck
+	g_dev = new PAW3902(PX4_SPI_BUS_EXPANSION, PX4_SPIDEV_EXPANSION_2, yaw_rotation_degrees);
+#elif defined(PX4_SPI_BUS_EXTERNAL1) && defined(PX4_SPIDEV_EXTERNAL1_1) // fmu-v5 ext CS1
+	g_dev = new PAW3902(PX4_SPI_BUS_EXTERNAL1, PX4_SPIDEV_EXTERNAL1_1, yaw_rotation_degrees);
+#elif defined(PX4_SPI_BUS_EXTERNAL) && defined(PX4_SPIDEV_EXTERNAL) // fmu-v4 extspi
+	g_dev = new PAW3902(PX4_SPI_BUS_EXTERNAL, PX4_SPIDEV_EXTERNAL, yaw_rotation_degrees);
+#else
+	PX4_ERR("External SPI not available");
+	return -1;
+#endif
 
 	if (g_dev == nullptr) {
-		goto fail;
+		PX4_ERR("alloc failed");
+		return -1;
 	}
 
-	if (OK != g_dev->init()) {
-		goto fail;
-	}
-
-	exit(0);
-
-fail:
-
-	if (g_dev != nullptr) {
+	if (g_dev->init() != PX4_OK) {
+		PX4_ERR("driver init failed");
 		delete g_dev;
 		g_dev = nullptr;
+		return -1;
 	}
 
-	errx(1, "driver start failed");
+	return 0;
 }
 
-/**
- * Stop the driver
- */
-void stop()
-{
-	if (g_dev != nullptr) {
-		delete g_dev;
-		g_dev = nullptr;
-
-	} else {
-		errx(1, "driver not running");
-	}
-
-	exit(0);
-}
-
-/**
- * Print a little info about the driver.
- */
-void
-info()
+static int stop()
 {
 	if (g_dev == nullptr) {
-		errx(1, "driver not running");
+		PX4_WARN("driver not running");
+		return -1;
 	}
 
-	printf("state @ %p\n", g_dev);
-	g_dev->print_info();
+	delete g_dev;
+	g_dev = nullptr;
 
-	exit(0);
+	return 0;
 }
 
-/**
- * Print a little info about how to start/stop/use the driver
- */
-void usage()
+static int status()
 {
-	PX4_INFO("usage: pmw3902 {start|test|reset|info'}");
-	PX4_INFO("    [-b SPI_BUS]");
-}
-
-} // namespace pmw3902
-
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int paw3902_main(int argc, char *argv[]);
-
-int
-paw3902_main(int argc, char *argv[])
-{
-	if (argc < 2) {
-		pmw3902::usage();
-		return PX4_ERROR;
+	if (g_dev != nullptr) {
+		g_dev->print_info();
+		return 0;
 	}
 
-	// don't exit from getopt loop to leave getopt global variables in consistent state,
-	// set error flag instead
-	bool err_flag = false;
-	int ch;
+	PX4_WARN("driver not running");
+	return -1;
+}
+
+static int usage()
+{
+	PX4_INFO("missing command: try 'start', 'stop', 'status'");
+	PX4_INFO("options:");
+	PX4_INFO("    -Y yaw rotation (degrees)");
+
+	return 0;
+}
+
+} // namespace paw3902
+
+extern "C" int paw3902_main(int argc, char *argv[])
+{
+	float yaw_rotation_degrees = NAN;
 	int myoptind = 1;
+	int ch = 0;
 	const char *myoptarg = nullptr;
-	int spi_bus = PAW3902_BUS;
 
-	while ((ch = px4_getopt(argc, argv, "b:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "Y:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
-		case 'b':
-			spi_bus = (uint8_t)atoi(myoptarg);
-
+		case 'Y':
+			yaw_rotation_degrees = atof(myoptarg);
 			break;
 
 		default:
-			err_flag = true;
-			break;
+			return paw3902::usage();
 		}
 	}
 
-	if (err_flag) {
-		pmw3902::usage();
-		return PX4_ERROR;
+	const char *verb = argv[myoptind];
+
+	if (!strcmp(verb, "start")) {
+		return paw3902::start(yaw_rotation_degrees);
+
+	} else if (!strcmp(verb, "stop")) {
+		return paw3902::stop();
+
+	} else if (!strcmp(verb, "status")) {
+		return paw3902::status();
 	}
 
-	/*
-	 * Start/load the driver.
-	 */
-	if (!strcmp(argv[myoptind], "start")) {
-		pmw3902::start(spi_bus);
-	}
-
-	/*
-	 * Stop the driver
-	 */
-	if (!strcmp(argv[myoptind], "stop")) {
-		pmw3902::stop();
-	}
-
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(argv[myoptind], "status")) {
-		pmw3902::info();
-	}
-
-	pmw3902::usage();
-	return PX4_ERROR;
+	return paw3902::usage();
 }

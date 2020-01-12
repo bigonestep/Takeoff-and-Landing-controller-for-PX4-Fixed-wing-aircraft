@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,77 +33,124 @@
 
 #include "PMW3901.hpp"
 
-static constexpr uint32_t TIME_us_TSWW = 11; //  - actually 10.5us
+#include <lib/conversion/rotation.h>
+#include <lib/mathlib/mathlib.h>
+#include <lib/parameters/param.h>
 
-PMW3901::PMW3901(int bus, enum Rotation yaw_rotation) :
-	SPI("PMW3901", PMW3901_DEVICE_PATH, bus, PMW3901_SPIDEV, SPIDEV_MODE0, PMW3901_SPI_BUS_SPEED),
+using namespace time_literals;
+using namespace PixArt_PMW3901MB;
+
+static constexpr int16_t combine(uint8_t lsb, uint8_t msb) { return (msb << 8u) | lsb; }
+
+PMW3901::PMW3901(int bus, uint32_t device, float yaw_rotation_degrees) :
+	SPI("PMW3901", nullptr, bus, device, SPIDEV_MODE0, SPI_SPEED),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_sample_perf(perf_alloc(PC_ELAPSED, "pmw3901: read")),
-	_comms_errors(perf_alloc(PC_COUNT, "pmw3901: com err")),
-	_yaw_rotation(yaw_rotation)
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_no_motion_perf(perf_alloc(PC_COUNT, MODULE_NAME": no motion")),
+	_bad_data_perf(perf_alloc(PC_COUNT, MODULE_NAME": bad data")),
+	_duplicate_data_perf(perf_alloc(PC_COUNT, MODULE_NAME": duplicate data"))
 {
+	if (PX4_ISFINITE(yaw_rotation_degrees)) {
+		_rotation = matrix::Dcmf{matrix::Eulerf{0.0f, 0.0f, math::radians(yaw_rotation_degrees)}};
+
+	} else {
+		// otherwise use the parameter SENS_FLOW_ROT
+		param_t rot = param_find("SENS_FLOW_ROT");
+		int32_t val = 0;
+
+		if (param_get(rot, &val) == PX4_OK) {
+			_rotation = get_rot_matrix((enum Rotation)val);
+
+		} else {
+			_rotation.identity();
+		}
+	}
 }
 
 PMW3901::~PMW3901()
 {
-	// make sure we are truly inactive
-	stop();
+	ScheduleClear();
 
-	// free perf counters
 	perf_free(_sample_perf);
-	perf_free(_comms_errors);
+	perf_free(_no_motion_perf);
+	perf_free(_bad_data_perf);
+	perf_free(_duplicate_data_perf);
 }
 
-int
-PMW3901::sensorInit()
+int PMW3901::init()
 {
-	uint8_t data[5] {};
+	// do SPI init (and probe) first
+	if (SPI::init() != OK) {
+		return PX4_ERROR;
+	}
 
-	// Power on reset
-	writeRegister(0x3A, 0x5A);
-	usleep(5000);
+	SetMode();
 
-	// Reading the motion registers one time
-	readRegister(0x02, &data[0], 1);
-	readRegister(0x03, &data[1], 1);
-	readRegister(0x04, &data[2], 1);
-	readRegister(0x05, &data[3], 1);
-	readRegister(0x06, &data[4], 1);
+	return PX4_OK;
+}
 
-	usleep(1000);
+int PMW3901::probe()
+{
+	// Product_ID
+	const uint8_t product_id = RegisterRead(Register::Product_ID);
+	PX4_DEBUG("Product_ID: %X", product_id);
+
+	// Revision_ID
+	const uint8_t revision_id = RegisterRead(Register::Revision_ID);
+	PX4_DEBUG("Revision_ID: %X", revision_id);
+
+	// Inverse_Product_ID
+	const uint8_t inverse_product_id = RegisterRead(Register::Inverse_Product_ID);
+	PX4_DEBUG("Inverse_Product_ID: %X", inverse_product_id);
+
+	if ((product_id == PRODUCT_ID) && (revision_id == REVISION_ID) && (inverse_product_id == INVERSE_PRODUCT_ID)) {
+		return PX4_OK;
+	}
+
+	return PX4_ERROR;
+}
+
+bool PMW3901::Reset()
+{
+	// Power on reset: Write 0x5A to this register to reset the chip.
+	RegisterWrite(Register::Power_Up_Reset, 0x5A);
+	px4_usleep(1_ms); // Wait for at least 1 ms.
+
+	_motion_count = 0;
+
+	return true;
+}
+
+void PMW3901::SetMode()
+{
+	// Issue a soft reset
+	Reset();
 
 	// set performance optimization registers
 	// from PixArt PMW3901MB Optical Motion Tracking chip demo kit V3.20 (21 Aug 2018)
-	unsigned char v = 0;
-	unsigned char c1 = 0;
-	unsigned char c2 = 0;
 
-	writeRegister(0x7F, 0x00);
-	writeRegister(0x55, 0x01);
-	writeRegister(0x50, 0x07);
-	writeRegister(0x7f, 0x0e);
-	writeRegister(0x43, 0x10);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x55, 0x01);
+	RegisterWrite(0x50, 0x07);
+	RegisterWrite(0x7f, 0x0e);
+	RegisterWrite(0x43, 0x10);
 
-	readRegister(0x67, &v, 1);
-
-	// if bit7 is set
-	if (v & (1 << 7)) {
-		writeRegister(0x48, 0x04);
+	if (RegisterRead(0x67) & Bit7) {
+		RegisterWrite(0x48, 0x04);
 
 	} else {
-		writeRegister(0x48, 0x02);
+		RegisterWrite(0x48, 0x02);
 	}
 
-	writeRegister(0x7F, 0x00);
-	writeRegister(0x51, 0x7b);
-	writeRegister(0x50, 0x00);
-	writeRegister(0x55, 0x00);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x51, 0x7b);
+	RegisterWrite(0x50, 0x00);
+	RegisterWrite(0x55, 0x00);
 
-	writeRegister(0x7F, 0x0e);
-	readRegister(0x73, &v, 1);
+	RegisterWrite(0x7F, 0x0e);
 
-	if (v == 0) {
-		readRegister(0x70, &c1, 1);
+	if (RegisterRead(0x73) == 0) {
+		uint8_t c1 = RegisterRead(0x70);
 
 		if (c1 <= 28) {
 			c1 = c1 + 14;
@@ -116,306 +163,207 @@ PMW3901::sensorInit()
 			c1 = 0x3F;
 		}
 
-		readRegister(0x71, &c2, 1);
-		c2 = ((unsigned short)c2 * 45) / 100;
+		uint8_t c2 = RegisterRead(0x71);
+		c2 = (c2 * 45) / 100;
 
-		writeRegister(0x7f, 0x00);
-		writeRegister(0x61, 0xAD);
-		writeRegister(0x51, 0x70);
-		writeRegister(0x7f, 0x0e);
-		writeRegister(0x70, c1);
-		writeRegister(0x71, c2);
+		RegisterWrite(0x7f, 0x00);
+		RegisterWrite(0x61, 0xAD);
+		RegisterWrite(0x51, 0x70);
+		RegisterWrite(0x7f, 0x0e);
+		RegisterWrite(0x70, c1);
+		RegisterWrite(0x71, c2);
 	}
 
-	writeRegister(0x7F, 0x00);
-	writeRegister(0x61, 0xAD);
-	writeRegister(0x7F, 0x03);
-	writeRegister(0x40, 0x00);
-	writeRegister(0x7F, 0x05);
-	writeRegister(0x41, 0xB3);
-	writeRegister(0x43, 0xF1);
-	writeRegister(0x45, 0x14);
-	writeRegister(0x5B, 0x32);
-	writeRegister(0x5F, 0x34);
-	writeRegister(0x7B, 0x08);
-	writeRegister(0x7F, 0x06);
-	writeRegister(0x44, 0x1B);
-	writeRegister(0x40, 0xBF);
-	writeRegister(0x4E, 0x3F);
-	writeRegister(0x7F, 0x08);
-	writeRegister(0x65, 0x20);
-	writeRegister(0x6A, 0x18);
-	writeRegister(0x7F, 0x09);
-	writeRegister(0x4F, 0xAF);
-	writeRegister(0x5F, 0x40);
-	writeRegister(0x48, 0x80);
-	writeRegister(0x49, 0x80);
-	writeRegister(0x57, 0x77);
-	writeRegister(0x60, 0x78);
-	writeRegister(0x61, 0x78);
-	writeRegister(0x62, 0x08);
-	writeRegister(0x63, 0x50);
-	writeRegister(0x7F, 0x0A);
-	writeRegister(0x45, 0x60);
-	writeRegister(0x7F, 0x00);
-	writeRegister(0x4D, 0x11);
-	writeRegister(0x55, 0x80);
-	writeRegister(0x74, 0x21);
-	writeRegister(0x75, 0x1F);
-	writeRegister(0x4A, 0x78);
-	writeRegister(0x4B, 0x78);
-	writeRegister(0x44, 0x08);
-	writeRegister(0x45, 0x50);
-	writeRegister(0x64, 0xFF);
-	writeRegister(0x65, 0x1F);
-	writeRegister(0x7F, 0x14);
-	writeRegister(0x65, 0x67);
-	writeRegister(0x66, 0x08);
-	writeRegister(0x63, 0x70);
-	writeRegister(0x7F, 0x15);
-	writeRegister(0x48, 0x48);
-	writeRegister(0x7F, 0x07);
-	writeRegister(0x41, 0x0D);
-	writeRegister(0x43, 0x14);
-	writeRegister(0x4B, 0x0E);
-	writeRegister(0x45, 0x0F);
-	writeRegister(0x44, 0x42);
-	writeRegister(0x4C, 0x80);
-	writeRegister(0x7F, 0x10);
-	writeRegister(0x5B, 0x02);
-	writeRegister(0x7F, 0x07);
-	writeRegister(0x40, 0x41);
-	writeRegister(0x70, 0x00);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x61, 0xAD);
+	RegisterWrite(0x7F, 0x03);
+	RegisterWrite(0x40, 0x00);
+	RegisterWrite(0x7F, 0x05);
+	RegisterWrite(0x41, 0xB3);
+	RegisterWrite(0x43, 0xF1);
+	RegisterWrite(0x45, 0x14);
+	RegisterWrite(0x5B, 0x32);
+	RegisterWrite(0x5F, 0x34);
+	RegisterWrite(0x7B, 0x08);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x44, 0x1B);
+	RegisterWrite(0x40, 0xBF);
+	RegisterWrite(0x4E, 0x3F);
+	RegisterWrite(0x7F, 0x08);
+	RegisterWrite(0x65, 0x20);
+	RegisterWrite(0x6A, 0x18);
+	RegisterWrite(0x7F, 0x09);
+	RegisterWrite(0x4F, 0xAF);
+	RegisterWrite(0x5F, 0x40);
+	RegisterWrite(0x48, 0x80);
+	RegisterWrite(0x49, 0x80);
+	RegisterWrite(0x57, 0x77);
+	RegisterWrite(0x60, 0x78);
+	RegisterWrite(0x61, 0x78);
+	RegisterWrite(0x62, 0x08);
+	RegisterWrite(0x63, 0x50);
+	RegisterWrite(0x7F, 0x0A);
+	RegisterWrite(0x45, 0x60);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x4D, 0x11);
+	RegisterWrite(0x55, 0x80);
+	RegisterWrite(0x74, 0x21);
+	RegisterWrite(0x75, 0x1F);
+	RegisterWrite(0x4A, 0x78);
+	RegisterWrite(0x4B, 0x78);
+	RegisterWrite(0x44, 0x08);
+	RegisterWrite(0x45, 0x50);
+	RegisterWrite(0x64, 0xFF);
+	RegisterWrite(0x65, 0x1F);
+	RegisterWrite(0x7F, 0x14);
+	RegisterWrite(0x65, 0x67);
+	RegisterWrite(0x66, 0x08);
+	RegisterWrite(0x63, 0x70);
+	RegisterWrite(0x7F, 0x15);
+	RegisterWrite(0x48, 0x48);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x41, 0x0D);
+	RegisterWrite(0x43, 0x14);
+	RegisterWrite(0x4B, 0x0E);
+	RegisterWrite(0x45, 0x0F);
+	RegisterWrite(0x44, 0x42);
+	RegisterWrite(0x4C, 0x80);
+	RegisterWrite(0x7F, 0x10);
+	RegisterWrite(0x5B, 0x02);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x41);
+	RegisterWrite(0x70, 0x00);
 
-	px4_usleep(10000); // delay 10ms
+	px4_usleep(10_ms); // delay 10ms
 
-	writeRegister(0x32, 0x44);
-	writeRegister(0x7F, 0x07);
-	writeRegister(0x40, 0x40);
-	writeRegister(0x7F, 0x06);
-	writeRegister(0x62, 0xF0);
-	writeRegister(0x63, 0x00);
-	writeRegister(0x7F, 0x0D);
-	writeRegister(0x48, 0xC0);
-	writeRegister(0x6F, 0xD5);
-	writeRegister(0x7F, 0x00);
-	writeRegister(0x5B, 0xA0);
-	writeRegister(0x4E, 0xA8);
-	writeRegister(0x5A, 0x50);
-	writeRegister(0x40, 0x80);
+	RegisterWrite(0x32, 0x44);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x40);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x62, 0xF0);
+	RegisterWrite(0x63, 0x00);
+	RegisterWrite(0x7F, 0x0D);
+	RegisterWrite(0x48, 0xC0);
+	RegisterWrite(0x6F, 0xD5);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x5B, 0xA0);
+	RegisterWrite(0x4E, 0xA8);
+	RegisterWrite(0x5A, 0x50);
+	RegisterWrite(0x40, 0x80);
 
-	return PX4_OK;
+
+	// schedule cycle
+	ScheduleOnInterval(SAMPLE_INTERVAL / 2, SAMPLE_INTERVAL);
 }
 
-int
-PMW3901::init()
+uint8_t PMW3901::RegisterRead(uint8_t reg)
 {
-	// get yaw rotation from sensor frame to body frame
-	param_t rot = param_find("SENS_FLOW_ROT");
-
-	if (rot != PARAM_INVALID) {
-		int32_t val = 0;
-		param_get(rot, &val);
-
-		_yaw_rotation = (enum Rotation)val;
-	}
-
-	/* For devices competing with NuttX SPI drivers on a bus (Crazyflie SD Card expansion board) */
-	SPI::set_lockmode(LOCK_THREADS);
-
-	/* do SPI init (and probe) first */
-	if (SPI::init() != OK) {
-		return PX4_ERROR;
-	}
-
-	sensorInit();
-
-	_previous_collect_timestamp = hrt_absolute_time();
-
-	start();
-
-	return PX4_OK;
+	uint8_t cmd[2] { reg, 0 };
+	transfer(&cmd[0], &cmd[0], sizeof(cmd));
+	return cmd[1];
 }
 
-int
-PMW3901::probe()
+void PMW3901::RegisterWrite(uint8_t reg, uint8_t data)
 {
-	uint8_t data[2] {};
-
-	readRegister(0x00, &data[0], 1); // chip id
-
-	// Test the SPI communication, checking chipId and inverse chipId
-	if (data[0] == 0x49) {
-		return OK;
-	}
-
-	// not found on any address
-	return -EIO;
-}
-
-int
-PMW3901::readRegister(unsigned reg, uint8_t *data, unsigned count)
-{
-	uint8_t cmd[5];	// read up to 4 bytes
-
-	cmd[0] = DIR_READ(reg);
-
-	int ret = transfer(&cmd[0], &cmd[0], count + 1);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		DEVICE_LOG("spi::transfer returned %d", ret);
-		return ret;
-	}
-
-	memcpy(&data[0], &cmd[1], count);
-
-	return ret;
-}
-
-int
-PMW3901::writeRegister(unsigned reg, uint8_t data)
-{
-	uint8_t cmd[2]; 						// write 1 byte
-	int ret;
-
-	cmd[0] = DIR_WRITE(reg);
+	uint8_t cmd[2];
+	cmd[0] = reg | DIR_WRITE;
 	cmd[1] = data;
-
-	ret = transfer(&cmd[0], nullptr, 2);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		DEVICE_LOG("spi::transfer returned %d", ret);
-		return ret;
-	}
-
-	px4_usleep(TIME_us_TSWW);
-
-	return ret;
+	transfer(&cmd[0], nullptr, sizeof(cmd));
 }
 
-void
-PMW3901::Run()
+void PMW3901::Run()
 {
 	perf_begin(_sample_perf);
 
-	int16_t delta_x_raw = 0;
-	int16_t delta_y_raw = 0;
-	uint8_t qual = 0;
-	float delta_x = 0.0f;
-	float delta_y = 0.0f;
+	// Reading the Motion_Burst register activates Burst Mode.
+	struct TransferBuffer {
+		uint8_t cmd = Register::Motion_Burst;
+		uint8_t Motion;
+		uint8_t Observation;
+		uint8_t Delta_X_L;
+		uint8_t Delta_X_H;
+		uint8_t Delta_Y_L;
+		uint8_t Delta_Y_H;
+		uint8_t SQUAL;
+	} buf{};
 
-	uint64_t timestamp = hrt_absolute_time();
-	uint64_t dt_flow = timestamp - _previous_collect_timestamp;
-	_previous_collect_timestamp = timestamp;
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	_flow_dt_sum_usec += dt_flow;
-
-	readMotionCount(delta_x_raw, delta_y_raw, qual);
-
-	if (qual > 0) {
-		_flow_sum_x += delta_x_raw;
-		_flow_sum_y += delta_y_raw;
-		_flow_sample_counter ++;
-		_flow_quality_sum += qual;
-	}
-
-	// returns if the collect time has not been reached
-	if (_flow_dt_sum_usec < _collect_time) {
+	if (transfer((uint8_t *)&buf, (uint8_t *)&buf, sizeof(buf)) != PX4_OK) {
+		perf_end(_sample_perf);
 		return;
 	}
 
-	delta_x = (float)_flow_sum_x / 500.0f;		// proportional factor + convert from pixels to radians
-	delta_y = (float)_flow_sum_y / 500.0f;		// proportional factor + convert from pixels to radians
+	// Check if motion occurred and data ready for reading in Delta_X_L, Delta_X_H, Delta_Y_L and Delta_Y_H registers.
+	if (buf.Motion & Bit7) {
+		_motion_count++;
+
+	} else {
+		perf_count(_no_motion_perf);
+		perf_end(_sample_perf);
+		return;
+	}
+
+	// Discard the first three motion data after mode change
+	if (_motion_count < 3) {
+		perf_end(_sample_perf);
+		return;
+	}
+
+	const int16_t x_raw = combine(buf.Delta_X_H, buf.Delta_X_L);
+	const int16_t y_raw = combine(buf.Delta_Y_H, buf.Delta_Y_L);
+
+	if ((x_raw == _x_raw_prev) && (y_raw == _y_raw_prev)) {
+		perf_count(_duplicate_data_perf);
+		perf_end(_sample_perf);
+		return;
+	}
+
+	_x_raw_prev = x_raw;
+	_y_raw_prev = y_raw;
+
+	// If the reported flow is impossibly large, we just got garbage from the SPI
+	if (x_raw > 240 || y_raw > 240 || x_raw < -240 || y_raw < -240) {
+		PX4_DEBUG("garbage data, discarding");
+		perf_count(_bad_data_perf);
+		perf_end(_sample_perf);
+		return;
+	}
 
 	optical_flow_s report{};
-	report.timestamp = timestamp;
+	report.timestamp = timestamp_sample;
 
-	report.pixel_flow_x_integral = static_cast<float>(delta_x);
-	report.pixel_flow_y_integral = static_cast<float>(delta_y);
+	float pixel_flow_x_integral = (float)x_raw / 500.0f; // proportional factor + convert from pixels to radians
+	float pixel_flow_y_integral = (float)y_raw / 500.0f; // proportional factor + convert from pixels to radians
+	const matrix::Vector3f pixel_flow_rotated = _rotation * matrix::Vector3f{pixel_flow_x_integral, pixel_flow_y_integral, 0.0f};
+	report.pixel_flow_x_integral = pixel_flow_rotated(0);
+	report.pixel_flow_y_integral = pixel_flow_rotated(1);
 
-	// rotate measurements in yaw from sensor frame to body frame according to parameter SENS_FLOW_ROT
-	float zeroval = 0.0f;
-	rotate_3f(_yaw_rotation, report.pixel_flow_x_integral, report.pixel_flow_y_integral, zeroval);
-	rotate_3f(_yaw_rotation, report.gyro_x_rate_integral, report.gyro_y_rate_integral, report.gyro_z_rate_integral);
+	report.frame_count_since_last_readout = 1;
+	report.integration_timespan = _interval;
 
-	report.frame_count_since_last_readout = _flow_sample_counter;	// number of frames
-	report.integration_timespan = _flow_dt_sum_usec; 	// microseconds
+	//report.sensor_id = 0; // TODO: device id
+	report.quality = buf.SQUAL;
 
-	report.sensor_id = 0;
-	report.quality = _flow_sample_counter > 0 ? _flow_quality_sum / _flow_sample_counter : 0;
-
-
-	/* No gyro on this board */
+	// No gyro on this board
 	report.gyro_x_rate_integral = NAN;
 	report.gyro_y_rate_integral = NAN;
 	report.gyro_z_rate_integral = NAN;
 
-	// set (conservative) specs according to datasheet
-	report.max_flow_rate = 5.0f;       // Datasheet: 7.4 rad/s
-	report.min_ground_distance = 0.1f; // Datasheet: 80mm
+	// set specs according to datasheet
+	report.max_flow_rate = 7.4f;       // Datasheet: 7.4 rad/s
+	report.min_ground_distance = 0.08f; // Datasheet: 80mm
 	report.max_ground_distance = 30.0f; // Datasheet: infinity
-
-	_flow_dt_sum_usec = 0;
-	_flow_sum_x = 0;
-	_flow_sum_y = 0;
-	_flow_sample_counter = 0;
-	_flow_quality_sum = 0;
 
 	_optical_flow_pub.publish(report);
 
 	perf_end(_sample_perf);
 }
 
-int
-PMW3901::readMotionCount(int16_t &deltaX, int16_t &deltaY, uint8_t &qual)
-{
-	uint8_t data[12] = { DIR_READ(0x02), 0, DIR_READ(0x03), 0, DIR_READ(0x04), 0,
-			     DIR_READ(0x05), 0, DIR_READ(0x06), 0, DIR_READ(0x07), 0
-			   };
-
-	int ret = transfer(&data[0], &data[0], 12);
-
-	if (OK != ret) {
-		qual = 0;
-		perf_count(_comms_errors);
-		DEVICE_LOG("spi::transfer returned %d", ret);
-		return ret;
-	}
-
-	deltaX = ((int16_t)data[5] << 8) | data[3];
-	deltaY = ((int16_t)data[9] << 8) | data[7];
-
-	// If the reported flow is impossibly large, we just got garbage from the SPI
-	if (deltaX > 240 || deltaY > 240 || deltaX < -240 || deltaY < -240) {
-		qual = 0;
-
-	} else {
-		qual = data[11];
-	}
-
-	ret = OK;
-
-	return ret;
-}
-
-void
-PMW3901::start()
-{
-	// schedule a cycle to start things
-	ScheduleOnInterval(PMW3901_SAMPLE_INTERVAL, PMW3901_US);
-}
-
-void
-PMW3901::stop()
-{
-	ScheduleClear();
-}
-
-void
-PMW3901::print_info()
+void PMW3901::print_info()
 {
 	perf_print_counter(_sample_perf);
-	perf_print_counter(_comms_errors);
+	perf_print_counter(_no_motion_perf);
+	perf_print_counter(_bad_data_perf);
+	perf_print_counter(_duplicate_data_perf);
 }

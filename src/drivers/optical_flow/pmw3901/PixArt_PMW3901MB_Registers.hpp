@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,67 +32,47 @@
  ****************************************************************************/
 
 /**
- * @file PAW3902.hpp
+ * @file PixArt_PMW3901MB_registers.hpp
  *
- * Driver for the Pixart PAW3902 optical flow sensor connected via SPI.
+ * Pixart PMW3901MB registers
+ *
  */
 
 #pragma once
 
-#include "PixArt_PAW3902JF_Registers.hpp"
+// TODO: move to a central header
+static constexpr uint8_t Bit0 = (1 << 0);
+static constexpr uint8_t Bit1 = (1 << 1);
+static constexpr uint8_t Bit2 = (1 << 2);
+static constexpr uint8_t Bit3 = (1 << 3);
+static constexpr uint8_t Bit4 = (1 << 4);
+static constexpr uint8_t Bit5 = (1 << 5);
+static constexpr uint8_t Bit6 = (1 << 6);
+static constexpr uint8_t Bit7 = (1 << 7);
 
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/device/spi.h>
-#include <lib/perf/perf_counter.h>
-#include <matrix/math.hpp>
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/optical_flow.h>
 
-using namespace PixArt_PAW3902JF;
-
-class PAW3902 : public device::SPI, public px4::ScheduledWorkItem
+namespace PixArt_PMW3901MB
 {
-public:
-	PAW3902(int bus, uint32_t device, float yaw_rotation_degrees = NAN);
-	~PAW3902() override;
 
-	int init() override;
-	void print_info();
+static constexpr uint32_t SPI_SPEED = 2 * 1000 * 1000; // 2 MHz SPI clock frequency
 
-private:
+static constexpr uint8_t DIR_WRITE = Bit7;
 
-	int probe() override;
-	void Run() override;
+static constexpr uint8_t PRODUCT_ID = 0x49; // shared with PMW3901/PAW3902/PAW3903
+static constexpr uint8_t REVISION_ID = 0x01;
+static constexpr uint8_t INVERSE_PRODUCT_ID = 0xB6;
 
-	uint8_t RegisterRead(uint8_t reg);
-	void    RegisterWrite(uint8_t reg, uint8_t data);
+static constexpr uint64_t SAMPLE_INTERVAL{1000000 / 126}; // 126 fps
 
-	bool Reset();
+enum Register : uint8_t {
+	Product_ID         = 0x00,
+	Revision_ID        = 0x01,
 
-	bool SetMode(Mode newMode, bool force = false);
-	void SetModeBright();
-	void SetModeLowLight();
-	void SetModeSuperLowLight();
+	Motion_Burst       = 0x16,
 
-	Mode _mode{Mode::LowLight};
-	Mode _mode_change{Mode::LowLight};
-	int _mode_change_count{0};
+	Power_Up_Reset     = 0x3A,
 
-	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
-
-	matrix::Dcmf _rotation;
-
-	uint64_t _interval{0};
-
-	int _motion_count{0};
-
-	int16_t _x_raw_prev{0};
-	int16_t _y_raw_prev{0};
-
-	perf_counter_t _sample_perf;
-	perf_counter_t _no_motion_perf;
-	perf_counter_t _bad_data_perf;
-	perf_counter_t _duplicate_data_perf;
+	Inverse_Product_ID = 0x5F
 };
+
+}

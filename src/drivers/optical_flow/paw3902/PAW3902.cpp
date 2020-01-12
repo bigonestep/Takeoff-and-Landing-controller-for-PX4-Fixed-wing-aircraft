@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,607 +33,661 @@
 
 #include "PAW3902.hpp"
 
-PAW3902::PAW3902(int bus, enum Rotation yaw_rotation) :
-	SPI("PAW3902", nullptr, bus, PAW3902_SPIDEV, SPIDEV_MODE0, PAW3902_SPI_BUS_SPEED),
+#include <lib/conversion/rotation.h>
+#include <lib/mathlib/mathlib.h>
+#include <lib/parameters/param.h>
+
+using namespace time_literals;
+using namespace PixArt_PAW3902JF;
+
+static constexpr int16_t combine(uint8_t lsb, uint8_t msb) { return (msb << 8u) | lsb; }
+
+PAW3902::PAW3902(int bus, uint32_t device, float yaw_rotation_degrees) :
+	SPI("PAW3902", nullptr, bus, device, SPIDEV_MODE0, SPI_SPEED),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_sample_perf(perf_alloc(PC_ELAPSED, "paw3902: read")),
-	_comms_errors(perf_alloc(PC_COUNT, "paw3902: com_err")),
-	_dupe_count_perf(perf_alloc(PC_COUNT, "paw3902: duplicate reading")),
-	_yaw_rotation(yaw_rotation)
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_no_motion_perf(perf_alloc(PC_COUNT, MODULE_NAME": no motion")),
+	_bad_data_perf(perf_alloc(PC_COUNT, MODULE_NAME": bad data")),
+	_duplicate_data_perf(perf_alloc(PC_COUNT, MODULE_NAME": duplicate data"))
 {
+	if (PX4_ISFINITE(yaw_rotation_degrees)) {
+		_rotation = matrix::Dcmf{matrix::Eulerf{0.0f, 0.0f, math::radians(yaw_rotation_degrees)}};
+
+	} else {
+		// otherwise use the parameter SENS_FLOW_ROT
+		param_t rot = param_find("SENS_FLOW_ROT");
+		int32_t val = 0;
+
+		if (param_get(rot, &val) == PX4_OK) {
+			_rotation = get_rot_matrix((enum Rotation)val);
+
+		} else {
+			_rotation.identity();
+		}
+	}
 }
 
 PAW3902::~PAW3902()
 {
-	// make sure we are truly inactive
-	stop();
+	ScheduleClear();
 
-	// free perf counters
 	perf_free(_sample_perf);
-	perf_free(_comms_errors);
-	perf_free(_dupe_count_perf);
+	perf_free(_no_motion_perf);
+	perf_free(_bad_data_perf);
+	perf_free(_duplicate_data_perf);
 }
 
-int
-PAW3902::init()
+int PAW3902::init()
 {
-	// get yaw rotation from sensor frame to body frame
-	param_t rot = param_find("SENS_FLOW_ROT");
-
-	if (rot != PARAM_INVALID) {
-		int32_t val = 0;
-
-		if (param_get(rot, &val) == PX4_OK) {
-			_yaw_rotation = (enum Rotation)val;
-		}
-	}
-
-	/* For devices competing with NuttX SPI drivers on a bus (Crazyflie SD Card expansion board) */
-	SPI::set_lockmode(LOCK_THREADS);
-
-	/* do SPI init (and probe) first */
+	// do SPI init (and probe) first
 	if (SPI::init() != OK) {
 		return PX4_ERROR;
 	}
 
-	reset();
-
-	// default to low light mode (1)
-	modeLowLight();
-
-	_previous_collect_timestamp = hrt_absolute_time();
-
-	start();
+	// default to low light mode
+	SetMode(Mode::LowLight, true);
 
 	return PX4_OK;
 }
 
-int
-PAW3902::probe()
+int PAW3902::probe()
 {
-	uint8_t product_id = registerRead(Register::Product_ID);
+	// Product_ID
+	const uint8_t product_id = RegisterRead(Register::Product_ID);
+	PX4_DEBUG("Product_ID: %X", product_id);
 
-	PX4_INFO("DEVICE_ID: %X", product_id);
+	// Revision_ID
+	const uint8_t revision_id = RegisterRead(Register::Revision_ID);
+	PX4_DEBUG("Revision_ID: %X", revision_id);
 
-	// Test the SPI communication, checking chipId and inverse chipId
-	if (product_id != PRODUCT_ID) {
-		return PX4_ERROR;
+	// Inverse_Product_ID
+	const uint8_t inverse_product_id = RegisterRead(Register::Inverse_Product_ID);
+	PX4_DEBUG("Inverse_Product_ID: %X", inverse_product_id);
+
+	if ((product_id == PRODUCT_ID) && (revision_id == REVISION_ID) && (inverse_product_id == INVERSE_PRODUCT_ID)) {
+		return PX4_OK;
 	}
 
-	uint8_t revision_id = registerRead(Register::Revision_ID);
-	PX4_INFO("REVISION_ID: %X", revision_id);
-
-	if (revision_id != REVISION_ID) {
-		return PX4_ERROR;
-	}
-
-	return PX4_OK;
+	return PX4_ERROR;
 }
 
-bool
-PAW3902::reset()
+bool PAW3902::Reset()
 {
-	// Power on reset
-	registerWrite(Register::Power_Up_Reset, 0x5A);
-	usleep(5000);
+	// Power on reset: Write 0x5A to this register to reset the chip.
+	RegisterWrite(Register::Power_Up_Reset, 0x5A);
+	px4_usleep(1_ms); // Wait for at least 1 ms.
 
-	// Read from registers 0x02, 0x03, 0x04, 0x05 and 0x06 one time regardless of the motion state
-	registerRead(Register::Motion);
-	registerRead(Register::Delta_X_L);
-	registerRead(Register::Delta_X_H);
-	registerRead(Register::Delta_Y_L);
-	registerRead(Register::Delta_Y_H);
-
-	usleep(1000);
+	_motion_count = 0;
 
 	return true;
 }
 
-bool
-PAW3902::changeMode(Mode newMode)
+bool PAW3902::SetMode(Mode newMode, bool force)
 {
-	if (newMode != _mode) {
-		PX4_INFO("changing from mode %d -> %d", static_cast<int>(_mode), static_cast<int>(newMode));
-		ScheduleClear();
-		reset();
+	if (newMode == _mode_change) {
+		_mode_change_count++;
 
+	} else {
+		_mode_change = newMode;
+		_mode_change_count = 0;
+	}
+
+	// require 10 consecutive requests
+	if (((newMode != _mode) && (_mode_change_count > 9)) || force) {
+
+		// Procedure to switch operation mode:
+		// 1. Issue a soft reset to PAW3902JF by writing 0x5A to Power_Up_Reset register.
+		Reset();
+
+		ScheduleClear();
+		PX4_DEBUG("changing from mode %d -> %d", static_cast<int>(_mode), static_cast<int>(newMode));
+
+		// 2. Refer Section 8.2 Performance Optimization Registers to configure the needed registers in order to achieve optimum
+		//    performance of the chip for the desired operation mode.
 		switch (newMode) {
 		case Mode::Bright:
-			modeBright();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_0);
+			SetModeBright();
 			break;
 
 		case Mode::LowLight:
-			modeLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_1);
+			SetModeLowLight();
 			break;
 
 		case Mode::SuperLowLight:
-			modeSuperLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_2);
+			SetModeSuperLowLight();
 			break;
 		}
 
+		// 3. Discard the first three motion data.
+		// handled in Run
+		_motion_count = 0;
+
+		// 4. Resume normal operation of reading motion data.
 		_mode = newMode;
+		_mode_change = newMode;
+		_mode_change_count = 0;
+
+		// Enable LED_N controls
+		RegisterWrite(0x7F, 0x14);
+		RegisterWrite(0x6F, 0x1c);
+		RegisterWrite(0x7F, 0x00);
+
+		ScheduleOnInterval(_interval / 2, _interval);
+
+		return true;
 	}
-
-	// Approximate Resolution = (Register Value + 1) * (50 / 8450) ≈ 0.6% of data point in Figure 19
-	// The maximum register value is 0xA8. The minimum register value is 0.
-	uint8_t resolution = registerRead(Register::Resolution);
-	PX4_INFO("Resolution: %X", resolution);
-	PX4_INFO("Resolution is approx: %.3f", (double)((resolution + 1.0f) * (50.0f / 8450.0f)));
-
-	return true;
-}
-
-bool
-PAW3902::modeBright()
-{
-	// Mode 0: Bright (126 fps) 60 Lux typical
-
-	// set performance optimization registers
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x55, 0x01);
-	registerWrite(0x50, 0x07);
-	registerWrite(0x7f, 0x0e);
-	registerWrite(0x43, 0x10);
-
-	registerWrite(0x48, 0x02);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x51, 0x7b);
-	registerWrite(0x50, 0x00);
-	registerWrite(0x55, 0x00);
-
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x61, 0xAD);
-	registerWrite(0x7F, 0x03);
-	registerWrite(0x40, 0x00);
-	registerWrite(0x7F, 0x05);
-	registerWrite(0x41, 0xB3);
-	registerWrite(0x43, 0xF1);
-	registerWrite(0x45, 0x14);
-	registerWrite(0x5F, 0x34);
-	registerWrite(0x7B, 0x08);
-	registerWrite(0x5e, 0x34);
-	registerWrite(0x5b, 0x32);
-	registerWrite(0x6d, 0x32);
-	registerWrite(0x45, 0x17);
-	registerWrite(0x70, 0xe5);
-	registerWrite(0x71, 0xe5);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x44, 0x1B);
-	registerWrite(0x40, 0xBF);
-	registerWrite(0x4E, 0x3F);
-	registerWrite(0x7F, 0x08);
-	registerWrite(0x66, 0x44);
-	registerWrite(0x65, 0x20);
-	registerWrite(0x6a, 0x3a);
-	registerWrite(0x61, 0x05);
-	registerWrite(0x62, 0x05);
-	registerWrite(0x7F, 0x09);
-	registerWrite(0x4F, 0xAF);
-	registerWrite(0x48, 0x80);
-	registerWrite(0x49, 0x80);
-	registerWrite(0x57, 0x77);
-	registerWrite(0x5F, 0x40);
-	registerWrite(0x60, 0x78);
-	registerWrite(0x61, 0x78);
-	registerWrite(0x62, 0x08);
-	registerWrite(0x63, 0x50);
-	registerWrite(0x7F, 0x0A);
-	registerWrite(0x45, 0x60);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x4D, 0x11);
-	registerWrite(0x55, 0x80);
-	registerWrite(0x74, 0x21);
-	registerWrite(0x75, 0x1F);
-	registerWrite(0x4A, 0x78);
-	registerWrite(0x4B, 0x78);
-	registerWrite(0x44, 0x08);
-	registerWrite(0x45, 0x50);
-	registerWrite(0x64, 0xFE);
-	registerWrite(0x65, 0x1F);
-	registerWrite(0x72, 0x0A);
-	registerWrite(0x73, 0x00);
-	registerWrite(0x7F, 0x14);
-	registerWrite(0x44, 0x84);
-	registerWrite(0x65, 0x47);
-	registerWrite(0x66, 0x18);
-	registerWrite(0x63, 0x70);
-	registerWrite(0x6f, 0x2c);
-	registerWrite(0x7F, 0x15);
-	registerWrite(0x48, 0x48);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x41, 0x0D);
-	registerWrite(0x43, 0x14);
-	registerWrite(0x4B, 0x0E);
-	registerWrite(0x45, 0x0F);
-	registerWrite(0x44, 0x42);
-	registerWrite(0x4C, 0x80);
-	registerWrite(0x7F, 0x10);
-	registerWrite(0x5B, 0x03);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x41);
-
-	usleep(10_ms); // delay 10ms
-
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x32, 0x00);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x40);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x68, 0x70);
-	registerWrite(0x69, 0x01);
-	registerWrite(0x7F, 0x0D);
-	registerWrite(0x48, 0xC0);
-	registerWrite(0x6F, 0xD5);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x5B, 0xA0);
-	registerWrite(0x4E, 0xA8);
-	registerWrite(0x5A, 0x50);
-	registerWrite(0x40, 0x80);
-	registerWrite(0x73, 0x1f);
-
-	usleep(10_ms); // delay 10ms
-
-	registerWrite(0x73, 0x00);
 
 	return false;
 }
 
-bool
-PAW3902::modeLowLight()
+void PAW3902::SetModeBright()
+{
+	// Mode 0: Bright (126 fps) 60 Lux typical
+	_interval = static_cast<uint64_t>(Interval::Bright);
+
+	// set performance optimization registers
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x55, 0x01);
+	RegisterWrite(0x50, 0x07);
+	RegisterWrite(0x7f, 0x0e);
+	RegisterWrite(0x43, 0x10);
+
+	RegisterWrite(0x48, 0x02);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x51, 0x7b);
+	RegisterWrite(0x50, 0x00);
+	RegisterWrite(0x55, 0x00);
+
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x61, 0xAD);
+	RegisterWrite(0x7F, 0x03);
+	RegisterWrite(0x40, 0x00);
+	RegisterWrite(0x7F, 0x05);
+	RegisterWrite(0x41, 0xB3);
+	RegisterWrite(0x43, 0xF1);
+	RegisterWrite(0x45, 0x14);
+	RegisterWrite(0x5F, 0x34);
+	RegisterWrite(0x7B, 0x08);
+	RegisterWrite(0x5e, 0x34);
+	RegisterWrite(0x5b, 0x32);
+	RegisterWrite(0x6d, 0x32);
+	RegisterWrite(0x45, 0x17);
+	RegisterWrite(0x70, 0xe5);
+	RegisterWrite(0x71, 0xe5);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x44, 0x1B);
+	RegisterWrite(0x40, 0xBF);
+	RegisterWrite(0x4E, 0x3F);
+	RegisterWrite(0x7F, 0x08);
+	RegisterWrite(0x66, 0x44);
+	RegisterWrite(0x65, 0x20);
+	RegisterWrite(0x6a, 0x3a);
+	RegisterWrite(0x61, 0x05);
+	RegisterWrite(0x62, 0x05);
+	RegisterWrite(0x7F, 0x09);
+	RegisterWrite(0x4F, 0xAF);
+	RegisterWrite(0x48, 0x80);
+	RegisterWrite(0x49, 0x80);
+	RegisterWrite(0x57, 0x77);
+	RegisterWrite(0x5F, 0x40);
+	RegisterWrite(0x60, 0x78);
+	RegisterWrite(0x61, 0x78);
+	RegisterWrite(0x62, 0x08);
+	RegisterWrite(0x63, 0x50);
+	RegisterWrite(0x7F, 0x0A);
+	RegisterWrite(0x45, 0x60);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x4D, 0x11);
+	RegisterWrite(0x55, 0x80);
+	RegisterWrite(0x74, 0x21);
+	RegisterWrite(0x75, 0x1F);
+	RegisterWrite(0x4A, 0x78);
+	RegisterWrite(0x4B, 0x78);
+	RegisterWrite(0x44, 0x08);
+	RegisterWrite(0x45, 0x50);
+	RegisterWrite(0x64, 0xFE);
+	RegisterWrite(0x65, 0x1F);
+	RegisterWrite(0x72, 0x0A);
+	RegisterWrite(0x73, 0x00);
+	RegisterWrite(0x7F, 0x14);
+	RegisterWrite(0x44, 0x84);
+	RegisterWrite(0x65, 0x47);
+	RegisterWrite(0x66, 0x18);
+	RegisterWrite(0x63, 0x70);
+	RegisterWrite(0x6f, 0x2c);
+	RegisterWrite(0x7F, 0x15);
+	RegisterWrite(0x48, 0x48);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x41, 0x0D);
+	RegisterWrite(0x43, 0x14);
+	RegisterWrite(0x4B, 0x0E);
+	RegisterWrite(0x45, 0x0F);
+	RegisterWrite(0x44, 0x42);
+	RegisterWrite(0x4C, 0x80);
+	RegisterWrite(0x7F, 0x10);
+	RegisterWrite(0x5B, 0x03);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x41);
+
+	px4_usleep(10_ms); // Delay 10 ms
+
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x32, 0x00);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x40);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x68, 0x70);
+	RegisterWrite(0x69, 0x01);
+	RegisterWrite(0x7F, 0x0D);
+	RegisterWrite(0x48, 0xC0);
+	RegisterWrite(0x6F, 0xD5);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x5B, 0xA0);
+	RegisterWrite(0x4E, 0xA8);
+	RegisterWrite(0x5A, 0x50);
+	RegisterWrite(0x40, 0x80);
+	RegisterWrite(0x73, 0x1f);
+
+	px4_usleep(10_ms); // Delay 10 ms
+
+	RegisterWrite(0x73, 0x00);
+}
+
+void PAW3902::SetModeLowLight()
 {
 	// Mode 1: Low Light (126 fps) 30 Lux typical
 	// low light and low speed motion tracking
+	_interval = static_cast<uint64_t>(Interval::LowLight);
 
 	// set performance optimization registers
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x55, 0x01);
-	registerWrite(0x50, 0x07);
-	registerWrite(0x7f, 0x0e);
-	registerWrite(0x43, 0x10);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x55, 0x01);
+	RegisterWrite(0x50, 0x07);
+	RegisterWrite(0x7f, 0x0e);
+	RegisterWrite(0x43, 0x10);
 
-	registerWrite(0x48, 0x02);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x51, 0x7b);
-	registerWrite(0x50, 0x00);
-	registerWrite(0x55, 0x00);
+	RegisterWrite(0x48, 0x02);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x51, 0x7b);
+	RegisterWrite(0x50, 0x00);
+	RegisterWrite(0x55, 0x00);
 
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x61, 0xAD);
-	registerWrite(0x7F, 0x03);
-	registerWrite(0x40, 0x00);
-	registerWrite(0x7F, 0x05);
-	registerWrite(0x41, 0xB3);
-	registerWrite(0x43, 0xF1);
-	registerWrite(0x45, 0x14);
-	registerWrite(0x5F, 0x34);
-	registerWrite(0x7B, 0x08);
-	registerWrite(0x5e, 0x34);
-	registerWrite(0x5b, 0x65);
-	registerWrite(0x6d, 0x65);
-	registerWrite(0x45, 0x17);
-	registerWrite(0x70, 0xe5);
-	registerWrite(0x71, 0xe5);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x44, 0x1B);
-	registerWrite(0x40, 0xBF);
-	registerWrite(0x4E, 0x3F);
-	registerWrite(0x7F, 0x08);
-	registerWrite(0x66, 0x44);
-	registerWrite(0x65, 0x20);
-	registerWrite(0x6a, 0x3a);
-	registerWrite(0x61, 0x05);
-	registerWrite(0x62, 0x05);
-	registerWrite(0x7F, 0x09);
-	registerWrite(0x4F, 0xAF);
-	registerWrite(0x48, 0x80);
-	registerWrite(0x49, 0x80);
-	registerWrite(0x57, 0x77);
-	registerWrite(0x5F, 0x40);
-	registerWrite(0x60, 0x78);
-	registerWrite(0x61, 0x78);
-	registerWrite(0x62, 0x08);
-	registerWrite(0x63, 0x50);
-	registerWrite(0x7F, 0x0A);
-	registerWrite(0x45, 0x60);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x4D, 0x11);
-	registerWrite(0x55, 0x80);
-	registerWrite(0x74, 0x21);
-	registerWrite(0x75, 0x1F);
-	registerWrite(0x4A, 0x78);
-	registerWrite(0x4B, 0x78);
-	registerWrite(0x44, 0x08);
-	registerWrite(0x45, 0x50);
-	registerWrite(0x64, 0xFE);
-	registerWrite(0x65, 0x1F);
-	registerWrite(0x72, 0x0A);
-	registerWrite(0x73, 0x00);
-	registerWrite(0x7F, 0x14);
-	registerWrite(0x44, 0x84);
-	registerWrite(0x65, 0x67);
-	registerWrite(0x66, 0x18);
-	registerWrite(0x63, 0x70);
-	registerWrite(0x6f, 0x2c);
-	registerWrite(0x7F, 0x15);
-	registerWrite(0x48, 0x48);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x41, 0x0D);
-	registerWrite(0x43, 0x14);
-	registerWrite(0x4B, 0x0E);
-	registerWrite(0x45, 0x0F);
-	registerWrite(0x44, 0x42);
-	registerWrite(0x4C, 0x80);
-	registerWrite(0x7F, 0x10);
-	registerWrite(0x5B, 0x03);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x41);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x61, 0xAD);
+	RegisterWrite(0x7F, 0x03);
+	RegisterWrite(0x40, 0x00);
+	RegisterWrite(0x7F, 0x05);
+	RegisterWrite(0x41, 0xB3);
+	RegisterWrite(0x43, 0xF1);
+	RegisterWrite(0x45, 0x14);
+	RegisterWrite(0x5F, 0x34);
+	RegisterWrite(0x7B, 0x08);
+	RegisterWrite(0x5e, 0x34);
+	RegisterWrite(0x5b, 0x65);
+	RegisterWrite(0x6d, 0x65);
+	RegisterWrite(0x45, 0x17);
+	RegisterWrite(0x70, 0xe5);
+	RegisterWrite(0x71, 0xe5);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x44, 0x1B);
+	RegisterWrite(0x40, 0xBF);
+	RegisterWrite(0x4E, 0x3F);
+	RegisterWrite(0x7F, 0x08);
+	RegisterWrite(0x66, 0x44);
+	RegisterWrite(0x65, 0x20);
+	RegisterWrite(0x6a, 0x3a);
+	RegisterWrite(0x61, 0x05);
+	RegisterWrite(0x62, 0x05);
+	RegisterWrite(0x7F, 0x09);
+	RegisterWrite(0x4F, 0xAF);
+	RegisterWrite(0x48, 0x80);
+	RegisterWrite(0x49, 0x80);
+	RegisterWrite(0x57, 0x77);
+	RegisterWrite(0x5F, 0x40);
+	RegisterWrite(0x60, 0x78);
+	RegisterWrite(0x61, 0x78);
+	RegisterWrite(0x62, 0x08);
+	RegisterWrite(0x63, 0x50);
+	RegisterWrite(0x7F, 0x0A);
+	RegisterWrite(0x45, 0x60);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x4D, 0x11);
+	RegisterWrite(0x55, 0x80);
+	RegisterWrite(0x74, 0x21);
+	RegisterWrite(0x75, 0x1F);
+	RegisterWrite(0x4A, 0x78);
+	RegisterWrite(0x4B, 0x78);
+	RegisterWrite(0x44, 0x08);
+	RegisterWrite(0x45, 0x50);
+	RegisterWrite(0x64, 0xFE);
+	RegisterWrite(0x65, 0x1F);
+	RegisterWrite(0x72, 0x0A);
+	RegisterWrite(0x73, 0x00);
+	RegisterWrite(0x7F, 0x14);
+	RegisterWrite(0x44, 0x84);
+	RegisterWrite(0x65, 0x67);
+	RegisterWrite(0x66, 0x18);
+	RegisterWrite(0x63, 0x70);
+	RegisterWrite(0x6f, 0x2c);
+	RegisterWrite(0x7F, 0x15);
+	RegisterWrite(0x48, 0x48);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x41, 0x0D);
+	RegisterWrite(0x43, 0x14);
+	RegisterWrite(0x4B, 0x0E);
+	RegisterWrite(0x45, 0x0F);
+	RegisterWrite(0x44, 0x42);
+	RegisterWrite(0x4C, 0x80);
+	RegisterWrite(0x7F, 0x10);
+	RegisterWrite(0x5B, 0x03);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x41);
 
-	usleep(10_ms); // delay 10ms
+	px4_usleep(10_ms); // Delay 10 ms
 
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x32, 0x00);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x40);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x68, 0x70);
-	registerWrite(0x69, 0x01);
-	registerWrite(0x7F, 0x0D);
-	registerWrite(0x48, 0xC0);
-	registerWrite(0x6F, 0xD5);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x5B, 0xA0);
-	registerWrite(0x4E, 0xA8);
-	registerWrite(0x5A, 0x50);
-	registerWrite(0x40, 0x80);
-	registerWrite(0x73, 0x1f);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x32, 0x00);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x40);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x68, 0x70);
+	RegisterWrite(0x69, 0x01);
+	RegisterWrite(0x7F, 0x0D);
+	RegisterWrite(0x48, 0xC0);
+	RegisterWrite(0x6F, 0xD5);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x5B, 0xA0);
+	RegisterWrite(0x4E, 0xA8);
+	RegisterWrite(0x5A, 0x50);
+	RegisterWrite(0x40, 0x80);
+	RegisterWrite(0x73, 0x1f);
 
-	usleep(10_ms); // delay 10ms
+	px4_usleep(10_ms); // Delay 10 ms
 
-	registerWrite(0x73, 0x00);
-
-	return false;
+	RegisterWrite(0x73, 0x00);
 }
 
-bool
-PAW3902::modeSuperLowLight()
+void PAW3902::SetModeSuperLowLight()
 {
 	// Mode 2: Super Low Light (50 fps) 9 Lux typical
 	// super low light and low speed motion tracking
+	_interval = static_cast<uint64_t>(Interval::SuperLowLight);
 
 	// set performance optimization registers
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x55, 0x01);
-	registerWrite(0x50, 0x07);
-	registerWrite(0x7f, 0x0e);
-	registerWrite(0x43, 0x10);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x55, 0x01);
+	RegisterWrite(0x50, 0x07);
+	RegisterWrite(0x7f, 0x0e);
+	RegisterWrite(0x43, 0x10);
 
-	registerWrite(0x48, 0x04);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x51, 0x7b);
-	registerWrite(0x50, 0x00);
-	registerWrite(0x55, 0x00);
+	RegisterWrite(0x48, 0x04);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x51, 0x7b);
+	RegisterWrite(0x50, 0x00);
+	RegisterWrite(0x55, 0x00);
 
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x61, 0xAD);
-	registerWrite(0x7F, 0x03);
-	registerWrite(0x40, 0x00);
-	registerWrite(0x7F, 0x05);
-	registerWrite(0x41, 0xB3);
-	registerWrite(0x43, 0xF1);
-	registerWrite(0x45, 0x14);
-	registerWrite(0x5F, 0x34);
-	registerWrite(0x7B, 0x08);
-	registerWrite(0x5E, 0x34);
-	registerWrite(0x5B, 0x32);
-	registerWrite(0x6D, 0x32);
-	registerWrite(0x45, 0x17);
-	registerWrite(0x70, 0xE5);
-	registerWrite(0x71, 0xE5);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x44, 0x1B);
-	registerWrite(0x40, 0xBF);
-	registerWrite(0x4E, 0x3F);
-	registerWrite(0x7F, 0x08);
-	registerWrite(0x66, 0x44);
-	registerWrite(0x65, 0x20);
-	registerWrite(0x6A, 0x3a);
-	registerWrite(0x61, 0x05);
-	registerWrite(0x62, 0x05);
-	registerWrite(0x7F, 0x09);
-	registerWrite(0x4F, 0xAF);
-	registerWrite(0x48, 0x80);
-	registerWrite(0x49, 0x80);
-	registerWrite(0x57, 0x77);
-	registerWrite(0x5F, 0x40);
-	registerWrite(0x60, 0x78);
-	registerWrite(0x61, 0x78);
-	registerWrite(0x62, 0x08);
-	registerWrite(0x63, 0x50);
-	registerWrite(0x7F, 0x0A);
-	registerWrite(0x45, 0x60);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x4D, 0x11);
-	registerWrite(0x55, 0x80);
-	registerWrite(0x74, 0x21);
-	registerWrite(0x75, 0x1F);
-	registerWrite(0x4A, 0x78);
-	registerWrite(0x4B, 0x78);
-	registerWrite(0x44, 0x08);
-	registerWrite(0x45, 0x50);
-	registerWrite(0x64, 0xCE);
-	registerWrite(0x65, 0x0B);
-	registerWrite(0x72, 0x0A);
-	registerWrite(0x73, 0x00);
-	registerWrite(0x7F, 0x14);
-	registerWrite(0x44, 0x84);
-	registerWrite(0x65, 0x67);
-	registerWrite(0x66, 0x18);
-	registerWrite(0x63, 0x70);
-	registerWrite(0x6f, 0x2c);
-	registerWrite(0x7F, 0x15);
-	registerWrite(0x48, 0x48);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x41, 0x0D);
-	registerWrite(0x43, 0x14);
-	registerWrite(0x4B, 0x0E);
-	registerWrite(0x45, 0x0F);
-	registerWrite(0x44, 0x42);
-	registerWrite(0x4C, 0x80);
-	registerWrite(0x7F, 0x10);
-	registerWrite(0x5B, 0x02);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x41);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x61, 0xAD);
+	RegisterWrite(0x7F, 0x03);
+	RegisterWrite(0x40, 0x00);
+	RegisterWrite(0x7F, 0x05);
+	RegisterWrite(0x41, 0xB3);
+	RegisterWrite(0x43, 0xF1);
+	RegisterWrite(0x45, 0x14);
+	RegisterWrite(0x5F, 0x34);
+	RegisterWrite(0x7B, 0x08);
+	RegisterWrite(0x5E, 0x34);
+	RegisterWrite(0x5B, 0x32);
+	RegisterWrite(0x6D, 0x32);
+	RegisterWrite(0x45, 0x17);
+	RegisterWrite(0x70, 0xE5);
+	RegisterWrite(0x71, 0xE5);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x44, 0x1B);
+	RegisterWrite(0x40, 0xBF);
+	RegisterWrite(0x4E, 0x3F);
+	RegisterWrite(0x7F, 0x08);
+	RegisterWrite(0x66, 0x44);
+	RegisterWrite(0x65, 0x20);
+	RegisterWrite(0x6A, 0x3a);
+	RegisterWrite(0x61, 0x05);
+	RegisterWrite(0x62, 0x05);
+	RegisterWrite(0x7F, 0x09);
+	RegisterWrite(0x4F, 0xAF);
+	RegisterWrite(0x48, 0x80);
+	RegisterWrite(0x49, 0x80);
+	RegisterWrite(0x57, 0x77);
+	RegisterWrite(0x5F, 0x40);
+	RegisterWrite(0x60, 0x78);
+	RegisterWrite(0x61, 0x78);
+	RegisterWrite(0x62, 0x08);
+	RegisterWrite(0x63, 0x50);
+	RegisterWrite(0x7F, 0x0A);
+	RegisterWrite(0x45, 0x60);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x4D, 0x11);
+	RegisterWrite(0x55, 0x80);
+	RegisterWrite(0x74, 0x21);
+	RegisterWrite(0x75, 0x1F);
+	RegisterWrite(0x4A, 0x78);
+	RegisterWrite(0x4B, 0x78);
+	RegisterWrite(0x44, 0x08);
+	RegisterWrite(0x45, 0x50);
+	RegisterWrite(0x64, 0xCE);
+	RegisterWrite(0x65, 0x0B);
+	RegisterWrite(0x72, 0x0A);
+	RegisterWrite(0x73, 0x00);
+	RegisterWrite(0x7F, 0x14);
+	RegisterWrite(0x44, 0x84);
+	RegisterWrite(0x65, 0x67);
+	RegisterWrite(0x66, 0x18);
+	RegisterWrite(0x63, 0x70);
+	RegisterWrite(0x6f, 0x2c);
+	RegisterWrite(0x7F, 0x15);
+	RegisterWrite(0x48, 0x48);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x41, 0x0D);
+	RegisterWrite(0x43, 0x14);
+	RegisterWrite(0x4B, 0x0E);
+	RegisterWrite(0x45, 0x0F);
+	RegisterWrite(0x44, 0x42);
+	RegisterWrite(0x4C, 0x80);
+	RegisterWrite(0x7F, 0x10);
+	RegisterWrite(0x5B, 0x02);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x41);
 
-	usleep(25_ms); // delay 25ms
+	px4_usleep(25_ms); // Delay 25ms
 
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x32, 0x44);
-	registerWrite(0x7F, 0x07);
-	registerWrite(0x40, 0x40);
-	registerWrite(0x7F, 0x06);
-	registerWrite(0x68, 0x40);
-	registerWrite(0x69, 0x02);
-	registerWrite(0x7F, 0x0D);
-	registerWrite(0x48, 0xC0);
-	registerWrite(0x6F, 0xD5);
-	registerWrite(0x7F, 0x00);
-	registerWrite(0x5B, 0xA0);
-	registerWrite(0x4E, 0xA8);
-	registerWrite(0x5A, 0x50);
-	registerWrite(0x40, 0x80);
-	registerWrite(0x73, 0x0B);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x32, 0x44);
+	RegisterWrite(0x7F, 0x07);
+	RegisterWrite(0x40, 0x40);
+	RegisterWrite(0x7F, 0x06);
+	RegisterWrite(0x68, 0x40);
+	RegisterWrite(0x69, 0x02);
+	RegisterWrite(0x7F, 0x0D);
+	RegisterWrite(0x48, 0xC0);
+	RegisterWrite(0x6F, 0xD5);
+	RegisterWrite(0x7F, 0x00);
+	RegisterWrite(0x5B, 0xA0);
+	RegisterWrite(0x4E, 0xA8);
+	RegisterWrite(0x5A, 0x50);
+	RegisterWrite(0x40, 0x80);
+	RegisterWrite(0x73, 0x0B);
 
-	usleep(25_ms); // delay 25ms
+	px4_usleep(25_ms); // Delay 25ms
 
-	registerWrite(0x73, 0x00);
-
-	return true;
+	RegisterWrite(0x73, 0x00);
 }
 
-uint8_t
-PAW3902::registerRead(uint8_t reg)
+uint8_t PAW3902::RegisterRead(uint8_t reg)
 {
-	uint8_t cmd[2] {};
-	cmd[0] = reg;
+	uint8_t cmd[2] { reg, 0 };
 	transfer(&cmd[0], &cmd[0], sizeof(cmd));
-	up_udelay(T_SRR);
 	return cmd[1];
 }
 
-void
-PAW3902::registerWrite(uint8_t reg, uint8_t data)
+void PAW3902::RegisterWrite(uint8_t reg, uint8_t data)
 {
 	uint8_t cmd[2];
-	cmd[0] = DIR_WRITE(reg);
+	cmd[0] = reg | DIR_WRITE;
 	cmd[1] = data;
 	transfer(&cmd[0], nullptr, sizeof(cmd));
-	up_udelay(T_SWW);
 }
 
-void
-PAW3902::Run()
+void PAW3902::Run()
 {
 	perf_begin(_sample_perf);
 
+	// Reading the Motion_Burst register activates Burst Mode.
+	// PAW3902JF will respond with the following motion burst report in order
 	struct TransferBuffer {
 		uint8_t cmd = Register::Motion_Burst;
-		BURST_TRANSFER data{};
-	};
-	TransferBuffer buf;
-	static_assert(sizeof(buf) == (12 + 1));
+		uint8_t Motion;
+		uint8_t Observation;
+		uint8_t Delta_X_L;
+		uint8_t Delta_X_H;
+		uint8_t Delta_Y_L;
+		uint8_t Delta_Y_H;
+		uint8_t SQUAL;
+		uint8_t RawData_Sum;
+		uint8_t Maximum_RawData;
+		uint8_t Minimum_RawData;
+		uint8_t Shutter_Upper;
+		uint8_t Shutter_Lower;
+	} buf{};
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 	if (transfer((uint8_t *)&buf, (uint8_t *)&buf, sizeof(buf)) != PX4_OK) {
-		perf_count(_comms_errors);
 		perf_end(_sample_perf);
 		return;
 	}
 
-	const uint64_t dt_flow = timestamp_sample - _previous_collect_timestamp;
-	_flow_dt_sum_usec += dt_flow;
-	_frame_count_since_last++;
+	// Check if motion occurred and data ready for reading in Delta_X_L, Delta_X_H, Delta_Y_L and Delta_Y_H registers.
+	if (buf.Motion & Bit7) {
+		_motion_count++;
 
-	// update for next iteration
-	_previous_collect_timestamp = timestamp_sample;
+	} else {
+		perf_count(_no_motion_perf);
+		perf_end(_sample_perf);
+		return;
+	}
 
-	// PX4_INFO("data.Motion %d", buf.data.Motion);
-	// PX4_INFO("data.Observation %d", buf.data.Observation);
-	// PX4_INFO("data.Delta_X_L %d", buf.data.Delta_X_L);
-	// PX4_INFO("data.Delta_X_H %d", buf.data.Delta_X_H);
-	// PX4_INFO("data.Delta_Y_L %d", buf.data.Delta_Y_L);
-	// PX4_INFO("data.Delta_Y_H %d", buf.data.Delta_Y_H);
-	// PX4_INFO("data.SQUAL %d", buf.data.SQUAL);
-	// PX4_INFO("data.RawData_Sum %d", buf.data.RawData_Sum);
-	// PX4_INFO("data.Maximum_RawData %d", buf.data.Maximum_RawData);
-	// PX4_INFO("data.Minimum_RawData %d", buf.data.Minimum_RawData);
-	// PX4_INFO("data.Shutter_Upper %d", buf.data.Shutter_Upper);
-	// PX4_INFO("data.Shutter_Lower %d", buf.data.Shutter_Lower);
-
-	const int16_t delta_x_raw = ((int16_t)buf.data.Delta_X_H << 8) | buf.data.Delta_X_L;
-	const int16_t delta_y_raw = ((int16_t)buf.data.Delta_Y_H << 8) | buf.data.Delta_Y_L;
+	// Discard the first three motion data after mode change
+	if (_motion_count < 3) {
+		perf_end(_sample_perf);
+		return;
+	}
 
 	// check SQUAL & Shutter values
-	// To suppress false motion reports, discard Delta X and Delta Y values if the SQUAL and Shutter values meet the condition
-	// Bright Mode,			SQUAL < 0x19, Shutter ≥ 0x1FF0
-	// Low Light Mode,		SQUAL < 0x46, Shutter ≥ 0x1FF0
-	// Super Low Light Mode,	SQUAL < 0x55, Shutter ≥ 0x0BC0
-	const uint16_t shutter = (buf.data.Shutter_Upper << 8) | buf.data.Shutter_Lower;
-
-	if ((buf.data.SQUAL < 0x19) && (shutter >= 0x0BC0)) {
-		PX4_ERR("false motion report, discarding");
-		perf_end(_sample_perf);
-		return;
-	}
+	const uint16_t shutter = combine(buf.Shutter_Upper & 0x1F, buf.Shutter_Lower);
 
 	switch (_mode) {
 	case Mode::Bright:
-		if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x3C)) { // AND valid for 10 consecutive frames?
+
+		// To suppress false motion reports, discard Delta X and Delta Y values if the SQUAL and Shutter values meet the condition
+		// Bright Mode,			SQUAL < 0x19, Shutter ≥ 0x1FF0
+		if ((buf.SQUAL < 0x19) && (shutter >= 0x1FF0)) {
+			PX4_DEBUG("false motion report, discarding");
+			perf_count(_bad_data_perf);
+			perf_end(_sample_perf);
+			return;
+		}
+
+		if ((shutter >= 0x1FFE) && (buf.RawData_Sum < 0x3C)) {
 			// Bright -> LowLight
-			changeMode(Mode::LowLight);
+			if (SetMode(Mode::LowLight)) {
+				perf_end(_sample_perf);
+				return;
+			}
+
+		} else {
+			_mode_change_count = 0;
 		}
 
 		break;
 
 	case Mode::LowLight:
-		if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x5A)) {	// AND valid for 10 consecutive frames?
-			// LowLight -> SuperLowLight
-			changeMode(Mode::SuperLowLight);
 
-		} else if ((shutter >= 0x0BB8)) {	// AND valid for 10 consecutive frames?
+		// To suppress false motion reports, discard Delta X and Delta Y values if the SQUAL and Shutter values meet the condition
+		// Low Light Mode,		SQUAL < 0x46, Shutter ≥ 0x1FF0
+		if ((buf.SQUAL < 0x46) && (shutter >= 0x1FF0)) {
+			PX4_DEBUG("false motion report, discarding");
+			perf_count(_bad_data_perf);
+			perf_end(_sample_perf);
+			return;
+		}
+
+		if ((shutter >= 0x1FFE) && (buf.RawData_Sum < 0x5A)) {
+			// LowLight -> SuperLowLight
+			if (SetMode(Mode::SuperLowLight)) {
+				perf_end(_sample_perf);
+				return;
+			}
+
+		} else if ((shutter >= 0x0BB8)) {
 			// LowLight -> Bright
-			changeMode(Mode::Bright);
+			if (SetMode(Mode::Bright)) {
+				perf_end(_sample_perf);
+				return;
+			}
+
+		} else {
+			_mode_change_count = 0;
 		}
 
 		break;
 
 	case Mode::SuperLowLight:
 
-		// SuperLowLight -> LowLight
-		if ((shutter >= 0x03E8)) { // AND valid for 10 consecutive frames?
-			changeMode(Mode::LowLight);
+		// To suppress false motion reports, discard Delta X and Delta Y values if the SQUAL and Shutter values meet the condition
+		// Super Low Light Mode,	SQUAL < 0x55, Shutter ≥ 0x0BC0
+		if ((buf.SQUAL < 0x55) && (shutter >= 0x0BC0)) {
+			PX4_DEBUG("false motion report, discarding");
+			perf_count(_bad_data_perf);
+			perf_end(_sample_perf);
+			return;
 		}
 
-		// PAW3902JF should not operate with Shutter < 0x01F4 in Mode 2
-		if (shutter >= 0x01F4) {
-			changeMode(Mode::LowLight);
+		if ((shutter >= 0x03E8)) {
+			// SuperLowLight -> LowLight
+			if (SetMode(Mode::LowLight)) {
+				perf_end(_sample_perf);
+				return;
+			}
+
+		} else if (shutter >= 0x01F4) {
+			// PAW3902JF should not operate with Shutter < 0x01F4 in Mode 2
+			if (SetMode(Mode::LowLight)) {
+				perf_end(_sample_perf);
+				return;
+			}
+
+		} else {
+			_mode_change_count = 0;
 		}
 
 		break;
 	}
 
-	// TODO: page 35 switching scheme
+	const int16_t x_raw = combine(buf.Delta_X_H, buf.Delta_X_L);
+	const int16_t y_raw = combine(buf.Delta_Y_H, buf.Delta_Y_L);
 
-	// As a minimum requirement, PAW3902JF should not operate with Shutter < 0x01F4 in Mode 2, and must switch to the next operation mode.
+	if ((x_raw == _x_raw_prev) && (y_raw == _y_raw_prev)) {
+		perf_count(_duplicate_data_perf);
+		perf_end(_sample_perf);
+		return;
+	}
 
-	_flow_sum_x += delta_x_raw;
-	_flow_sum_y += delta_y_raw;
+	_x_raw_prev = x_raw;
+	_y_raw_prev = y_raw;
 
-	// returns if the collect time has not been reached
-	if (_flow_dt_sum_usec < _collect_time) {
+	// If the reported flow is impossibly large, we just got garbage from the SPI
+	if (x_raw > 240 || y_raw > 240 || x_raw < -240 || y_raw < -240) {
+		PX4_DEBUG("garbage data, discarding");
+		perf_count(_bad_data_perf);
 		perf_end(_sample_perf);
 		return;
 	}
@@ -641,60 +695,39 @@ PAW3902::Run()
 	optical_flow_s report{};
 	report.timestamp = timestamp_sample;
 
+	float pixel_flow_x_integral = (float)x_raw / 500.0f; // proportional factor + convert from pixels to radians
+	float pixel_flow_y_integral = (float)y_raw / 500.0f; // proportional factor + convert from pixels to radians
+	const matrix::Vector3f pixel_flow_rotated = _rotation * matrix::Vector3f{pixel_flow_x_integral, pixel_flow_y_integral, 0.0f};
+	report.pixel_flow_x_integral = pixel_flow_rotated(0);
+	report.pixel_flow_y_integral = pixel_flow_rotated(1);
 
-	//PX4_INFO("X: %d Y: %d", _flow_sum_x, _flow_sum_y);
+	report.frame_count_since_last_readout = 1;
+	report.integration_timespan = _interval;
 
-	report.pixel_flow_x_integral = (float)_flow_sum_x / 500.0f;	// proportional factor + convert from pixels to radians
-	report.pixel_flow_y_integral = (float)_flow_sum_y / 500.0f;	// proportional factor + convert from pixels to radians
+	//report.sensor_id = 0; // TODO: device id
+	report.quality = buf.SQUAL;
 
-	// rotate measurements in yaw from sensor frame to body frame according to parameter SENS_FLOW_ROT
-	float zeroval = 0.0f;
-	rotate_3f(_yaw_rotation, report.pixel_flow_x_integral, report.pixel_flow_y_integral, zeroval);
-
-	report.frame_count_since_last_readout = _frame_count_since_last;
-	report.integration_timespan = _flow_dt_sum_usec;	// microseconds
-
-	report.sensor_id = 0;
-	report.quality = buf.data.SQUAL;
-
-	/* No gyro on this board */
+	// No gyro on this board
 	report.gyro_x_rate_integral = NAN;
 	report.gyro_y_rate_integral = NAN;
 	report.gyro_z_rate_integral = NAN;
 
-	// set (conservative) specs according to datasheet
-	report.max_flow_rate = 5.0f;       // Datasheet: 7.4 rad/s
+	// set specs according to datasheet
+	report.max_flow_rate = 7.4f;       // Datasheet: 7.4 rad/s
 	report.min_ground_distance = 0.08f; // Datasheet: 80mm
 	report.max_ground_distance = 30.0f; // Datasheet: infinity
 
 	_optical_flow_pub.publish(report);
 
-	// reset
-	_flow_dt_sum_usec = 0;
-	_flow_sum_x = 0;
-	_flow_sum_y = 0;
-	_frame_count_since_last = 0;
-
 	perf_end(_sample_perf);
 }
 
-void
-PAW3902::start()
-{
-	// schedule a cycle to start things
-	ScheduleOnInterval(SAMPLE_INTERVAL_MODE_1);
-}
-
-void
-PAW3902::stop()
-{
-	ScheduleClear();
-}
-
-void
-PAW3902::print_info()
+void PAW3902::print_info()
 {
 	perf_print_counter(_sample_perf);
-	perf_print_counter(_comms_errors);
-	perf_print_counter(_dupe_count_perf);
+	perf_print_counter(_no_motion_perf);
+	perf_print_counter(_bad_data_perf);
+	perf_print_counter(_duplicate_data_perf);
+
+	PX4_INFO("Mode: %d", (int)_mode);
 }
