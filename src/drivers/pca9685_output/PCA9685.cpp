@@ -53,7 +53,7 @@
 
 #include <px4_platform_common/log.h>
 
-using namespace linux_pwm_out;
+using namespace pca9685_output;
 
 int PCA9685::init(int bus, int address)
 {

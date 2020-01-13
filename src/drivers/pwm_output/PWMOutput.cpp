@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,185 +31,10 @@
  *
  ****************************************************************************/
 
-/**
- * @file fmu.cpp
- *
- * Driver/configurator for the PX4 FMU
- */
+#include "PWMOutput.hpp"
 
-#include <float.h>
-#include <math.h>
-
-#include <board_config.h>
-#include <drivers/device/device.h>
-#include <drivers/device/i2c.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/drv_input_capture.h>
-#include <drivers/drv_mixer.h>
-#include <drivers/drv_pwm_output.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/mathlib/mathlib.h>
-#include <lib/mixer_module/mixer_module.hpp>
-#include <lib/parameters/param.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/getopt.h>
-#include <px4_platform_common/log.h>
-#include <px4_platform_common/module.h>
-#include <uORB/Publication.hpp>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
-#include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/actuator_outputs.h>
-#include <uORB/topics/multirotor_motor_limits.h>
-#include <uORB/topics/parameter_update.h>
-
-using namespace time_literals;
-
-/** Mode given via CLI */
-enum PortMode {
-	PORT_MODE_UNSET = 0,
-	PORT_FULL_GPIO,
-	PORT_FULL_PWM,
-	PORT_PWM8,
-	PORT_PWM6,
-	PORT_PWM5,
-	PORT_PWM4,
-	PORT_PWM3,
-	PORT_PWM2,
-	PORT_PWM1,
-	PORT_PWM3CAP1,
-	PORT_PWM4CAP1,
-	PORT_PWM4CAP2,
-	PORT_PWM5CAP1,
-	PORT_PWM2CAP2,
-	PORT_CAPTURE,
-};
-
-#if !defined(BOARD_HAS_PWM)
-#  error "board_config.h needs to define BOARD_HAS_PWM"
-#endif
-
-#define PX4FMU_DEVICE_PATH	"/dev/px4fmu"
-
-
-class PX4FMU : public cdev::CDev, public ModuleBase<PX4FMU>, public OutputModuleInterface
-{
-public:
-	enum Mode {
-		MODE_NONE,
-		MODE_1PWM,
-		MODE_2PWM,
-		MODE_2PWM2CAP,
-		MODE_3PWM,
-		MODE_3PWM1CAP,
-		MODE_4PWM,
-		MODE_4PWM1CAP,
-		MODE_4PWM2CAP,
-		MODE_5PWM,
-		MODE_5PWM1CAP,
-		MODE_6PWM,
-		MODE_8PWM,
-		MODE_14PWM,
-		MODE_4CAP,
-		MODE_5CAP,
-		MODE_6CAP,
-	};
-	PX4FMU();
-	virtual ~PX4FMU();
-
-	/** @see ModuleBase */
-	static int task_spawn(int argc, char *argv[]);
-
-	/** @see ModuleBase */
-	static int custom_command(int argc, char *argv[]);
-
-	/** @see ModuleBase */
-	static int print_usage(const char *reason = nullptr);
-
-	void Run() override;
-
-	/** @see ModuleBase::print_status() */
-	int print_status() override;
-
-	/** change the FMU mode of the running module */
-	static int fmu_new_mode(PortMode new_mode);
-
-	static int test();
-
-	static int fake(int argc, char *argv[]);
-
-	virtual int	ioctl(file *filp, int cmd, unsigned long arg);
-
-	virtual int	init();
-
-	int		set_mode(Mode mode);
-	Mode		get_mode() { return _mode; }
-
-	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
-
-	static void	capture_trampoline(void *context, uint32_t chan_index,
-					   hrt_abstime edge_time, uint32_t edge_state,
-					   uint32_t overflow);
-
-	void update_pwm_trims();
-
-	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
-			   unsigned num_outputs, unsigned num_control_groups_updated) override;
-
-private:
-	static constexpr int FMU_MAX_ACTUATORS = DIRECT_PWM_OUTPUT_CHANNELS;
-	static_assert(FMU_MAX_ACTUATORS <= MAX_ACTUATORS, "Increase MAX_ACTUATORS if this fails");
-
-	MixingOutput _mixing_output{FMU_MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, true};
-
-	Mode		_mode{MODE_NONE};
-
-	unsigned	_pwm_default_rate{50};
-	unsigned	_pwm_alt_rate{50};
-	uint32_t	_pwm_alt_rate_channels{0};
-
-	unsigned	_current_update_rate{0};
-
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
-
-
-	unsigned	_num_outputs{0};
-	int		_class_instance{-1};
-
-	bool		_pwm_on{false};
-	uint32_t	_pwm_mask{0};
-	bool		_pwm_initialized{false};
-	bool		_test_mode{false};
-
-	unsigned	_num_disarmed_set{0};
-
-	perf_counter_t	_cycle_perf;
-
-	void		capture_callback(uint32_t chan_index,
-					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
-	void		update_current_rate();
-	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
-	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
-	void		update_pwm_rev_mask();
-	void		update_pwm_out_state(bool on);
-
-	void		update_params();
-
-	static void		sensor_reset(int ms);
-	static void		peripheral_reset(int ms);
-
-	int		capture_ioctl(file *filp, int cmd, unsigned long arg);
-
-	PX4FMU(const PX4FMU &) = delete;
-	PX4FMU operator=(const PX4FMU &) = delete;
-
-};
-
-PX4FMU::PX4FMU() :
-	CDev(PX4FMU_DEVICE_PATH),
+PWMOutput::PWMOutput() :
+	CDev(PWMOUTPUT_DEVICE_PATH),
 	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default),
 	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
 {
@@ -218,7 +43,7 @@ PX4FMU::PX4FMU() :
 
 }
 
-PX4FMU::~PX4FMU()
+PWMOutput::~PWMOutput()
 {
 	/* make sure servos are off */
 	up_pwm_servo_deinit();
@@ -229,8 +54,7 @@ PX4FMU::~PX4FMU()
 	perf_free(_cycle_perf);
 }
 
-int
-PX4FMU::init()
+int PWMOutput::init()
 {
 	/* do regular cdev init */
 	int ret = CDev::init();
@@ -263,8 +87,7 @@ PX4FMU::init()
 	return 0;
 }
 
-int
-PX4FMU::set_mode(Mode mode)
+int PWMOutput::set_mode(Mode mode)
 {
 	unsigned old_mask = _pwm_mask;
 
@@ -489,8 +312,7 @@ PX4FMU::set_mode(Mode mode)
  *                                    For Oneshot there is no rate, 0 is therefore used
  *                                    to  select Oneshot mode
  */
-int
-PX4FMU::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_rate)
+int PWMOutput::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_rate)
 {
 	PX4_DEBUG("set_pwm_rate %x %u %u", rate_map, default_rate, alt_rate);
 
@@ -557,14 +379,7 @@ PX4FMU::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_rate
 	return OK;
 }
 
-int
-PX4FMU::set_i2c_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	return device::I2C::set_bus_clock(bus, clock_hz);
-}
-
-void
-PX4FMU::update_current_rate()
+void PWMOutput::update_current_rate()
 {
 	/*
 	* Adjust actuator topic update rate to keep up with
@@ -586,8 +401,7 @@ PX4FMU::update_current_rate()
 	_mixing_output.setMaxTopicUpdateRate(update_interval_in_us);
 }
 
-void
-PX4FMU::update_pwm_rev_mask()
+void PWMOutput::update_pwm_rev_mask()
 {
 	uint16_t &reverse_pwm_mask = _mixing_output.reverseOutputMask();
 	reverse_pwm_mask = 0;
@@ -620,8 +434,7 @@ PX4FMU::update_pwm_rev_mask()
 	}
 }
 
-void
-PX4FMU::update_pwm_trims()
+void PWMOutput::update_pwm_trims()
 {
 	PX4_DEBUG("update_pwm_trims");
 
@@ -664,10 +477,9 @@ PX4FMU::update_pwm_trims()
 	PX4_DEBUG("set %d trims", n_out);
 }
 
-int
-PX4FMU::task_spawn(int argc, char *argv[])
+int PWMOutput::task_spawn(int argc, char *argv[])
 {
-	PX4FMU *instance = new PX4FMU();
+	PWMOutput *instance = new PWMOutput();
 
 	if (instance) {
 		_object.store(instance);
@@ -688,23 +500,21 @@ PX4FMU::task_spawn(int argc, char *argv[])
 	return PX4_ERROR;
 }
 
-void
-PX4FMU::capture_trampoline(void *context, uint32_t chan_index,
-			   hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
+#if defined(BOARD_HAS_CAPTURE)
+void PWMOutput::capture_trampoline(void *context, uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state,
+				   uint32_t overflow)
 {
-	PX4FMU *dev = static_cast<PX4FMU *>(context);
+	PWMOutput *dev = static_cast<PWMOutput *>(context);
 	dev->capture_callback(chan_index, edge_time, edge_state, overflow);
 }
 
-void
-PX4FMU::capture_callback(uint32_t chan_index,
-			 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
+void PWMOutput::capture_callback(uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
 {
 	fprintf(stdout, "FMU: Capture chan:%d time:%lld state:%d overflow:%d\n", chan_index, edge_time, edge_state, overflow);
 }
+#endif // BOARD_HAS_CAPTURE
 
-void
-PX4FMU::update_pwm_out_state(bool on)
+void PWMOutput::update_pwm_out_state(bool on)
 {
 	if (on && !_pwm_initialized && _pwm_mask != 0) {
 		up_pwm_servo_init(_pwm_mask);
@@ -715,9 +525,8 @@ PX4FMU::update_pwm_out_state(bool on)
 	up_pwm_servo_arm(on);
 }
 
-
-bool PX4FMU::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
-			   unsigned num_outputs, unsigned num_control_groups_updated)
+bool PWMOutput::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS], unsigned num_outputs,
+			      unsigned num_control_groups_updated)
 {
 	if (_test_mode) {
 		return false;
@@ -740,8 +549,7 @@ bool PX4FMU::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 	return true;
 }
 
-void
-PX4FMU::Run()
+void PWMOutput::Run()
 {
 	if (should_exit()) {
 		ScheduleClear();
@@ -783,7 +591,7 @@ PX4FMU::Run()
 	perf_end(_cycle_perf);
 }
 
-void PX4FMU::update_params()
+void PWMOutput::update_params()
 {
 	update_pwm_rev_mask();
 	update_pwm_trims();
@@ -791,17 +599,19 @@ void PX4FMU::update_params()
 	updateParams();
 }
 
-int
-PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
+int PWMOutput::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
-	int ret;
+	int ret = -ENOTTY;
 
+#if defined(BOARD_HAS_CAPTURE)
 	/* try it as a Capture ioctl next */
 	ret = capture_ioctl(filp, cmd, arg);
 
 	if (ret != -ENOTTY) {
 		return ret;
 	}
+
+#endif // BOARD_HAS_CAPTURE
 
 	/* if we are in valid PWM mode, try it as a PWM ioctl as well */
 	switch (_mode) {
@@ -810,11 +620,13 @@ PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
 	case MODE_3PWM:
 	case MODE_4PWM:
 	case MODE_5PWM:
+#if defined(BOARD_HAS_CAPTURE)
 	case MODE_2PWM2CAP:
 	case MODE_3PWM1CAP:
 	case MODE_4PWM1CAP:
 	case MODE_4PWM2CAP:
 	case MODE_5PWM1CAP:
+#endif // BOARD_HAS_CAPTURE
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
 	case MODE_6PWM:
 #endif
@@ -840,8 +652,7 @@ PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
 	return ret;
 }
 
-int
-PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
+int PWMOutput::pwm_ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret = OK;
 
@@ -1117,6 +928,8 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	case PWM_SERVO_SET(11):
 	case PWM_SERVO_SET(10):
 	case PWM_SERVO_SET(9):
+
+	// FALLTHROUGH
 	case PWM_SERVO_SET(8):
 		if (_mode < MODE_14PWM) {
 			ret = -EINVAL;
@@ -1126,6 +939,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 
+	// FALLTHROUGH
 	case PWM_SERVO_SET(7):
 
 	/* FALLTHROUGH */
@@ -1301,23 +1115,31 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 #endif
 
 		case MODE_5PWM:
+#if defined(BOARD_HAS_CAPTURE)
 		case MODE_5PWM1CAP:
+#endif
 			*(unsigned *)arg = 5;
 			break;
 
 		case MODE_4PWM:
+#if defined(BOARD_HAS_CAPTURE)
 		case MODE_4PWM1CAP:
 		case MODE_4PWM2CAP:
+#endif
 			*(unsigned *)arg = 4;
 			break;
 
 		case MODE_3PWM:
+#if defined(BOARD_HAS_CAPTURE)
 		case MODE_3PWM1CAP:
+#endif
 			*(unsigned *)arg = 3;
 			break;
 
 		case MODE_2PWM:
+#if defined(BOARD_HAS_CAPTURE)
 		case MODE_2PWM2CAP:
+#endif
 			*(unsigned *)arg = 2;
 			break;
 
@@ -1399,20 +1221,34 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 				ret = set_mode(MODE_2PWM);
 				break;
 
-			case PWM_SERVO_MODE_2PWM2CAP:
-				ret = set_mode(MODE_2PWM2CAP);
-				break;
-
 			case PWM_SERVO_MODE_3PWM:
 				ret = set_mode(MODE_3PWM);
 				break;
 
-			case PWM_SERVO_MODE_3PWM1CAP:
-				ret = set_mode(MODE_3PWM1CAP);
-				break;
-
 			case PWM_SERVO_MODE_4PWM:
 				ret = set_mode(MODE_4PWM);
+				break;
+
+			case PWM_SERVO_MODE_5PWM:
+				ret = set_mode(MODE_5PWM);
+				break;
+
+			case PWM_SERVO_MODE_6PWM:
+				ret = set_mode(MODE_6PWM);
+				break;
+
+			case PWM_SERVO_MODE_8PWM:
+				ret = set_mode(MODE_8PWM);
+				break;
+
+#if defined(BOARD_HAS_CAPTURE)
+
+			case PWM_SERVO_MODE_2PWM2CAP:
+				ret = set_mode(MODE_2PWM2CAP);
+				break;
+
+			case PWM_SERVO_MODE_3PWM1CAP:
+				ret = set_mode(MODE_3PWM1CAP);
 				break;
 
 			case PWM_SERVO_MODE_4PWM1CAP:
@@ -1423,20 +1259,8 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 				ret = set_mode(MODE_4PWM2CAP);
 				break;
 
-			case PWM_SERVO_MODE_5PWM:
-				ret = set_mode(MODE_5PWM);
-				break;
-
 			case PWM_SERVO_MODE_5PWM1CAP:
 				ret = set_mode(MODE_5PWM1CAP);
-				break;
-
-			case PWM_SERVO_MODE_6PWM:
-				ret = set_mode(MODE_6PWM);
-				break;
-
-			case PWM_SERVO_MODE_8PWM:
-				ret = set_mode(MODE_8PWM);
 				break;
 
 			case PWM_SERVO_MODE_4CAP:
@@ -1450,6 +1274,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 			case PWM_SERVO_MODE_6CAP:
 				ret = set_mode(MODE_6CAP);
 				break;
+#endif // BOARD_HAS_CAPTURE
 
 			case PWM_SERVO_ENTER_TEST_MODE:
 				_test_mode = true;
@@ -1490,32 +1315,10 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	return ret;
 }
 
-void
-PX4FMU::sensor_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 1;
-	}
-
-	board_spi_reset(ms);
-}
-
-void
-PX4FMU::peripheral_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 10;
-	}
-
-	board_peripheral_reset(ms);
-}
-
-int
-PX4FMU::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	int	ret = -EINVAL;
-
 #if defined(BOARD_HAS_CAPTURE)
+int PWMOutput::capture_ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
+{
+	int ret = -EINVAL;
 
 	lock();
 
@@ -1656,25 +1459,19 @@ PX4FMU::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	unlock();
 
-#else
-	ret = -ENOTTY;
-#endif
 	return ret;
 }
+#endif // BOARD_HAS_CAPTURE
 
-int
-PX4FMU::fmu_new_mode(PortMode new_mode)
+int PWMOutput::fmu_new_mode(PortMode new_mode)
 {
 	if (!is_running()) {
 		return -1;
 	}
 
-	PX4FMU::Mode servo_mode;
-
-	servo_mode = PX4FMU::MODE_NONE;
+	PWMOutput::Mode servo_mode = PWMOutput::MODE_NONE;
 
 	switch (new_mode) {
-	case PORT_FULL_GPIO:
 	case PORT_MODE_UNSET:
 		break;
 
@@ -1682,44 +1479,44 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM == 4
 		/* select 4-pin PWM mode */
-		servo_mode = PX4FMU::MODE_4PWM;
+		servo_mode = PWMOutput::MODE_4PWM;
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM == 5
-		servo_mode = PX4FMU::MODE_5PWM;
+		servo_mode = PWMOutput::MODE_5PWM;
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM == 6
-		servo_mode = PX4FMU::MODE_6PWM;
+		servo_mode = PWMOutput::MODE_6PWM;
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM == 8
-		servo_mode = PX4FMU::MODE_8PWM;
+		servo_mode = PWMOutput::MODE_8PWM;
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM == 14
-		servo_mode = PX4FMU::MODE_14PWM;
+		servo_mode = PWMOutput::MODE_14PWM;
 #endif
 		break;
 
 	case PORT_PWM1:
 		/* select 2-pin PWM mode */
-		servo_mode = PX4FMU::MODE_1PWM;
+		servo_mode = PWMOutput::MODE_1PWM;
 		break;
 
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 
 	case PORT_PWM8:
 		/* select 8-pin PWM mode */
-		servo_mode = PX4FMU::MODE_8PWM;
+		servo_mode = PWMOutput::MODE_8PWM;
 		break;
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
 
 	case PORT_PWM6:
 		/* select 6-pin PWM mode */
-		servo_mode = PX4FMU::MODE_6PWM;
+		servo_mode = PWMOutput::MODE_6PWM;
 		break;
 
 	case PORT_PWM5:
 		/* select 5-pin PWM mode */
-		servo_mode = PX4FMU::MODE_5PWM;
+		servo_mode = PWMOutput::MODE_5PWM;
 		break;
 
 
@@ -1727,14 +1524,14 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 
 	case PORT_PWM5CAP1:
 		/* select 5-pin PWM mode 1 capture */
-		servo_mode = PX4FMU::MODE_5PWM1CAP;
+		servo_mode = PWMOutput::MODE_5PWM1CAP;
 		break;
 
 #  endif
 
 	case PORT_PWM4:
 		/* select 4-pin PWM mode */
-		servo_mode = PX4FMU::MODE_4PWM;
+		servo_mode = PWMOutput::MODE_4PWM;
 		break;
 
 
@@ -1742,39 +1539,39 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 
 	case PORT_PWM4CAP1:
 		/* select 4-pin PWM mode 1 capture */
-		servo_mode = PX4FMU::MODE_4PWM1CAP;
+		servo_mode = PWMOutput::MODE_4PWM1CAP;
 		break;
 
 	case PORT_PWM4CAP2:
 		/* select 4-pin PWM mode 2 capture */
-		servo_mode = PX4FMU::MODE_4PWM2CAP;
+		servo_mode = PWMOutput::MODE_4PWM2CAP;
 		break;
 
 #  endif
 
 	case PORT_PWM3:
 		/* select 3-pin PWM mode */
-		servo_mode = PX4FMU::MODE_3PWM;
+		servo_mode = PWMOutput::MODE_3PWM;
 		break;
 
 #  if defined(BOARD_HAS_CAPTURE)
 
 	case PORT_PWM3CAP1:
 		/* select 3-pin PWM mode 1 capture */
-		servo_mode = PX4FMU::MODE_3PWM1CAP;
+		servo_mode = PWMOutput::MODE_3PWM1CAP;
 		break;
 #  endif
 
 	case PORT_PWM2:
 		/* select 2-pin PWM mode */
-		servo_mode = PX4FMU::MODE_2PWM;
+		servo_mode = PWMOutput::MODE_2PWM;
 		break;
 
 #  if defined(BOARD_HAS_CAPTURE)
 
 	case PORT_PWM2CAP2:
 		/* select 2-pin PWM mode 2 capture */
-		servo_mode = PX4FMU::MODE_2PWM2CAP;
+		servo_mode = PWMOutput::MODE_2PWM2CAP;
 		break;
 
 #  endif
@@ -1784,7 +1581,7 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 		return -1;
 	}
 
-	PX4FMU *object = get_instance();
+	PWMOutput *object = get_instance();
 
 	if (servo_mode != object->get_mode()) {
 		/* (re)set the PWM output mode */
@@ -1794,21 +1591,10 @@ PX4FMU::fmu_new_mode(PortMode new_mode)
 	return OK;
 }
 
-
-namespace
+#if defined(BOARD_HAS_CAPTURE)
+int PWMOutput::test()
 {
-
-int fmu_new_i2c_speed(unsigned bus, unsigned clock_hz)
-{
-	return PX4FMU::set_i2c_bus_clock(bus, clock_hz);
-}
-
-} // namespace
-
-int
-PX4FMU::test()
-{
-	int	 fd;
+	int fd = -1;
 	unsigned servo_count = 0;
 	unsigned capture_count = 0;
 	unsigned pwm_value = 1000;
@@ -1821,29 +1607,29 @@ PX4FMU::test()
 		input_capture_config_t  chan;
 	} capture_conf[INPUT_CAPTURE_MAX_CHANNELS];
 
-	fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
+	fd = px4_open(PWMOUTPUT_DEVICE_PATH, O_RDWR);
 
 	if (fd < 0) {
 		PX4_ERR("open fail");
 		return -1;
 	}
 
-	if (::ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
+	if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
 		PX4_ERR("Failed to Enter pwm test mode");
 		goto err_out_no_test;
 	}
 
-	if (::ioctl(fd, PWM_SERVO_ARM, 0) < 0) {
+	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) < 0) {
 		PX4_ERR("servo arm failed");
 		goto err_out;
 	}
 
-	if (::ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count) != 0) {
+	if (px4_ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count) != 0) {
 		PX4_ERR("Unable to get servo count");
 		goto err_out;
 	}
 
-	if (::ioctl(fd, INPUT_CAP_GET_COUNT, (unsigned long)&capture_count) != 0) {
+	if (px4_ioctl(fd, INPUT_CAP_GET_COUNT, (unsigned long)&capture_count) != 0) {
 		PX4_INFO("Not in a capture mode");
 	}
 
@@ -1856,16 +1642,16 @@ PX4FMU::test()
 			capture_conf[i].chan.channel = i + servo_count;
 
 			/* Save handler */
-			if (::ioctl(fd, INPUT_CAP_GET_CALLBACK, (unsigned long)&capture_conf[i].chan.channel) != 0) {
+			if (px4_ioctl(fd, INPUT_CAP_GET_CALLBACK, (unsigned long)&capture_conf[i].chan.channel) != 0) {
 				PX4_ERR("Unable to get capture callback for chan %u\n", capture_conf[i].chan.channel);
 				goto err_out;
 
 			} else {
 				input_capture_config_t conf = capture_conf[i].chan;
-				conf.callback = &PX4FMU::capture_trampoline;
-				conf.context = PX4FMU::get_instance();
+				conf.callback = &PWMOutput::capture_trampoline;
+				conf.context = PWMOutput::get_instance();
 
-				if (::ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&conf) == 0) {
+				if (px4_ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&conf) == 0) {
 					capture_conf[i].valid = true;
 
 				} else {
@@ -1894,7 +1680,7 @@ PX4FMU::test()
 		}
 
 		for (unsigned i = 0; i < servo_count;	i++) {
-			if (::ioctl(fd, PWM_SERVO_SET(i), servos[i]) < 0) {
+			if (px4_ioctl(fd, PWM_SERVO_SET(i), servos[i]) < 0) {
 				PX4_ERR("servo %u set failed", i);
 				goto err_out;
 			}
@@ -1921,7 +1707,7 @@ PX4FMU::test()
 		for (unsigned i = 0; i < servo_count; i++) {
 			servo_position_t value;
 
-			if (::ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&value)) {
+			if (px4_ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&value)) {
 				PX4_ERR("error reading PWM servo %d", i);
 				goto err_out;
 			}
@@ -1938,7 +1724,7 @@ PX4FMU::test()
 					input_capture_stats_t stats;
 					stats.chan_in_edges_out = capture_conf[i].chan.channel;
 
-					if (::ioctl(fd, INPUT_CAP_GET_STATS, (unsigned long)&stats) != 0) {
+					if (px4_ioctl(fd, INPUT_CAP_GET_STATS, (unsigned long)&stats) != 0) {
 						PX4_ERR("Unable to get stats for chan %u\n", capture_conf[i].chan.channel);
 						goto err_out;
 
@@ -1976,7 +1762,7 @@ PX4FMU::test()
 			// Map to channel number
 			if (capture_conf[i].valid) {
 				/* Save handler */
-				if (::ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&capture_conf[i].chan) != 0) {
+				if (px4_ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&capture_conf[i].chan) != 0) {
 					PX4_ERR("Unable to set capture callback for chan %u\n", capture_conf[i].chan.channel);
 					goto err_out;
 				}
@@ -1988,110 +1774,24 @@ PX4FMU::test()
 
 err_out:
 
-	if (::ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_EXIT_TEST_MODE) < 0) {
+	if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_EXIT_TEST_MODE) < 0) {
 		PX4_ERR("Failed to Exit pwm test mode");
 	}
 
 err_out_no_test:
-	::close(fd);
+	px4_close(fd);
 	return rv;
 }
+#endif // BOARD_HAS_CAPTURE
 
-int
-PX4FMU::fake(int argc, char *argv[])
-{
-	if (argc < 5) {
-		print_usage("not enough arguments");
-		return -1;
-	}
-
-	actuator_controls_s ac;
-
-	ac.control[0] = strtol(argv[1], 0, 0) / 100.0f;
-
-	ac.control[1] = strtol(argv[2], 0, 0) / 100.0f;
-
-	ac.control[2] = strtol(argv[3], 0, 0) / 100.0f;
-
-	ac.control[3] = strtol(argv[4], 0, 0) / 100.0f;
-
-	orb_advert_t handle = orb_advertise(ORB_ID_VEHICLE_ATTITUDE_CONTROLS, &ac);
-
-	if (handle == nullptr) {
-		PX4_ERR("advertise failed");
-		return -1;
-	}
-
-	orb_unadvertise(handle);
-
-	actuator_armed_s aa;
-
-	aa.armed = true;
-	aa.lockdown = false;
-
-	handle = orb_advertise(ORB_ID(actuator_armed), &aa);
-
-	if (handle == nullptr) {
-		PX4_ERR("advertise failed 2");
-		return -1;
-	}
-
-	orb_unadvertise(handle);
-	return 0;
-}
-
-int PX4FMU::custom_command(int argc, char *argv[])
+int PWMOutput::custom_command(int argc, char *argv[])
 {
 	PortMode new_mode = PORT_MODE_UNSET;
 	const char *verb = argv[0];
 
-	/* does not operate on a FMU instance */
-	if (!strcmp(verb, "i2c")) {
-		if (argc > 2) {
-			int bus = strtol(argv[1], 0, 0);
-			int clock_hz = strtol(argv[2], 0, 0);
-			int ret = fmu_new_i2c_speed(bus, clock_hz);
-
-			if (ret) {
-				PX4_ERR("setting I2C clock failed");
-			}
-
-			return ret;
-		}
-
-		return print_usage("not enough arguments");
-	}
-
-	if (!strcmp(verb, "sensor_reset")) {
-		if (argc > 1) {
-			int reset_time = strtol(argv[1], nullptr, 0);
-			sensor_reset(reset_time);
-
-		} else {
-			sensor_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-	if (!strcmp(verb, "peripheral_reset")) {
-		if (argc > 2) {
-			int reset_time = strtol(argv[2], 0, 0);
-			peripheral_reset(reset_time);
-
-		} else {
-			peripheral_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-
 	/* start the FMU if not running */
 	if (!is_running()) {
-		int ret = PX4FMU::task_spawn(argc, argv);
+		int ret = PWMOutput::task_spawn(argc, argv);
 
 		if (ret) {
 			return ret;
@@ -2101,10 +1801,7 @@ int PX4FMU::custom_command(int argc, char *argv[])
 	/*
 	 * Mode switches.
 	 */
-	if (!strcmp(verb, "mode_gpio")) {
-		new_mode = PORT_FULL_GPIO;
-
-	} else if (!strcmp(verb, "mode_pwm")) {
+	if (!strcmp(verb, "mode_pwm")) {
 		new_mode = PORT_FULL_PWM;
 
 		// mode: defines which outputs to drive (others may be used by other tasks such as camera capture)
@@ -2172,21 +1869,21 @@ int PX4FMU::custom_command(int argc, char *argv[])
 	if (new_mode != PORT_MODE_UNSET) {
 
 		/* switch modes */
-		return PX4FMU::fmu_new_mode(new_mode);
+		return PWMOutput::fmu_new_mode(new_mode);
 	}
+
+#if defined(BOARD_HAS_CAPTURE)
 
 	if (!strcmp(verb, "test")) {
 		return test();
 	}
 
-	if (!strcmp(verb, "fake")) {
-		return fake(argc - 1, argv + 1);
-	}
+#endif // BOARD_HAS_CAPTURE
 
 	return print_usage("unknown command");
 }
 
-int PX4FMU::print_status()
+int PWMOutput::print_status()
 {
 	PX4_INFO("Max update rate: %i Hz", _current_update_rate);
 
@@ -2199,31 +1896,34 @@ int PX4FMU::print_status()
 
 	case MODE_2PWM: mode_str = "pwm2"; break;
 
-	case MODE_2PWM2CAP: mode_str = "pwm2cap2"; break;
-
 	case MODE_3PWM: mode_str = "pwm3"; break;
 
-	case MODE_3PWM1CAP: mode_str = "pwm3cap1"; break;
-
 	case MODE_4PWM: mode_str = "pwm4"; break;
+
+	case MODE_5PWM: mode_str = "pwm5"; break;
+
+	case MODE_6PWM: mode_str = "pwm6"; break;
+
+	case MODE_8PWM: mode_str = "pwm8"; break;
+
+#if defined(BOARD_HAS_CAPTURE)
+
+	case MODE_2PWM2CAP: mode_str = "pwm2cap2"; break;
+
+	case MODE_3PWM1CAP: mode_str = "pwm3cap1"; break;
 
 	case MODE_4PWM1CAP: mode_str = "pwm4cap1"; break;
 
 	case MODE_4PWM2CAP: mode_str = "pwm4cap2"; break;
 
-	case MODE_5PWM: mode_str = "pwm5"; break;
-
 	case MODE_5PWM1CAP: mode_str = "pwm5cap1"; break;
-
-	case MODE_6PWM: mode_str = "pwm6"; break;
-
-	case MODE_8PWM: mode_str = "pwm8"; break;
 
 	case MODE_4CAP: mode_str = "cap4"; break;
 
 	case MODE_5CAP: mode_str = "cap5"; break;
 
 	case MODE_6CAP: mode_str = "cap6"; break;
+#endif // BOARD_HAS_CAPTURE
 
 	default:
 		break;
@@ -2239,7 +1939,7 @@ int PX4FMU::print_status()
 	return 0;
 }
 
-int PX4FMU::print_usage(const char *reason)
+int PWMOutput::print_usage(const char *reason)
 {
 	if (reason) {
 		PX4_WARN("%s\n", reason);
@@ -2276,49 +1976,39 @@ Use the `pwm` command for further configurations (PWM rate, levels, ...), and th
 mixer files.
 )DESCR_STR");
 
-	PRINT_MODULE_USAGE_NAME("fmu", "driver");
+	PRINT_MODULE_USAGE_NAME("pwm_output", "driver");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start the task (without any mode set, use any of the mode_* cmds)");
 
 	PRINT_MODULE_USAGE_PARAM_COMMENT("All of the mode_* commands will start the fmu if not running already");
 
-	PRINT_MODULE_USAGE_COMMAND("mode_gpio");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("mode_pwm", "Select all available pins as PWM");
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm5cap1");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm4");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap1");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap2");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm3cap1");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm2cap2");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm2cap2");
 #endif
 #if defined(BOARD_HAS_PWM)
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
 #endif
 
-	PRINT_MODULE_USAGE_COMMAND_DESCR("sensor_reset", "Do a sensor reset (SPI bus)");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-	PRINT_MODULE_USAGE_COMMAND_DESCR("peripheral_reset", "Reset board peripherals");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("i2c", "Configure I2C clock rate");
-	PRINT_MODULE_USAGE_ARG("<bus_id> <rate>", "Specify the bus id (>=0) and rate in Hz", false);
-
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test inputs and outputs");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("fake", "Arm and send an actuator controls command");
 	PRINT_MODULE_USAGE_ARG("<roll> <pitch> <yaw> <thrust>", "Control values in range [-100, 100]", false);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;
 }
 
-extern "C" __EXPORT int fmu_main(int argc, char *argv[])
+extern "C" __EXPORT int pwm_output_main(int argc, char *argv[])
 {
-	return PX4FMU::main(argc, argv);
+	return PWMOutput::main(argc, argv);
 }

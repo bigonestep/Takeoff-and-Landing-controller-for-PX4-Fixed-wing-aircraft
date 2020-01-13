@@ -9,7 +9,7 @@
 #  Otherwise, the variable name goes to the end of the argument.
 #
 
-set FMU_CMD fmu
+set FMU_CMD pmw_output
 set MIXER_AUX_FILE none
 set OUTPUT_AUX_DEV /dev/pwm_output1
 set OUTPUT_DEV none
@@ -54,7 +54,7 @@ then
 			set OUTPUT_MODE dshot
 			set FMU_CMD dshot
 		else
-			set OUTPUT_MODE fmu
+			set OUTPUT_MODE pmw_output
 		fi
 	fi
 fi
@@ -233,7 +233,7 @@ then
 				set FAILSAFE_AUX none
 			fi
 		else
-			echo "ERROR: Could not start: fmu mode_pwm" >> $LOG_FILE
+			echo "ERROR: Could not start: pmw_output mode_pwm" >> $LOG_FILE
 			tune_control play -t 20
 			set PWM_AUX_OUT none
 			set FAILSAFE_AUX none
@@ -322,7 +322,7 @@ then
 	fi
 fi
 
-if [ $OUTPUT_MODE = fmu -o $OUTPUT_MODE = io ]
+if [ $OUTPUT_MODE = pwm_output -o $OUTPUT_MODE = io ]
 then
 	if [ $PWM_OUT != none ]
 	then

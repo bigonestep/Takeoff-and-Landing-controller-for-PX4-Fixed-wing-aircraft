@@ -41,7 +41,7 @@
 #include <inttypes.h>
 #include "common.h"
 
-namespace linux_pwm_out
+namespace pca9685_output
 {
 
 // Register Definitions

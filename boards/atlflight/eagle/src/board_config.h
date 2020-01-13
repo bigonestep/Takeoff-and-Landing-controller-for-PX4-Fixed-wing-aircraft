@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,7 +60,13 @@
 #define PX4_SPI_BUS_SENSORS    1
 #define PX4_SPIDEV_MPU         PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 1) // spi-1 - mpu9250
 
-// Battery ADC channels
+// RC Serial port
+#ifdef __PX4_QURT
+# define RC_SERIAL_PORT               "/dev/tty-3" // Snapdraogon: use J12 (next to J13, power module side)
+
+# define DIRECT_PWM_OUTPUT_CHANNELS	4
+# define BOARD_HAS_PWM	DIRECT_PWM_OUTPUT_CHANNELS
+#endif // PX4_QURT
 
 #include <system_config.h>
 #include <px4_platform_common/board_common.h>

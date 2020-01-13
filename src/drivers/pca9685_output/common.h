@@ -33,35 +33,25 @@
 
 #pragma once
 
-#include "common.h"
+#include <stdint.h>
 
-namespace linux_pwm_out
+namespace pca9685_output
 {
 
 /**
- ** class NavioSysfsPWMOut
- * PWM output class for Navio Sysfs
+ ** class PWMOutBase
+ * common abstract PWM output base class
  */
-class NavioSysfsPWMOut : public PWMOutBase
+class PWMOutBase
 {
 public:
-	NavioSysfsPWMOut(const char *device, int max_num_outputs);
-	virtual ~NavioSysfsPWMOut();
 
-	int init() override;
+	virtual ~PWMOutBase() {}
 
-	int send_output_pwm(const uint16_t *pwm, int num_outputs) override;
+	virtual int init() = 0;
 
-private:
-	int pwm_write_sysfs(char *path, int value);
-
-	static const int MAX_NUM_PWM = 14;
-	static const int FREQUENCY_PWM = 400;
-
-	int _pwm_fd[MAX_NUM_PWM];
-	int _pwm_num;
-
-	const char *_device;
+	virtual int send_output_pwm(const uint16_t *pwm, int num_outputs) = 0;
 };
 
-}
+
+} /* namespace rpi_pwm_out */

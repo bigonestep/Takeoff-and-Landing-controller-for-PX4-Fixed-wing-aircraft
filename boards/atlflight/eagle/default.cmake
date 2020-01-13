@@ -50,8 +50,8 @@ px4_add_board(
 		gps
 		#imu # all available imu drivers
 		#lights/rgbled
-		linux_sbus
 		#magnetometer # all available magnetometer drivers
+		#pwm_output
 		pwm_out_sim
 		qshell/posix
 		rc_input

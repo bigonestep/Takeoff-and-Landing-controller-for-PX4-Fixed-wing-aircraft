@@ -75,6 +75,9 @@
 #define ADC_BATTERY_VOLTAGE_CHANNEL  8
 #define ADC_BATTERY_CURRENT_CHANNEL  ((uint8_t)(-1))
 
+// TODO: verify
+#define DIRECT_PWM_OUTPUT_CHANNELS	8
+#define BOARD_HAS_PWM	DIRECT_PWM_OUTPUT_CHANNELS
 
 #include <system_config.h>
 #include <px4_platform_common/board_common.h>

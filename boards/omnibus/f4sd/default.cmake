@@ -33,7 +33,7 @@ px4_add_board(
 		#pca9685
 		#pwm_input
 		#pwm_out_sim
-		px4fmu
+		pwm_output
 		rc_input
 		#tap_esc
 		#telemetry # all available telemetry drivers

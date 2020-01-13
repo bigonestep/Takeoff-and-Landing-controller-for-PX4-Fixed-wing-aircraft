@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2016 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,18 +30,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-
 px4_add_module(
-	MODULE drivers__linux_pwm_out
-	MAIN linux_pwm_out
-	COMPILE_FLAGS
+	MODULE drivers__pwm_output
+	MAIN pwm_output
 	SRCS
-		PCA9685.cpp
-		navio_sysfs.cpp
-		linux_pwm_out.cpp
-		ocpoc_mmap.cpp
-		bbblue_pwm_rc.cpp
+		PWMOutput.cpp
+		PWMOutput.hpp
 	DEPENDS
+		arch_io_pins
+		mixer
+		mixer_module
 		output_limit
 	)
-

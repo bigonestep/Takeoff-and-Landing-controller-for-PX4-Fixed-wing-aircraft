@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2016 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,13 +30,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
 px4_add_module(
-	MODULE drivers__snapdragon_pwm_out
-	MAIN snapdragon_pwm_out
+	MODULE drivers__pca9685_output
+	MAIN pca9685_output
 	COMPILE_FLAGS
 	SRCS
-		snapdragon_pwm_out.cpp
+		PCA9685.cpp
+		pca9685_output.cpp
 	DEPENDS
-		mixer
 		output_limit
 	)
+
