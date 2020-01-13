@@ -38,6 +38,8 @@
 
 #pragma once
 
+#include <drivers/drv_hrt.h>
+
 #define _PX4_LOG_LEVEL_DEBUG		0
 #define _PX4_LOG_LEVEL_INFO		1
 #define _PX4_LOG_LEVEL_WARN		2

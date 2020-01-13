@@ -89,6 +89,7 @@ static int pwm_write_sysfs(char *path, int value)
 
 int up_pwm_servo_init(uint32_t channel_mask)
 {
+	printf("\n up_pwm_servo_init: %X\n", channel_mask);
 	PX4_DEBUG("up_pwm_servo_init: %X", channel_mask);
 
 	for (int i = 0; i < MAX_NUM_PWM; ++i) {
@@ -184,7 +185,7 @@ servo_position_t up_pwm_servo_get(unsigned channel)
 
 void up_pwm_update()
 {
-	PX4_DEBUG("up_pwm_update");
+	//PX4_DEBUG("up_pwm_update");
 	// Trigger all timer's channels in Oneshot mode to fire the oneshots with updated values.
 }
 

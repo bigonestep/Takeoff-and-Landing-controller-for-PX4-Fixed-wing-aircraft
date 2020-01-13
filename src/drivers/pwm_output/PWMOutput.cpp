@@ -233,7 +233,7 @@ int PWMOutput::set_mode(Mode mode)
 
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 
-	case MODE_8PWM: // AeroCore PWMs as 8 PWM outs
+	case MODE_8PWM:
 		PX4_DEBUG("MODE_8PWM");
 		/* default output rates */
 		_pwm_default_rate = 50;
@@ -442,8 +442,6 @@ void PWMOutput::update_pwm_trims()
 		return;
 	}
 
-	int16_t values[FMU_MAX_ACTUATORS] = {};
-
 	const char *pname_format;
 
 	if (_class_instance == CLASS_DEVICE_PRIMARY) {
@@ -457,10 +455,11 @@ void PWMOutput::update_pwm_trims()
 		return;
 	}
 
-	for (unsigned i = 0; i < FMU_MAX_ACTUATORS; i++) {
-		char pname[16];
+	int16_t values[FMU_MAX_ACTUATORS] {};
 
-		/* fill the struct from parameters */
+	for (unsigned i = 0; i < FMU_MAX_ACTUATORS; i++) {
+		// fill the struct from parameters
+		char pname[16] {};
 		sprintf(pname, pname_format, i + 1);
 		param_t param_h = param_find(pname);
 
@@ -516,6 +515,8 @@ void PWMOutput::capture_callback(uint32_t chan_index, hrt_abstime edge_time, uin
 
 void PWMOutput::update_pwm_out_state(bool on)
 {
+	PX4_DEBUG("update_pwm_out_state: on: %d _pwm_initialized: %d _pwm_mask: %X", on, _pwm_initialized, _pwm_mask);
+
 	if (on && !_pwm_initialized && _pwm_mask != 0) {
 		up_pwm_servo_init(_pwm_mask);
 		set_pwm_rate(_pwm_alt_rate_channels, _pwm_default_rate, _pwm_alt_rate);
@@ -1500,13 +1501,23 @@ int PWMOutput::fmu_new_mode(PortMode new_mode)
 		servo_mode = PWMOutput::MODE_1PWM;
 		break;
 
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
+#if defined(BOARD_HAS_PWM)
+#if BOARD_HAS_PWM == 8
 
 	case PORT_PWM8:
 		/* select 8-pin PWM mode */
 		servo_mode = PWMOutput::MODE_8PWM;
 		break;
+#elif BOARD_HAS_PWM == 14
+
+	case PORT_PWM14:
+		/* select 14-pin PWM mode */
+		servo_mode = PWMOutput::MODE_14PWM;
+		break;
 #endif
+#endif
+
+
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
 
 	case PORT_PWM6:
@@ -1863,6 +1874,11 @@ int PWMOutput::custom_command(int argc, char *argv[])
 	} else if (!strcmp(verb, "mode_pwm8")) {
 		new_mode = PORT_PWM8;
 #endif
+#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 14
+
+	} else if (!strcmp(verb, "mode_pwm14")) {
+		new_mode = PORT_PWM14;
+#endif
 	}
 
 	/* was a new mode set? */
@@ -1905,6 +1921,8 @@ int PWMOutput::print_status()
 	case MODE_6PWM: mode_str = "pwm6"; break;
 
 	case MODE_8PWM: mode_str = "pwm8"; break;
+
+	case MODE_14PWM: mode_str = "pwm14"; break;
 
 #if defined(BOARD_HAS_CAPTURE)
 
@@ -1982,6 +2000,9 @@ mixer files.
 	PRINT_MODULE_USAGE_PARAM_COMMENT("All of the mode_* commands will start the fmu if not running already");
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("mode_pwm", "Select all available pins as PWM");
+#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 14
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm14");
+#endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
 #endif

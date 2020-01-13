@@ -69,7 +69,12 @@ using namespace time_literals;
 enum PortMode {
 	PORT_MODE_UNSET = 0,
 	PORT_FULL_PWM,
+#if BOARD_HAS_PWM == 14
+	PORT_PWM14,
+#endif
+#if BOARD_HAS_PWM >= 8
 	PORT_PWM8,
+#endif
 	PORT_PWM6,
 	PORT_PWM5,
 	PORT_PWM4,

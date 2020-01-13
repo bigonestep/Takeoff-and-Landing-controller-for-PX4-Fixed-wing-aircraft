@@ -33,6 +33,8 @@
 px4_add_module(
 	MODULE drivers__pwm_output
 	MAIN pwm_output
+	COMPILE_FLAGS
+		-DDEBUG_BUILD
 	SRCS
 		PWMOutput.cpp
 		PWMOutput.hpp

@@ -34,4 +34,4 @@
 px4_add_library(arch_io_pins
 	pwm_servo.cpp
 )
-add_compile_options(-DDEBUG_BUILD)
+target_compile_options(arch_io_pins PRIVATE -DDEBUG_BUILD)
