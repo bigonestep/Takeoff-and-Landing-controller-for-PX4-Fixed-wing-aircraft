@@ -126,6 +126,7 @@ public:
 	 * @param interval The interval in microseconds.
 	 */
 	void		set_interval_us(uint32_t interval) { _interval_us = interval; }
+	uint32_t	get_interval_us() const { return _interval_us; }
 
 	/**
 	 * Set the interval in milliseconds

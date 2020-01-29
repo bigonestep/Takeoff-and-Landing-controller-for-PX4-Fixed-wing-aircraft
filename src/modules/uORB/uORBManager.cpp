@@ -282,9 +282,7 @@ int uORB::Manager::orb_publish(const struct orb_metadata *meta, orb_advert_t han
 
 int uORB::Manager::orb_copy(const struct orb_metadata *meta, int handle, void *buffer)
 {
-	int ret;
-
-	ret = px4_read(handle, buffer, meta->o_size);
+	int ret = px4_read(handle, buffer, meta->o_size);
 
 	if (ret < 0) {
 		return PX4_ERROR;

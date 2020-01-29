@@ -254,18 +254,6 @@ private:
 	 */
 	bool copy_locked(void *dst, unsigned &generation);
 
-	struct UpdateIntervalData {
-		uint64_t last_update{0}; /**< time at which the last update was provided, used when update_interval is nonzero */
-		unsigned interval{0}; /**< if nonzero minimum interval between updates */
-	};
-
-	struct SubscriberData {
-		~SubscriberData() { if (update_interval) { delete (update_interval); } }
-
-		unsigned generation{0}; /**< last generation the subscriber has seen */
-		UpdateIntervalData *update_interval{nullptr}; /**< if null, no update interval */
-	};
-
 	const orb_metadata *_meta; /**< object metadata information */
 	const uint8_t _instance; /**< orb multi instance identifier */
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
@@ -280,17 +268,5 @@ private:
 	// statistics
 	uint32_t _lost_messages = 0; /**< nr of lost messages for all subscribers. If two subscribers lose the same
 					message, it is counted as two. */
-
-	inline static SubscriberData    *filp_to_sd(cdev::file_t *filp);
-
-	/**
-	 * Check whether a topic appears updated to a subscriber.
-	 *
-	 * Lock must already be held when calling this.
-	 *
-	 * @param sd    The subscriber for whom to check.
-	 * @return    True if the topic should appear updated to the subscriber
-	 */
-	bool      appears_updated(SubscriberData *sd);
 
 };

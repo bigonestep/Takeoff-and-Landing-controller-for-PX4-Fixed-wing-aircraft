@@ -42,17 +42,7 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
-uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(cdev::file_t *filp)
-{
-#ifndef __PX4_NUTTX
-
-	if (!filp) {
-		return nullptr;
-	}
-
-#endif
-	return (SubscriberData *)(filp->f_priv);
-}
+static uORB::SubscriptionInterval *filp_to_subscription(cdev::file_t *filp) { return static_cast<uORB::SubscriptionInterval *>(filp->f_priv); }
 
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path,
 			     uint8_t priority, uint8_t queue_size) :
@@ -89,21 +79,15 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 	if (filp->f_oflags == PX4_F_RDONLY) {
 
 		/* allocate subscriber data */
-		SubscriberData *sd = new SubscriberData{};
+		uORB::SubscriptionInterval *sd = new SubscriptionInterval(_meta, 0, _instance);
 
 		if (nullptr == sd) {
 			return -ENOMEM;
 		}
 
-		/* If there were any previous publications, allow the subscriber to read them */
-		const unsigned gen = published_message_count();
-		sd->generation = gen - (_queue_size < gen ? _queue_size : gen);
-
 		filp->f_priv = (void *)sd;
 
 		int ret = CDev::open(filp);
-
-		add_internal_subscriber();
 
 		if (ret != PX4_OK) {
 			PX4_ERR("CDev::open failed");
@@ -125,13 +109,10 @@ int
 uORB::DeviceNode::close(cdev::file_t *filp)
 {
 	if (filp->f_oflags == PX4_F_RDONLY) { /* subscriber */
-		SubscriberData *sd = filp_to_sd(filp);
+		uORB::SubscriptionInterval *sd = filp_to_subscription(filp);
 
 		if (sd != nullptr) {
-			remove_internal_subscriber();
-
 			delete sd;
-			sd = nullptr;
 		}
 	}
 
@@ -209,23 +190,7 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 		return -EIO;
 	}
 
-	SubscriberData *sd = (SubscriberData *)filp_to_sd(filp);
-
-	/*
-	 * Perform an atomic copy & state update
-	 */
-	ATOMIC_ENTER;
-
-	copy_locked(buffer, sd->generation);
-
-	// if subscriber has an interval track the last update time
-	if (sd->update_interval) {
-		sd->update_interval->last_update = _last_update;
-	}
-
-	ATOMIC_LEAVE;
-
-	return _meta->o_size;
+	return filp_to_subscription(filp)->copy(buffer) ? _meta->o_size : 0;
 }
 
 ssize_t
@@ -299,8 +264,6 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 int
 uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
-	SubscriberData *sd = filp_to_sd(filp);
-
 	switch (cmd) {
 	case ORBIOCLASTUPDATE: {
 			ATOMIC_ENTER;
@@ -311,40 +274,14 @@ uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 
 	case ORBIOCUPDATED: {
 			ATOMIC_ENTER;
-			*(bool *)arg = appears_updated(sd);
+			*(bool *)arg = filp_to_subscription(filp)->updated();
 			ATOMIC_LEAVE;
 			return PX4_OK;
 		}
 
-	case ORBIOCSETINTERVAL: {
-			int ret = PX4_OK;
-			lock();
-
-			if (arg == 0) {
-				if (sd->update_interval) {
-					delete (sd->update_interval);
-					sd->update_interval = nullptr;
-				}
-
-			} else {
-				if (sd->update_interval) {
-					sd->update_interval->interval = arg;
-
-				} else {
-					sd->update_interval = new UpdateIntervalData();
-
-					if (sd->update_interval) {
-						sd->update_interval->interval = arg;
-
-					} else {
-						ret = -ENOMEM;
-					}
-				}
-			}
-
-			unlock();
-			return ret;
-		}
+	case ORBIOCSETINTERVAL:
+		filp_to_subscription(filp)->set_interval_us(arg);
+		return PX4_OK;
 
 	case ORBIOCGADVERTISER:
 		*(uintptr_t *)arg = (uintptr_t)this;
@@ -362,13 +299,7 @@ uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 		}
 
 	case ORBIOCGETINTERVAL:
-		if (sd->update_interval) {
-			*(unsigned *)arg = sd->update_interval->interval;
-
-		} else {
-			*(unsigned *)arg = 0;
-		}
-
+		*(unsigned *)arg = filp_to_subscription(filp)->get_interval_us();
 		return OK;
 
 	case ORBIOCISADVERTISED:
@@ -483,12 +414,10 @@ int16_t uORB::DeviceNode::topic_unadvertised(const orb_metadata *meta, int prior
 px4_pollevent_t
 uORB::DeviceNode::poll_state(cdev::file_t *filp)
 {
-	SubscriberData *sd = filp_to_sd(filp);
-
 	/*
 	 * If the topic appears updated to the subscriber, say so.
 	 */
-	if (appears_updated(sd)) {
+	if (filp_to_subscription(filp)->updated()) {
 		return POLLIN;
 	}
 
@@ -498,33 +427,10 @@ uORB::DeviceNode::poll_state(cdev::file_t *filp)
 void
 uORB::DeviceNode::poll_notify_one(px4_pollfd_struct_t *fds, px4_pollevent_t events)
 {
-	SubscriberData *sd = filp_to_sd((cdev::file_t *)fds->priv);
-
-	/*
-	 * If the topic looks updated to the subscriber, go ahead and notify them.
-	 */
-	if (appears_updated(sd)) {
+	// If the topic looks updated to the subscriber, go ahead and notify them.
+	if (filp_to_subscription((cdev::file_t *)fds->priv)->updated()) {
 		CDev::poll_notify_one(fds, events);
 	}
-}
-
-bool
-uORB::DeviceNode::appears_updated(SubscriberData *sd)
-{
-	// check if this topic has been published yet, if not bail out
-	if (_data == nullptr) {
-		return false;
-	}
-
-	// if subscriber has interval check time since last update
-	if (sd->update_interval != nullptr) {
-		if (hrt_elapsed_time(&sd->update_interval->last_update) < sd->update_interval->interval) {
-			return false;
-		}
-	}
-
-	// finally, compare the generation
-	return (sd->generation != published_message_count());
 }
 
 bool
