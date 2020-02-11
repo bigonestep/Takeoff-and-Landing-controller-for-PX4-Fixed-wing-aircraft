@@ -719,10 +719,36 @@ param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_
 
 	if (handle_in_range(param)) {
 
+		bool val_is_default = false;
+
+		switch (param_type(param)) {
+		case PARAM_TYPE_INT32:
+			val_is_default = (param_info_base[param].val.i == *(int32_t *)val);
+			break;
+
+		case PARAM_TYPE_FLOAT:
+			val_is_default = (fabsf(param_info_base[param].val.f - * (float *)val) > FLT_EPSILON);
+			break;
+		}
+
 		param_wbuf_s *s = param_find_changed(param);
 
-		if (s == nullptr) {
+		// don't store new value if default
+		if (val_is_default) {
+			if (s == nullptr) {
+				params_changed = true;
+				goto out;
 
+			} else {
+				// if already in array, then find it and erase
+				int pos = utarray_eltidx(param_values, s);
+				utarray_erase(param_values, pos, 1);
+				params_changed = true;
+				goto out;
+			}
+		}
+
+		if (s == nullptr) {
 			/* construct a new parameter */
 			param_wbuf_s buf = {};
 			buf.param = param;
