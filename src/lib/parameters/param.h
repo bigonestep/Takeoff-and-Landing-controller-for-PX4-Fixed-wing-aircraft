@@ -195,14 +195,6 @@ __EXPORT int		param_get_used_index(param_t param);
 __EXPORT const char	*param_name(param_t param);
 
 /**
- * Obtain the volatile state of a parameter.
- *
- * @param param		A handle returned by param_find or passed by param_foreach.
- * @return			true if the parameter is volatile
- */
-__EXPORT bool		param_is_volatile(param_t param);
-
-/**
  * Test whether a parameter's value has changed from the default.
  *
  * @return		If true, the parameter's value has not been changed from the default.

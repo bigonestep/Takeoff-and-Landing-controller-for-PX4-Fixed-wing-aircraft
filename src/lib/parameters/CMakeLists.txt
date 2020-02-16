@@ -138,12 +138,14 @@ endif()
 if (NOT "${PX4_BOARD}" MATCHES "px4_io")
 	add_library(parameters
 		${SRCS}
+		ParameterBackend.cpp
+		ParameterBackend.hpp
 		px4_parameters.c
 		px4_parameters.h
 		px4_parameters_public.h
-		)
+	)
 
-	if ("${CONFIG_SHMEM}" STREQUAL "1")
+	if("${CONFIG_SHMEM}" STREQUAL "1")
 		target_link_libraries(parameters PRIVATE px4_layer)
 	endif()
 
