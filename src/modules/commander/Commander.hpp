@@ -121,7 +121,7 @@ private:
 			 bool *changed);
 
 	bool check_posvel_validity(const bool data_valid, const float data_accuracy, const float required_accuracy,
-				   const hrt_abstime &data_timestamp_us, hrt_abstime *last_fail_time_us, hrt_abstime *probation_time_us, bool *valid_state,
+				   const hrt_abstime &data_timestamp_us, hrt_abstime *last_fail_time_us, bool *valid_state,
 				   bool *validity_changed);
 
 	void control_status_leds(vehicle_status_s *status_local, const actuator_armed_s *actuator_armed, bool changed,
@@ -147,8 +147,6 @@ private:
 
 	void print_reject_arm(const char *msg);
 	void print_reject_mode(const char *msg);
-
-	void reset_posvel_validity(bool *changed);
 
 	bool set_home_position();
 	bool set_home_position_alt_only();
@@ -189,7 +187,6 @@ private:
 
 		(ParamInt<px4::params::COM_POS_FS_DELAY>) _param_com_pos_fs_delay,
 		(ParamInt<px4::params::COM_POS_FS_PROB>) _param_com_pos_fs_prob,
-		(ParamInt<px4::params::COM_POS_FS_GAIN>) _param_com_pos_fs_gain,
 
 		(ParamInt<px4::params::COM_LOW_BAT_ACT>) _param_com_low_bat_act,
 		(ParamFloat<px4::params::COM_DISARM_LAND>) _param_com_disarm_land,
@@ -277,19 +274,12 @@ private:
 	static constexpr uint64_t PRINT_MODE_REJECT_INTERVAL{500_ms};
 	static constexpr uint64_t INAIR_RESTART_HOLDOFF_INTERVAL{500_ms};
 
-	const int64_t POSVEL_PROBATION_MIN = 1_s;	/**< minimum probation duration (usec) */
-	const int64_t POSVEL_PROBATION_MAX = 100_s;	/**< maximum probation duration (usec) */
 
 	PreFlightCheck::arm_requirements_t	_arm_requirements{};
 
 	hrt_abstime	_last_gpos_fail_time_us{0};	/**< Last time that the global position validity recovery check failed (usec) */
 	hrt_abstime	_last_lpos_fail_time_us{0};	/**< Last time that the local position validity recovery check failed (usec) */
 	hrt_abstime	_last_lvel_fail_time_us{0};	/**< Last time that the local velocity validity recovery check failed (usec) */
-
-	// Probation times for position and velocity validity checks to pass if failed
-	hrt_abstime	_gpos_probation_time_us = POSVEL_PROBATION_MIN;
-	hrt_abstime	_lpos_probation_time_us = POSVEL_PROBATION_MIN;
-	hrt_abstime	_lvel_probation_time_us = POSVEL_PROBATION_MIN;
 
 	/* class variables used to check for navigation failure after takeoff */
 	hrt_abstime	_time_at_takeoff{0};		/**< last time we were on the ground */

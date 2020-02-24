@@ -15,8 +15,6 @@ then
 	param set COM_POS_FS_DELAY 5
 	param set COM_POS_FS_EPH 15
 	param set COM_POS_FS_EPV 30
-	param set COM_POS_FS_GAIN 0
-	param set COM_POS_FS_PROB 1
 	param set COM_VEL_FS_EVH 5
 
 	param set EKF2_ARSP_THR 8

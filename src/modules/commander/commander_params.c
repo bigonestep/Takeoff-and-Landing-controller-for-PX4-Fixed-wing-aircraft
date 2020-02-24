@@ -712,13 +712,9 @@ PARAM_DEFINE_INT32(COM_ARM_AUTH_REQ, 0);
 PARAM_DEFINE_INT32(COM_POS_FS_DELAY, 1);
 
 /**
- * Loss of position probation delay at takeoff.
+ * Loss of position probation delay
  *
  * The probation delay is the number of seconds that the EKF innovation checks need to pass for the position to be declared good after it has been declared bad.
- * The probation delay will be reset to this parameter value when takeoff is detected.
- * After takeoff, if position checks are passing, the probation delay will reduce by one second for every lapsed second of valid position down to a minimum of 1 second.
- * If position checks are failing, the probation delay will increase by COM_POS_FS_GAIN seconds for every lapsed second up to a maximum of 100 seconds.
- * The default value has been optimised for rotary wing applications. For fixed wing applications, a value of 1 should be used.
  *
  * @unit sec
  * @reboot_required true
@@ -726,18 +722,7 @@ PARAM_DEFINE_INT32(COM_POS_FS_DELAY, 1);
  * @min 1
  * @max 100
  */
-PARAM_DEFINE_INT32(COM_POS_FS_PROB, 30);
-
-/**
- * Loss of position probation gain factor.
- *
- * This sets the rate that the loss of position probation time grows when position checks are failing.
- * The default value has been optimised for rotary wing applications. For fixed wing applications a value of 0 should be used.
- *
- * @reboot_required true
- * @group Commander
- */
-PARAM_DEFINE_INT32(COM_POS_FS_GAIN, 10);
+PARAM_DEFINE_INT32(COM_POS_FS_PROB, 1);
 
 /**
  * Horizontal position error threshold.
