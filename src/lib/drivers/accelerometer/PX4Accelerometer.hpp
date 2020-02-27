@@ -60,6 +60,7 @@ public:
 	void set_device_type(uint8_t devtype);
 	void set_error_count(uint64_t error_count) { _error_count = error_count; }
 	void increase_error_count() { _error_count++; }
+	void set_integrator_reset_interval(unsigned interval) { _integrator.set_autoreset_interval(interval); }
 	void set_range(float range) { _range = range; UpdateClipLimit(); }
 	void set_scale(float scale) { _scale = scale; UpdateClipLimit(); }
 	void set_temperature(float temperature) { _temperature = temperature; }

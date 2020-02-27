@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,64 +33,30 @@
 
 #pragma once
 
-#include <drivers/device/spi.h>
-#include <ecl/geo/geo.h>
-#include <lib/conversion/rotation.h>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
-#define DIR_READ                0x80
-#define DIR_WRITE               0x00
+#include "BMI088_Accelerometer.hpp"
+#include "BMI088_Gyroscope.hpp"
 
-//Soft-reset command Value
-#define BMI088_SOFT_RESET       0xB6
+using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
+using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
 
-#define BMI088_BUS_SPEED				10*1000*1000
-
-#define BMI088_TIMER_REDUCTION				200
-
-class BMI088 : public device::SPI
+class BMI088 : public px4::ScheduledWorkItem
 {
-
-protected:
-
-	uint8_t         _whoami;    /** whoami result */
-
-	uint8_t         _register_wait;
-	uint64_t        _reset_wait;
-
-	enum Rotation       _rotation;
-
-	uint8_t         _checked_next;
-
-	/**
-	* Read a register from the BMI088
-	*
-	* @param       The register to read.
-	* @return      The value that was read.
-	*/
-	virtual uint8_t         read_reg(unsigned reg); // This needs to be declared as virtual, because the
-	virtual uint16_t        read_reg16(unsigned reg);
-
-	/**
-	* Write a register in the BMI088
-	*
-	* @param reg       The register to write.
-	* @param value     The new value to write.
-	*/
-	void            write_reg(unsigned reg, uint8_t value);
-
-	/* do not allow to copy this class due to pointer data members */
-	BMI088(const BMI088 &);
-	BMI088 operator=(const BMI088 &);
-
 public:
+	BMI088(int bus, enum Rotation rotation);
+	~BMI088() override = default;
 
-	BMI088(const char *name, const char *devname, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency,
-	       enum Rotation rotation);
+	int init();
+	bool start();
+	bool stop();
+	void print_info();
 
-	virtual ~BMI088() = default;
+private:
+	void Run() override;
 
-
+	BMI088_Accelerometer	_accel;
+	BMI088_Gyroscope	_gyro;
 };

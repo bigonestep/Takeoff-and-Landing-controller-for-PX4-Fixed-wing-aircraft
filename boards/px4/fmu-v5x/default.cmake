@@ -31,7 +31,8 @@ px4_add_board(
 		imu/adis16448
 		imu/adis16477
 		imu/adis16497
-		imu/bmi088
+		#imu/bmi088
+		imu/bosch/bmi088
 		#imu/mpu6000 # legacy icm20602 driver
 		imu/invensense/icm20602
 		imu/st/ism330dlc

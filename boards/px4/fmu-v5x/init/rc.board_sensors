@@ -15,11 +15,8 @@ icm20602 -R 2 start
 # Internal SPI bus ISM300DLC
 ism330dlc start
 
-# Internal SPI bus BMI088 accel
-bmi088 -A -R 12 start
-
-# Internal SPI bus BMI088 gyro
-bmi088 -G -R 12 start
+# Internal SPI bus BMI088 accel + gyro
+bmi088 -R 12 start
 
 # Possible external compasses
 ist8310 -b 1 start
