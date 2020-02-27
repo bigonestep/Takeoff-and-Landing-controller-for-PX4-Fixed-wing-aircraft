@@ -182,16 +182,11 @@ void UUVAttitudeControl::control_attitude_geo(const vehicle_attitude_s &att, con
 	float yaw_u;
 	float thrust_u;
 
-	float roll_body = _vehicle_attitude_sp.roll_body;
-	float pitch_body = _vehicle_attitude_sp.pitch_body;
-	float yaw_body = _vehicle_attitude_sp.yaw_body;
-
 	/* get attitude setpoint rotational matrix */
-	Dcmf _rot_des = Eulerf(roll_body, pitch_body, yaw_body);
+	Dcmf _rot_des(Quatf(_vehicle_attitude_sp.q_d));
 
 	/* get current rotation matrix from control state quaternions */
-	Quatf q_att(att.q[0], att.q[1], att.q[2], att.q[3]);
-	Matrix3f _rot_att = q_att.to_dcm();
+	Dcmf _rot_att(Quatf(att.q));
 
 	Vector3f e_R_vec;
 	Vector3f torques;

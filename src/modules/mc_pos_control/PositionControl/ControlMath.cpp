@@ -92,14 +92,7 @@ void bodyzToAttitude(Vector3f body_z, const float yaw_sp, vehicle_attitude_setpo
 	}
 
 	// copy quaternion setpoint to attitude setpoint topic
-	Quatf q_sp = R_sp;
-	q_sp.copyTo(att_sp.q_d);
-
-	// calculate euler angles, for logging only, must not be used for control
-	Eulerf euler = R_sp;
-	att_sp.roll_body = euler(0);
-	att_sp.pitch_body = euler(1);
-	att_sp.yaw_body = euler(2);
+	Quatf(R_sp).copyTo(att_sp.q_d);
 }
 
 Vector2f constrainXY(const Vector2f &v0, const Vector2f &v1, const float &max)

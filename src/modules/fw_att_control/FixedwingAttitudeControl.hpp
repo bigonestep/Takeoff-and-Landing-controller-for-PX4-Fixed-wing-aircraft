@@ -67,11 +67,6 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
-using matrix::Eulerf;
-using matrix::Quatf;
-
-using uORB::SubscriptionData;
-
 class FixedwingAttitudeControl final : public ModuleBase<FixedwingAttitudeControl>, public ModuleParams,
 	public px4::WorkItem
 {
@@ -125,6 +120,8 @@ private:
 	vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
+
+	matrix::Eulerf _att_sp_euler;
 
 	float _flaps_applied{0.0f};
 	float _flaperons_applied{0.0f};

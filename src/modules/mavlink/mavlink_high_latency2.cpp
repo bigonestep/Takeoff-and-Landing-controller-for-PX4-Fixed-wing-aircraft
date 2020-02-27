@@ -59,7 +59,7 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/uORB.h>
 
-using matrix::wrap_2pi;
+using namespace matrix;
 
 MavlinkStreamHighLatency2::MavlinkStreamHighLatency2(Mavlink *mavlink) : MavlinkStream(mavlink),
 	_actuator_sub_0(_mavlink->add_orb_subscription(ORB_ID(actuator_controls_0))),
@@ -264,10 +264,12 @@ bool MavlinkStreamHighLatency2::write_attitude_sp(mavlink_high_latency2_t *msg)
 {
 	struct vehicle_attitude_setpoint_s attitude_sp;
 
+	// Extract attitude setpoint yaw from quaternion
 	const bool updated = _attitude_sp_sub->update(&_attitude_sp_time, &attitude_sp);
+	matrix::Eulerf euler_sp(Quatf(attitude_sp.q_d));
 
 	if (_attitude_sp_time > 0) {
-		msg->target_heading = static_cast<uint8_t>(math::degrees(wrap_2pi(attitude_sp.yaw_body)) * 0.5f);
+		msg->target_heading = static_cast<uint8_t>(math::degrees(wrap_2pi(euler_sp(2))) * 0.5f);
 	}
 
 	return updated;

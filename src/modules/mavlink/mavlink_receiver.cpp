@@ -78,7 +78,7 @@
 #define MAVLINK_RECEIVER_NET_ADDED_STACK 0
 #endif
 
-using matrix::wrap_2pi;
+using namespace matrix;
 
 MavlinkReceiver::~MavlinkReceiver()
 {
@@ -1224,8 +1224,7 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 	visual_odom.x = ev.x;
 	visual_odom.y = ev.y;
 	visual_odom.z = ev.z;
-	matrix::Quatf q(matrix::Eulerf(ev.roll, ev.pitch, ev.yaw));
-	q.copyTo(visual_odom.q);
+	Quatf(Eulerf(ev.roll, ev.pitch, ev.yaw)).copyTo(visual_odom.q);
 
 	// TODO:
 	// - add a MAV_FRAME_*_OTHER to the Mavlink MAV_FRAME enum IOT define
@@ -1269,7 +1268,7 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 
 	/* The quaternion of the ODOMETRY msg represents a rotation from body frame to
 	 * a local frame*/
-	matrix::Quatf q_body_to_local(odom.q);
+	Quatf q_body_to_local(odom.q);
 	q_body_to_local.normalize();
 	q_body_to_local.copyTo(odometry.q);
 
@@ -1302,10 +1301,10 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 	if (odom.child_frame_id == MAV_FRAME_BODY_FRD) {
 		/* Linear velocity has to be rotated to the local NED frame
 		 * Angular velocities are already in the right body frame  */
-		const matrix::Dcmf R_body_to_local = matrix::Dcmf(q_body_to_local);
+		const Dcmf R_body_to_local(q_body_to_local);
 
 		/* the linear velocities needs to be transformed to the local frame FRD*/
-		matrix::Vector3<float> linvel_local(R_body_to_local * matrix::Vector3<float>(odom.vx, odom.vy, odom.vz));
+		Vector3f linvel_local(R_body_to_local * Vector3f(odom.vx, odom.vy, odom.vz));
 
 		odometry.vx = linvel_local(0);
 		odometry.vy = linvel_local(1);
@@ -1316,14 +1315,14 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 		odometry.yawspeed = odom.yawspeed;
 
 		/* the linear velocity's covariance needs to be transformed to the local frame FRD*/
-		matrix::Matrix3f lin_vel_cov_body;
+		Matrix3f lin_vel_cov_body;
 		lin_vel_cov_body(0, 0) = odom.velocity_covariance[odometry.COVARIANCE_MATRIX_VX_VARIANCE];
 		lin_vel_cov_body(0, 1) = lin_vel_cov_body(1, 0) = odom.velocity_covariance[1];
 		lin_vel_cov_body(0, 2) = lin_vel_cov_body(2, 0) = odom.velocity_covariance[2];
 		lin_vel_cov_body(1, 1) = odom.velocity_covariance[odometry.COVARIANCE_MATRIX_VY_VARIANCE];
 		lin_vel_cov_body(1, 2) = lin_vel_cov_body(2, 1) = odom.velocity_covariance[7];
 		lin_vel_cov_body(2, 2) = odom.velocity_covariance[odometry.COVARIANCE_MATRIX_VZ_VARIANCE];
-		matrix::Matrix3f lin_vel_cov_local = R_body_to_local * lin_vel_cov_body * R_body_to_local.transpose();
+		Matrix3f lin_vel_cov_local = R_body_to_local * lin_vel_cov_body * R_body_to_local.transpose();
 
 		/* Only the linear velocity variance elements are used */
 		for (size_t i = 0; i < VEL_URT_SIZE; i++) {
@@ -1489,13 +1488,7 @@ MavlinkReceiver::handle_message_set_attitude_target(mavlink_message_t *msg)
 					att_sp.timestamp = hrt_absolute_time();
 
 					if (!ignore_attitude_msg) { // only copy att sp if message contained new data
-						matrix::Quatf q(set_attitude_target.q);
-						q.copyTo(att_sp.q_d);
-
-						matrix::Eulerf euler{q};
-						att_sp.roll_body = euler.phi();
-						att_sp.pitch_body = euler.theta();
-						att_sp.yaw_body = euler.psi();
+						Quatf(set_attitude_target.q).copyTo(att_sp.q_d);
 						att_sp.yaw_sp_move_rate = 0.0f;
 					}
 
@@ -2448,12 +2441,8 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 	/* attitude */
 	{
 		vehicle_attitude_s hil_attitude{};
-
 		hil_attitude.timestamp = timestamp;
-
-		matrix::Quatf q(hil_state.attitude_quaternion);
-		q.copyTo(hil_attitude.q);
-
+		Quatf(hil_state.attitude_quaternion).copyTo(hil_attitude.q);
 		_attitude_pub.publish(hil_attitude);
 	}
 
@@ -2508,7 +2497,7 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		hil_local_pos.vy = hil_state.vy / 100.0f;
 		hil_local_pos.vz = hil_state.vz / 100.0f;
 
-		matrix::Eulerf euler{matrix::Quatf(hil_state.attitude_quaternion)};
+		Eulerf euler(Quatf(hil_state.attitude_quaternion));
 		hil_local_pos.yaw = euler.psi();
 		hil_local_pos.xy_global = true;
 		hil_local_pos.z_global = true;

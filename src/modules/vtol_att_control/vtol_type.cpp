@@ -408,7 +408,7 @@ float VtolType::pusher_assist()
 	const Dcmf R(Quatf(_v_att->q));
 	const Dcmf R_sp(Quatf(_v_att_sp->q_d));
 	const Eulerf euler(R);
-	const Eulerf euler_sp(R_sp);
+	Eulerf euler_sp(R_sp);
 
 	// direction of desired body z axis represented in earth frame
 	Vector3f body_z_sp(R_sp(0, 2), R_sp(1, 2), R_sp(2, 2));
@@ -450,11 +450,10 @@ float VtolType::pusher_assist()
 		tilt_new = R_yaw_correction * tilt_new;
 
 		// now extract roll and pitch setpoints
-		_v_att_sp->pitch_body = atan2f(tilt_new(0), tilt_new(2));
-		_v_att_sp->roll_body = -asinf(tilt_new(1));
+		euler_sp(0) = -asinf(tilt_new(1));
+		euler_sp(1) = atan2f(tilt_new(0), tilt_new(2));
 
-		const Quatf q_sp(Eulerf(_v_att_sp->roll_body, _v_att_sp->pitch_body, euler_sp(2)));
-		q_sp.copyTo(_v_att_sp->q_d);
+		Quatf(euler_sp).copyTo(_v_att_sp->q_d);
 	}
 
 	return forward_thrust;

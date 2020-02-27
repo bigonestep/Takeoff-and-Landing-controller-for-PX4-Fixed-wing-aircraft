@@ -264,10 +264,10 @@ FixedwingPositionControl::calculate_target_airspeed(float airspeed_demand, const
 	 *
 	 */
 	float adjusted_min_airspeed = _param_fw_airspd_min.get();
+	matrix::Eulerf euler_sp(Quatf(_att_sp.q_d));
 
-	if (_airspeed_valid && PX4_ISFINITE(_att_sp.roll_body)) {
-
-		adjusted_min_airspeed = constrain(_param_fw_airspd_min.get() / sqrtf(cosf(_att_sp.roll_body)),
+	if (_airspeed_valid) {
+		adjusted_min_airspeed = constrain(_param_fw_airspd_min.get() / sqrtf(cosf(euler_sp(0))),
 						  _param_fw_airspd_min.get(), _param_fw_airspd_max.get());
 	}
 
@@ -349,8 +349,8 @@ FixedwingPositionControl::status_publish()
 {
 	position_controller_status_s pos_ctrl_status = {};
 
-	pos_ctrl_status.nav_roll = _att_sp.roll_body;
-	pos_ctrl_status.nav_pitch = _att_sp.pitch_body;
+	pos_ctrl_status.nav_roll = _attitude_setpoint_euler(0);
+	pos_ctrl_status.nav_pitch = _attitude_setpoint_euler(1);
 	pos_ctrl_status.nav_bearing = _l1_control.nav_bearing();
 
 	pos_ctrl_status.target_bearing = _l1_control.target_bearing();
@@ -658,14 +658,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 		if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
 			_att_sp.thrust_body[0] = 0.0f;
-			_att_sp.roll_body = 0.0f;
-			_att_sp.pitch_body = 0.0f;
+			_attitude_setpoint_euler(0) = 0.0f;
+			_attitude_setpoint_euler(1) = 0.0f;
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
 			/* waypoint is a plain navigation waypoint */
 			_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
-			_att_sp.roll_body = _l1_control.get_roll_setpoint();
-			_att_sp.yaw_body = _l1_control.nav_bearing();
+			_attitude_setpoint_euler(0) = _l1_control.get_roll_setpoint();
+			_attitude_setpoint_euler(2) = _l1_control.nav_bearing();
 
 			tecs_update_pitch_throttle(pos_sp_curr.alt,
 						   calculate_target_airspeed(mission_airspeed, ground_speed),
@@ -691,8 +691,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 			_l1_control.navigate_loiter(curr_wp, curr_pos, loiter_radius, loiter_direction, nav_speed_2d);
 
-			_att_sp.roll_body = _l1_control.get_roll_setpoint();
-			_att_sp.yaw_body = _l1_control.nav_bearing();
+			_attitude_setpoint_euler(0) = _l1_control.get_roll_setpoint();
+			_attitude_setpoint_euler(2) = _l1_control.nav_bearing();
 
 			float alt_sp = pos_sp_curr.alt;
 
@@ -708,7 +708,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 			if (in_takeoff_situation()) {
 				alt_sp = max(alt_sp, _takeoff_ground_alt + _param_fw_clmbout_diff.get());
-				_att_sp.roll_body = constrain(_att_sp.roll_body, radians(-5.0f), radians(5.0f));
+				_attitude_setpoint_euler(0) = constrain(_attitude_setpoint_euler(0), radians(-5.0f), radians(5.0f));
 			}
 
 			if (_land_abort) {
@@ -718,7 +718,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 				} else {
 					// continue straight until vehicle has sufficient altitude
-					_att_sp.roll_body = 0.0f;
+					_attitude_setpoint_euler(0) = 0.0f;
 				}
 
 				_tecs.set_time_const_throt(_param_fw_thrtc_sc.get() * _param_fw_t_thro_const.get());
@@ -770,8 +770,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 			/* reset setpoints from other modes (auto) otherwise we won't
 			 * level out without new manual input */
-			_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get());
-			_att_sp.yaw_body = 0;
+			_attitude_setpoint_euler(0) = _manual.y * radians(_param_fw_man_r_max.get());
+			_attitude_setpoint_euler(2) = 0;
 		}
 
 		_control_mode_current = FW_POSCTRL_MODE_POSITION;
@@ -848,12 +848,12 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 				/* populate l1 control setpoint */
 				_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 
-				_att_sp.roll_body = _l1_control.get_roll_setpoint();
-				_att_sp.yaw_body = _l1_control.nav_bearing();
+				_attitude_setpoint_euler(0) = _l1_control.get_roll_setpoint();
+				_attitude_setpoint_euler(2) = _l1_control.nav_bearing();
 
 				if (in_takeoff_situation()) {
 					/* limit roll motion to ensure enough lift */
-					_att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
+					_attitude_setpoint_euler(0) = constrain(_attitude_setpoint_euler(0), radians(-15.0f), radians(15.0f));
 				}
 			}
 		}
@@ -863,8 +863,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 			_hdg_hold_enabled = false;
 			_yaw_lock_engaged = false;
-			_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get());
-			_att_sp.yaw_body = 0;
+			_attitude_setpoint_euler(0) = _manual.y * radians(_param_fw_man_r_max.get());
+			_attitude_setpoint_euler(2) = 0;
 		}
 
 	} else if (_control_mode.flag_control_altitude_enabled) {
@@ -907,8 +907,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 					   climbout_requested ? radians(10.0f) : pitch_limit_min,
 					   tecs_status_s::TECS_MODE_NORMAL);
 
-		_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get());
-		_att_sp.yaw_body = 0;
+		_attitude_setpoint_euler(0) = _manual.y * radians(_param_fw_man_r_max.get());
+		_attitude_setpoint_euler(2) = 0;
 
 	} else {
 		_control_mode_current = FW_POSCTRL_MODE_OTHER;
@@ -978,7 +978,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 	use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_OTHER);
 
 	if (use_tecs_pitch) {
-		_att_sp.pitch_body = get_tecs_pitch();
+		_attitude_setpoint_euler(1) = get_tecs_pitch();
 	}
 
 	if (_control_mode.flag_control_position_enabled) {
@@ -1062,10 +1062,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 					   tecs_status_s::TECS_MODE_TAKEOFF);
 
 		// assign values
-		_att_sp.roll_body = _runway_takeoff.getRoll(_l1_control.get_roll_setpoint());
-		_att_sp.yaw_body = _runway_takeoff.getYaw(_l1_control.nav_bearing());
+		_attitude_setpoint_euler(0) = _runway_takeoff.getRoll(_l1_control.get_roll_setpoint());
+		_attitude_setpoint_euler(2) = _runway_takeoff.getYaw(_l1_control.nav_bearing());
 		_att_sp.fw_control_yaw = _runway_takeoff.controlYaw();
-		_att_sp.pitch_body = _runway_takeoff.getPitch(get_tecs_pitch());
+		_attitude_setpoint_euler(1) = _runway_takeoff.getPitch(get_tecs_pitch());
 
 		// reset integrals except yaw (which also counts for the wheel controller)
 		_att_sp.roll_reset_integral = _runway_takeoff.resetIntegrators();
@@ -1102,8 +1102,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 			/* Launch has been detected, hence we have to control the plane. */
 
 			_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
-			_att_sp.roll_body = _l1_control.get_roll_setpoint();
-			_att_sp.yaw_body = _l1_control.nav_bearing();
+			_attitude_setpoint_euler(0) = _l1_control.get_roll_setpoint();
+			_attitude_setpoint_euler(2) = _l1_control.nav_bearing();
 
 			/* Select throttle: only in LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS we want to use
 			 * full throttle, otherwise we use idle throttle */
@@ -1133,7 +1133,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 							   tecs_status_s::TECS_MODE_TAKEOFF);
 
 				/* limit roll motion to ensure enough lift */
-				_att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
+				_attitude_setpoint_euler(0) = constrain(_attitude_setpoint_euler(0), radians(-15.0f), radians(15.0f));
 
 			} else {
 				tecs_update_pitch_throttle(pos_sp_curr.alt,
@@ -1155,8 +1155,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 			_att_sp.yaw_reset_integral = true;
 
 			/* Set default roll and pitch setpoints during detection phase */
-			_att_sp.roll_body = 0.0f;
-			_att_sp.pitch_body = max(radians(pos_sp_curr.pitch_min), radians(10.0f));
+			_attitude_setpoint_euler(0) = 0.0f;
+			_attitude_setpoint_euler(1) = max(radians(pos_sp_curr.pitch_min), radians(10.0f));
 		}
 	}
 }
@@ -1258,12 +1258,12 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 		_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 	}
 
-	_att_sp.roll_body = _l1_control.get_roll_setpoint();
-	_att_sp.yaw_body = _l1_control.nav_bearing();
+	_attitude_setpoint_euler(0) = _l1_control.get_roll_setpoint();
+	_attitude_setpoint_euler(2) = _l1_control.nav_bearing();
 
 	if (_land_noreturn_horizontal) {
 		/* limit roll motion to prevent wings from touching the ground first */
-		_att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
+		_attitude_setpoint_euler(0) = constrain(_attitude_setpoint_euler(0), radians(-10.0f), radians(10.0f));
 	}
 
 	/* Vertical landing control */
@@ -1323,7 +1323,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
 		/* enable direct yaw control using rudder/wheel */
 		if (_land_noreturn_horizontal) {
-			_att_sp.yaw_body = _target_bearing;
+			_attitude_setpoint_euler(2) = _target_bearing;
 			_att_sp.fw_control_yaw = true;
 		}
 
@@ -1377,7 +1377,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 			// otherwise continue using previous _flare_pitch_sp
 		}
 
-		_att_sp.pitch_body = _flare_pitch_sp;
+		_attitude_setpoint_euler(1) = _flare_pitch_sp;
 		_flare_curve_alt_rel_last = flare_curve_alt_rel;
 
 	} else {
@@ -1547,18 +1547,17 @@ FixedwingPositionControl::Run()
 			_att_sp.timestamp = hrt_absolute_time();
 
 			// add attitude setpoint offsets
-			_att_sp.roll_body += radians(_param_fw_rsp_off.get());
-			_att_sp.pitch_body += radians(_param_fw_psp_off.get());
+			_attitude_setpoint_euler(0) += radians(_param_fw_rsp_off.get());
+			_attitude_setpoint_euler(1) += radians(_param_fw_psp_off.get());
 
 			if (_control_mode.flag_control_manual_enabled) {
-				_att_sp.roll_body = constrain(_att_sp.roll_body, -radians(_param_fw_man_r_max.get()),
-							      radians(_param_fw_man_r_max.get()));
-				_att_sp.pitch_body = constrain(_att_sp.pitch_body, -radians(_param_fw_man_p_max.get()),
-							       radians(_param_fw_man_p_max.get()));
+				_attitude_setpoint_euler(0) = constrain(_attitude_setpoint_euler(0), -radians(_param_fw_man_r_max.get()),
+									radians(_param_fw_man_r_max.get()));
+				_attitude_setpoint_euler(1) = constrain(_attitude_setpoint_euler(1), -radians(_param_fw_man_p_max.get()),
+									radians(_param_fw_man_p_max.get()));
 			}
 
-			Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
-			q.copyTo(_att_sp.q_d);
+			Quatf(_attitude_setpoint_euler).copyTo(_att_sp.q_d);
 
 			if (_control_mode.flag_control_offboard_enabled ||
 			    _control_mode.flag_control_position_enabled ||

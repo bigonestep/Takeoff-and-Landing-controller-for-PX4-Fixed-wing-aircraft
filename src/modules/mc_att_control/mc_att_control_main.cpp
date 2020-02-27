@@ -164,15 +164,12 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 		v *= _man_tilt_max / v_norm;
 	}
 
-	Quatf q_sp_rpy = AxisAnglef(v(0), v(1), 0.f);
-	Eulerf euler_sp = q_sp_rpy;
-	attitude_setpoint.roll_body = euler_sp(0);
-	attitude_setpoint.pitch_body = euler_sp(1);
+	Eulerf euler_sp = Quatf(AxisAnglef(v(0), v(1), 0.f));
 	// The axis angle can change the yaw as well (noticeable at higher tilt angles).
 	// This is the formula by how much the yaw changes:
 	//   let a := tilt angle, b := atan(y/x) (direction of maximum tilt)
 	//   yaw = atan(-2 * sin(b) * cos(b) * sin^2(a/2) / (1 - 2 * cos^2(b) * sin^2(a/2))).
-	attitude_setpoint.yaw_body = _man_yaw_sp + euler_sp(2);
+	euler_sp(2) += _man_yaw_sp;
 
 	/* modify roll/pitch only if we're a VTOL */
 	if (_vehicle_status.is_vtol) {
@@ -190,12 +187,12 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 		// - look at the roll and pitch angles: they should stay pretty much the same as when not yawing
 
 		// calculate our current yaw error
-		float yaw_error = wrap_pi(attitude_setpoint.yaw_body - yaw);
+		float yaw_error = wrap_pi(euler_sp(2) - yaw);
 
 		// compute the vector obtained by rotating a z unit vector by the rotation
 		// given by the roll and pitch commands of the user
 		Vector3f zB = {0.0f, 0.0f, 1.0f};
-		Dcmf R_sp_roll_pitch = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, 0.0f);
+		Dcmf R_sp_roll_pitch = Eulerf(euler_sp(0), euler_sp(1), 0.0f);
 		Vector3f z_roll_pitch_sp = R_sp_roll_pitch * zB;
 
 		// transform the vector into a new frame which is rotated around the z axis
@@ -207,13 +204,12 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 		// use the formula z_roll_pitch_sp = R_tilt * [0;0;1]
 		// R_tilt is computed from_euler; only true if cos(roll) not equal zero
 		// -> valid if roll is not +-pi/2;
-		attitude_setpoint.roll_body = -asinf(z_roll_pitch_sp(1));
-		attitude_setpoint.pitch_body = atan2f(z_roll_pitch_sp(0), z_roll_pitch_sp(2));
+		euler_sp(0) = -asinf(z_roll_pitch_sp(1));
+		euler_sp(1) = atan2f(z_roll_pitch_sp(0), z_roll_pitch_sp(2));
 	}
 
 	/* copy quaternion setpoint to attitude setpoint topic */
-	Quatf q_sp = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, attitude_setpoint.yaw_body);
-	q_sp.copyTo(attitude_setpoint.q_d);
+	Quatf(euler_sp).copyTo(attitude_setpoint.q_d);
 
 	attitude_setpoint.thrust_body[2] = -throttle_curve(_manual_control_sp.z);
 	attitude_setpoint.timestamp = hrt_absolute_time();

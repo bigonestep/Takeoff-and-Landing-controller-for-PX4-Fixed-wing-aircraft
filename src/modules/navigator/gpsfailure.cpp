@@ -83,14 +83,12 @@ GpsFailure::on_active()
 	case GPSF_STATE_LOITER: {
 			/* Position controller does not run in this mode:
 			 * navigator has to publish an attitude setpoint */
+			Eulerf att_sp_euler(math::radians(_param_nav_gpsf_r.get()), math::radians(_param_nav_gpsf_p.get()), 0.f);
+
 			vehicle_attitude_setpoint_s att_sp = {};
 			att_sp.timestamp = hrt_absolute_time();
-			att_sp.roll_body = math::radians(_param_nav_gpsf_r.get());
-			att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
 			att_sp.thrust_body[0] = _param_nav_gpsf_tr.get();
-
-			Quatf q(Eulerf(att_sp.roll_body, att_sp.pitch_body, 0.0f));
-			q.copyTo(att_sp.q_d);
+			Quatf(att_sp_euler).copyTo(att_sp.q_d);
 
 			if (_navigator->get_vstatus()->is_vtol) {
 				_fw_virtual_att_sp_pub.publish(att_sp);

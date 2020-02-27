@@ -67,6 +67,8 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/uORB.h>
 
+using namespace matrix;
+
 /* Prototypes */
 
 /**
@@ -185,7 +187,6 @@ void control_attitude(const struct vehicle_attitude_setpoint_s *att_sp, const st
 void control_heading(const struct vehicle_global_position_s *pos, const struct position_setpoint_s *sp,
 		     const struct vehicle_attitude_s *att, struct vehicle_attitude_setpoint_s *att_sp)
 {
-
 	/*
 	 * Calculate heading error of current position to desired position
 	 */
@@ -207,8 +208,7 @@ void control_heading(const struct vehicle_global_position_s *pos, const struct p
 		roll_body = 0.6f;
 	}
 
-	matrix::Eulerf att_spe(roll_body, 0, bearing);
-	matrix::Quatf(att_spe).copyTo(att_sp->q_d);
+	Quatf(Eulerf(roll_body, 0, bearing)).copyTo(att_sp->q_d);
 }
 
 int parameters_init(struct param_handles *handles)

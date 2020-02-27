@@ -204,7 +204,8 @@ void Tailsitter::update_transition_state()
 
 			// the intial attitude setpoint for a backtransition is a combination of the current fw pitch setpoint,
 			// the yaw setpoint and zero roll since we want wings level transition
-			_q_trans_start = Eulerf(0.0f, _fw_virtual_att_sp->pitch_body, yaw_sp);
+			const Eulerf euler_sp(Quatf(_fw_virtual_att_sp.q_d));
+			_q_trans_start = Eulerf(0.0f, euler_sp(1), yaw_sp);
 
 			// attitude during transitions are controlled by mc attitude control so rotate the desired attitude to the
 			// multirotor frame
@@ -247,20 +248,13 @@ void Tailsitter::update_transition_state()
 		}
 	}
 
-	_v_att_sp->thrust_body[2] = _mc_virtual_att_sp->thrust_body[2];
-
 	_mc_roll_weight = 1.0f;
 	_mc_pitch_weight = 1.0f;
 	_mc_yaw_weight = 1.0f;
 
 	_v_att_sp->timestamp = hrt_absolute_time();
-
-	const Eulerf euler_sp(_q_trans_sp);
-	_v_att_sp->roll_body = euler_sp.phi();
-	_v_att_sp->pitch_body = euler_sp.theta();
-	_v_att_sp->yaw_body = euler_sp.psi();
-
 	_q_trans_sp.copyTo(_v_att_sp->q_d);
+	_v_att_sp->thrust_body[2] = _mc_virtual_att_sp->thrust_body[2];
 }
 
 void Tailsitter::waiting_on_tecs()

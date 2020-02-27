@@ -36,6 +36,7 @@
 #include <vtol_att_control/vtol_type.h>
 
 using namespace time_literals;
+using namespace matrix;
 using math::constrain;
 using math::gradual;
 using math::radians;
@@ -155,23 +156,16 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 
 				if (_vcontrol_mode.flag_control_attitude_enabled) {
 					// STABILIZED mode generate the attitude setpoint from manual user inputs
+					_att_sp_euler(0) = _manual.y * radians(_param_fw_man_r_max.get()) + radians(_param_fw_rsp_off.get());
+					_att_sp_euler(0) = constrain(_att_sp_euler(0), -radians(_param_fw_man_r_max.get()), radians(_param_fw_man_r_max.get()));
 
-					_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get()) + radians(_param_fw_rsp_off.get());
-					_att_sp.roll_body = constrain(_att_sp.roll_body,
-								      -radians(_param_fw_man_r_max.get()), radians(_param_fw_man_r_max.get()));
+					_att_sp_euler(1) = -_manual.x * radians(_param_fw_man_p_max.get()) + radians(_param_fw_psp_off.get());
+					_att_sp_euler(1) = constrain(_att_sp_euler(1), -radians(_param_fw_man_p_max.get()), radians(_param_fw_man_p_max.get()));
 
-					_att_sp.pitch_body = -_manual.x * radians(_param_fw_man_p_max.get()) + radians(_param_fw_psp_off.get());
-					_att_sp.pitch_body = constrain(_att_sp.pitch_body,
-								       -radians(_param_fw_man_p_max.get()), radians(_param_fw_man_p_max.get()));
-
-					_att_sp.yaw_body = 0.0f;
-					_att_sp.thrust_body[0] = _manual.z;
-
-					Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
-					q.copyTo(_att_sp.q_d);
-
+					// fill attitude setpoint with generated quaternion and thrust
 					_att_sp.timestamp = hrt_absolute_time();
-
+					Quatf(_att_sp_euler).copyTo(_att_sp.q_d);
+					_att_sp.thrust_body[0] = _manual.z;
 					_attitude_sp_pub.publish(_att_sp);
 
 				} else if (_vcontrol_mode.flag_control_rates_enabled &&
@@ -435,9 +429,9 @@ void FixedwingAttitudeControl::Run()
 			control_input.body_x_rate = rollspeed;
 			control_input.body_y_rate = pitchspeed;
 			control_input.body_z_rate = yawspeed;
-			control_input.roll_setpoint = _att_sp.roll_body;
-			control_input.pitch_setpoint = _att_sp.pitch_body;
-			control_input.yaw_setpoint = _att_sp.yaw_body;
+			control_input.roll_setpoint = _att_sp_euler(0);
+			control_input.pitch_setpoint = _att_sp_euler(1);
+			control_input.yaw_setpoint = _att_sp_euler(2);
 			control_input.airspeed_min = _param_fw_airspd_min.get();
 			control_input.airspeed_max = _param_fw_airspd_max.get();
 			control_input.airspeed = airspeed;
@@ -493,7 +487,7 @@ void FixedwingAttitudeControl::Run()
 
 			/* Run attitude controllers */
 			if (_vcontrol_mode.flag_control_attitude_enabled) {
-				if (PX4_ISFINITE(_att_sp.roll_body) && PX4_ISFINITE(_att_sp.pitch_body)) {
+				if (PX4_ISFINITE(_att_sp_euler(0)) && PX4_ISFINITE(_att_sp_euler(1))) {
 					_roll_ctrl.control_attitude(control_input);
 					_pitch_ctrl.control_attitude(control_input);
 					_yaw_ctrl.control_attitude(control_input); //runs last, because is depending on output of roll and pitch attitude

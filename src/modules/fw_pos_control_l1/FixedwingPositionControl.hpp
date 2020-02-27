@@ -183,6 +183,8 @@ private:
 
 	perf_counter_t	_loop_perf;				///< loop performance counter
 
+	Eulerf _attitude_setpoint_euler{};			///< euler angles for desired attitude before converting to quaternion
+
 	float	_hold_alt{0.0f};				///< hold altitude for altitude mode
 	float	_takeoff_ground_alt{0.0f};			///< ground altitude at which plane was launched
 	float	_hdg_hold_yaw{0.0f};				///< hold heading for velocity mode
