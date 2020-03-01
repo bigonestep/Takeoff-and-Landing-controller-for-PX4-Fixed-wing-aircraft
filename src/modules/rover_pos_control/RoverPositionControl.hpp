@@ -63,11 +63,13 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_acceleration.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/uORB.h>
@@ -108,14 +110,18 @@ private:
 	int		_manual_control_sub{-1};		/**< notification of manual control updates */
 	int		_pos_sp_triplet_sub{-1};
 	int		_att_sp_sub{-1};
+	int		_rates_sp_sub{-1};
 	int		_vehicle_attitude_sub{-1};
+	int		_vehicle_rates_sub{-1};
 	int		_sensor_combined_sub{-1};
 
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
 
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
+	vehicle_angular_velocity_s		_vehicle_rate{};			/**< angular rates > */
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< attitude setpoint > */
+	vehicle_rates_setpoint_s		_rates_sp{};			/**< rate setpoint > */
 	vehicle_control_mode_s			_control_mode{};		/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
 	vehicle_local_position_s		_local_pos{};			/**< global vehicle position */
@@ -176,8 +182,10 @@ private:
 	void		manual_control_setpoint_poll();
 	void		position_setpoint_triplet_poll();
 	void		attitude_setpoint_poll();
+	void		rates_setpoint_poll();
 	void		vehicle_control_mode_poll();
 	void 		vehicle_attitude_poll();
+	void		vehicle_rates_poll();
 
 	/**
 	 * Control position.
@@ -186,5 +194,6 @@ private:
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
 	void		control_velocity(const matrix::Vector3f &current_velocity, const position_setpoint_triplet_s &pos_sp_triplet);
 	void		control_attitude(const vehicle_attitude_s &att, const vehicle_attitude_setpoint_s &att_sp);
+	void		control_rates(const vehicle_angular_velocity_s &rates, const vehicle_rates_setpoint_s &rates_sp);
 
 };
