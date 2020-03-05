@@ -62,4 +62,8 @@ TEST(PositionControlTest, NavigationYawInfluence)
 	EXPECT_LT(rate_setpoint(1), 0.f);
 	EXPECT_FLOAT_EQ(fabsf(rate_setpoint(0)), fabsf(rate_setpoint(1)));
 	EXPECT_FLOAT_EQ(rate_setpoint(2), 0.f);
+
+	qd.print();
+	Eulerf(qd).print();
+	EXPECT_FLOAT_EQ(Eulerf(qd).psi(), yaw_setpoint);
 }
