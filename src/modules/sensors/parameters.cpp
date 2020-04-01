@@ -44,12 +44,6 @@ namespace sensors
 
 void initialize_parameter_handles(ParameterHandles &parameter_handles)
 {
-	/* Differential pressure offset */
-	parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-	parameter_handles.diff_pres_analog_scale = param_find("SENS_DPRES_ANSC");
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-
 	/* rotations */
 	parameter_handles.board_rotation = param_find("SENS_BOARD_ROT");
 
@@ -73,6 +67,9 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 	parameter_handles.mag_comp_paramZ[1] = param_find("CAL_MAG1_ZCOMP");
 	parameter_handles.mag_comp_paramZ[2] = param_find("CAL_MAG2_ZCOMP");
 	parameter_handles.mag_comp_paramZ[3] = param_find("CAL_MAG3_ZCOMP");
+
+	/* Differential pressure offset */
+	parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
 
 	parameter_handles.air_cmodel = param_find("CAL_AIR_CMODEL");
 	parameter_handles.air_tube_length = param_find("CAL_AIR_TUBELEN");
@@ -108,12 +105,6 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 
 void update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters)
 {
-	/* Airspeed offset */
-	param_get(parameter_handles.diff_pres_offset_pa, &(parameters.diff_pres_offset_pa));
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-	param_get(parameter_handles.diff_pres_analog_scale, &(parameters.diff_pres_analog_scale));
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-
 	param_get(parameter_handles.board_rotation, &(parameters.board_rotation));
 
 	param_get(parameter_handles.board_offset[0], &(parameters.board_offset[0]));
@@ -134,6 +125,8 @@ void update_parameters(const ParameterHandles &parameter_handles, Parameters &pa
 	param_get(parameter_handles.mag_comp_paramZ[1], &(parameters.mag_comp_paramZ[1]));
 	param_get(parameter_handles.mag_comp_paramZ[2], &(parameters.mag_comp_paramZ[2]));
 	param_get(parameter_handles.mag_comp_paramZ[3], &(parameters.mag_comp_paramZ[3]));
+
+	param_get(parameter_handles.diff_pres_offset_pa, &(parameters.diff_pres_offset_pa));
 
 	param_get(parameter_handles.air_cmodel, &parameters.air_cmodel);
 	param_get(parameter_handles.air_tube_length, &parameters.air_tube_length);

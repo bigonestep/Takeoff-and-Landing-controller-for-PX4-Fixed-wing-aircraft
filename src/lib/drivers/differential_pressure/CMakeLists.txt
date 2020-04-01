@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,30 +31,4 @@
 #
 ############################################################################
 
-add_subdirectory(sensor_corrections) # used by vehicle_{acceleration, angular_velocity, imu}
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory(vehicle_acceleration)
-add_subdirectory(vehicle_angular_velocity)
-add_subdirectory(vehicle_air_data)
-add_subdirectory(vehicle_imu)
-
-px4_add_module(
-	MODULE modules__sensors
-	MAIN sensors
-	SRCS
-		voted_sensors_update.cpp
-		sensors.cpp
-		parameters.cpp
-	DEPENDS
-		airspeed
-		conversion
-		drivers__device
-		git_ecl
-		ecl_validation
-		mag_compensation
-		mathlib
-		vehicle_acceleration
-		vehicle_angular_velocity
-		vehicle_air_data
-		vehicle_imu
-	)
+px4_add_library(drivers_differential_pressure PX4DifferentialPressure.cpp)

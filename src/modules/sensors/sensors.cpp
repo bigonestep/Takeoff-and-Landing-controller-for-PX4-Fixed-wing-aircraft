@@ -41,7 +41,6 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
-#include <drivers/drv_adc.h>
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
 #include <lib/airspeed/airspeed.h>
@@ -110,7 +109,6 @@ public:
 	bool init();
 
 private:
-	const bool	_hil_enabled;			/**< if true, HIL is active */
 	bool		_armed{false};				/**< arming status of the vehicle */
 
 	hrt_abstime     _last_config_update{0};
@@ -145,15 +143,6 @@ private:
 
 	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
 
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-
-	hrt_abstime	_last_adc{0};			/**< last time we took input from the ADC */
-
-	uORB::Subscription	_adc_report_sub{ORB_ID(adc_report)};		/**< adc_report sub */
-	differential_pressure_s	_diff_pres {};
-	uORB::PublicationMulti<differential_pressure_s>	_diff_pres_pub{ORB_ID(differential_pressure)};		/**< differential_pressure */
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-
 	Parameters		_parameters{};			/**< local copies of interesting parameters */
 	ParameterHandles	_parameter_handles{};		/**< handles for interesting parameters */
 
@@ -185,14 +174,6 @@ private:
 	 */
 	void 		parameter_update_poll(bool forced = false);
 
-	/**
-	 * Poll the ADC and update readings to suit.
-	 *
-	 * @param raw			Combined sensor data structure into which
-	 *				data should be returned.
-	 */
-	void		adc_poll();
-
 	void		InitializeVehicleIMU();
 
 };
@@ -200,7 +181,6 @@ private:
 Sensors::Sensors(bool hil_enabled) :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::att_pos_ctrl),
-	_hil_enabled(hil_enabled),
 	_loop_perf(perf_alloc(PC_ELAPSED, "sensors")),
 	_voted_sensors_update(_parameters, hil_enabled)
 {
@@ -343,65 +323,6 @@ Sensors::parameter_update_poll(bool forced)
 	}
 }
 
-void Sensors::adc_poll()
-{
-	/* only read if not in HIL mode */
-	if (_hil_enabled) {
-		return;
-	}
-
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-
-	if (_parameters.diff_pres_analog_scale > 0.0f) {
-
-		hrt_abstime t = hrt_absolute_time();
-
-		/* rate limit to 100 Hz */
-		if (t - _last_adc >= 10000) {
-			adc_report_s adc;
-
-			if (_adc_report_sub.update(&adc)) {
-				/* Read add channels we got */
-				for (unsigned i = 0; i < PX4_MAX_ADC_CHANNELS; i++) {
-					if (adc.channel_id[i] == -1) {
-						continue;	// skip non-exist channels
-					}
-
-					if (ADC_AIRSPEED_VOLTAGE_CHANNEL == adc.channel_id[i]) {
-
-						/* calculate airspeed, raw is the difference from */
-						const float voltage = (float)(adc.raw_data[i]) * adc.v_ref / adc.resolution * ADC_DP_V_DIV;
-
-						/**
-						 * The voltage divider pulls the signal down, only act on
-						 * a valid voltage from a connected sensor. Also assume a non-
-						 * zero offset from the sensor if its connected.
-						 *
-						 * Notice: This won't work on devices which have PGA controlled
-						 * vref. Those devices require no divider at all.
-						 */
-						if (voltage > 0.4f) {
-							const float diff_pres_pa_raw = voltage * _parameters.diff_pres_analog_scale - _parameters.diff_pres_offset_pa;
-
-							_diff_pres.timestamp = t;
-							_diff_pres.differential_pressure_raw_pa = diff_pres_pa_raw;
-							_diff_pres.differential_pressure_filtered_pa = (_diff_pres.differential_pressure_filtered_pa * 0.9f) +
-									(diff_pres_pa_raw * 0.1f);
-							_diff_pres.temperature = -1000.0f;
-
-							_diff_pres_pub.publish(_diff_pres);
-						}
-					}
-				}
-			}
-
-			_last_adc = t;
-		}
-	}
-
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-}
-
 void Sensors::InitializeVehicleIMU()
 {
 	// create a VehicleIMU instance for each accel/gyro pair
@@ -484,11 +405,7 @@ void Sensors::Run()
 	vehicle_magnetometer_s magnetometer{};
 	_voted_sensors_update.sensorsPoll(_sensor_combined, magnetometer);
 
-	// check analog airspeed
-	adc_poll();
-
 	diff_pres_poll();
-
 
 	// check failover and update subscribed sensor (if necessary)
 	_voted_sensors_update.checkFailover();
