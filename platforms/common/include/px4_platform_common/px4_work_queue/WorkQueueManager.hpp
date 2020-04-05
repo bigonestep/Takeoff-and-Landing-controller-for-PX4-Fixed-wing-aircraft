@@ -68,19 +68,19 @@ static constexpr wq_config_t I2C4{"wq:I2C4", 1472, -12};
 static constexpr wq_config_t attitude_ctrl{"wq:attitude_ctrl", 1672, -13};
 static constexpr wq_config_t nav_and_controllers{"wq:nav_and_controllers", 7200, -14};
 
-static constexpr wq_config_t hp_default{"wq:hp_default", 1900, -15};
+static constexpr wq_config_t hp_default{"wq:hp_default", 10900, -15};
 
 static constexpr wq_config_t uavcan{"wq:uavcan", 3000, -16};
 
-static constexpr wq_config_t UART0{"wq:UART0", 1400, -17};
-static constexpr wq_config_t UART1{"wq:UART1", 1400, -18};
-static constexpr wq_config_t UART2{"wq:UART2", 1400, -19};
-static constexpr wq_config_t UART3{"wq:UART3", 1400, -20};
-static constexpr wq_config_t UART4{"wq:UART4", 1400, -21};
-static constexpr wq_config_t UART5{"wq:UART5", 1400, -22};
-static constexpr wq_config_t UART6{"wq:UART6", 1400, -23};
-static constexpr wq_config_t UART7{"wq:UART7", 1400, -24};
-static constexpr wq_config_t UART8{"wq:UART8", 1400, -25};
+static constexpr wq_config_t UART0{"wq:UART0", 10400, -17};
+static constexpr wq_config_t UART1{"wq:UART1", 10400, -18};
+static constexpr wq_config_t UART2{"wq:UART2", 10400, -19};
+static constexpr wq_config_t UART3{"wq:UART3", 10400, -20};
+static constexpr wq_config_t UART4{"wq:UART4", 10400, -21};
+static constexpr wq_config_t UART5{"wq:UART5", 10400, -22};
+static constexpr wq_config_t UART6{"wq:UART6", 10400, -23};
+static constexpr wq_config_t UART7{"wq:UART7", 10400, -24};
+static constexpr wq_config_t UART8{"wq:UART8", 10400, -25};
 static constexpr wq_config_t UART_UNKNOWN{"wq:UART_UNKNOWN", 1400, -26};
 
 static constexpr wq_config_t lp_default{"wq:lp_default", 1700, -50};

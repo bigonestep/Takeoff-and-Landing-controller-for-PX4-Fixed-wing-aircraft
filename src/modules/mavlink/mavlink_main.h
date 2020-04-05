@@ -69,6 +69,7 @@
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/posix.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <systemlib/mavlink_log.h>
 #include <systemlib/uthash/utlist.h>
 #include <uORB/PublicationMulti.hpp>
@@ -79,6 +80,11 @@
 
 #include "mavlink_command_sender.h"
 #include "mavlink_messages.h"
+#include "mavlink_mission.h"
+#include "mavlink_parameters.h"
+#include "mavlink_ftp.h"
+#include "mavlink_log_handler.h"
+#include "mavlink_receiver.h"
 #include "mavlink_shell.h"
 #include "mavlink_ulog.h"
 
@@ -101,18 +107,11 @@ enum class Protocol {
 
 using namespace time_literals;
 
-class Mavlink : public ModuleParams
+class Mavlink : public ModuleParams, public px4::ScheduledWorkItem
 {
 
 public:
-	/**
-	 * Constructor
-	 */
 	Mavlink();
-
-	/**
-	 * Destructor, also kills the mavlinks task.
-	 */
 	~Mavlink();
 
 	/**
@@ -281,8 +280,6 @@ public:
 	 */
 	unsigned		get_free_tx_buf();
 
-	static int		start_helper(int argc, char *argv[]);
-
 	/**
 	 * Enable / disable Hardware in the Loop simulation mode.
 	 *
@@ -338,6 +335,7 @@ public:
 	void			handle_message(const mavlink_message_t *msg);
 
 	int			get_instance_id() const { return _instance_id; }
+	const char             *get_device_name() const { return _device_name; }
 
 	/**
 	 * Enable / disable hardware flow control.
@@ -527,17 +525,26 @@ protected:
 	Mavlink			*next{nullptr};
 
 private:
+
+	MavlinkReceiver		_mavlink_receiver{this};
+
+	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
+	uORB::Subscription	_cmd_sub{ORB_ID(vehicle_command)};
+	uORB::Subscription	_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription	_ack_sub{ORB_ID(vehicle_command_ack)};
+	uORB::Subscription	_mavlink_log_sub{ORB_ID(mavlink_log)};
+
+	uORB::PublicationQueued<vehicle_command_ack_s> _command_ack_pub{ORB_ID(vehicle_command_ack)};
+	uORB::PublicationMulti<telemetry_status_s> _telem_status_pub{ORB_ID(telemetry_status)};
+	orb_advert_t		_mavlink_log_pub{nullptr};
+
 	int			_instance_id{0};
 
 	bool			_transmitting_enabled{true};
 	bool			_transmitting_enabled_commanded{false};
 	bool			_first_heartbeat_sent{false};
 
-	orb_advert_t		_mavlink_log_pub{nullptr};
-
-	uORB::PublicationMulti<telemetry_status_s> _telem_status_pub{ORB_ID(telemetry_status)};
-
-	bool			_task_running{true};
+	bool			_task_running{false};
 	static bool		_boot_complete;
 	static constexpr int	MAVLINK_MAX_INSTANCES{4};
 	static constexpr int	MAVLINK_MIN_INTERVAL{1500};
@@ -556,8 +563,12 @@ private:
 
 	unsigned		_main_loop_delay{1000};	/**< mainloop delay, depends on data rate */
 
-	List<MavlinkStream *>		_streams;
+	List<MavlinkStream *>	_streams;
 
+	MavlinkFTP               _mavlink_ftp{this};
+	MavlinkLogHandler        _mavlink_log_handler{this};
+	MavlinkMissionManager    _mission_manager{this};
+	MavlinkParametersManager _parameters_manager{this};
 	MavlinkShell		*_mavlink_shell{nullptr};
 	MavlinkULog		*_mavlink_ulog{nullptr};
 
@@ -568,8 +579,6 @@ private:
 	mavlink_channel_t	_channel{MAVLINK_COMM_0};
 
 	ringbuffer::RingBuffer	_logbuffer{5, sizeof(mavlink_log_s)};
-
-	pthread_t		_receive_thread {};
 
 	bool			_forwarding_on{false};
 	bool			_ftp_on{false};
@@ -743,7 +752,6 @@ private:
 	void init_udp();
 #endif // MAVLINK_UDP
 
-
 	void set_channel();
 
 	void set_instance_id();
@@ -751,7 +759,16 @@ private:
 	/**
 	 * Main mavlink task.
 	 */
-	int task_main(int argc, char *argv[]);
+	struct setup_data_t {
+		int argc;
+		char **argv;
+		int return_code{-1};
+	};
+	static void initializer_trampoline(void *argument);
+
+	int setup(int argc, char *argv[]);
+
+	void Run() override;
 
 	// Disallow copy construction and move assignment.
 	Mavlink(const Mavlink &) = delete;

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -73,6 +73,13 @@
 
 using matrix::wrap_2pi;
 
+MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
+	ModuleParams(parent),
+	_mavlink(parent),
+	_mavlink_timesync(parent)
+{
+}
+
 MavlinkReceiver::~MavlinkReceiver()
 {
 	delete _tune_publisher;
@@ -82,19 +89,7 @@ MavlinkReceiver::~MavlinkReceiver()
 	delete _px4_mag;
 }
 
-MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
-	ModuleParams(nullptr),
-	_mavlink(parent),
-	_mavlink_ftp(parent),
-	_mavlink_log_handler(parent),
-	_mission_manager(parent),
-	_parameters_manager(parent),
-	_mavlink_timesync(parent)
-{
-}
-
-void
-MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result)
+void MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result)
 {
 	vehicle_command_ack_s command_ack{};
 
@@ -2826,18 +2821,9 @@ void MavlinkReceiver::handle_message_statustext(mavlink_message_t *msg)
 	}
 }
 
-/**
- * Receive data from UART/UDP
- */
-void
-MavlinkReceiver::Run()
+void MavlinkReceiver::update()
 {
-	/* set thread name */
-	{
-		char thread_name[17];
-		snprintf(thread_name, sizeof(thread_name), "mavlink_rcv_if%d", _mavlink->get_instance_id());
-		px4_prctl(PR_SET_NAME, thread_name, px4_getpid());
-	}
+	//const hrt_abstime start_time = hrt_absolute_time();
 
 	// make sure mavlink app has booted before we start processing anything (parameter sync, etc)
 	while (!_mavlink->boot_complete()) {
@@ -2846,11 +2832,13 @@ MavlinkReceiver::Run()
 			_mavlink->set_boot_complete();
 		}
 
-		px4_usleep(100000);
+		// TODO: fix
+		//ScheduleDelayed(100_ms);
+		return;
 	}
 
 	// poll timeout in ms. Also defines the max update frequency of the mission & param manager, etc.
-	const int timeout = 10;
+	//const int timeout = 10;
 
 #if defined(__PX4_POSIX)
 	/* 1500 is the Wifi MTU, so we make sure to fit a full packet */
@@ -2883,9 +2871,8 @@ MavlinkReceiver::Run()
 #endif // MAVLINK_UDP
 
 	ssize_t nread = 0;
-	hrt_abstime last_send_update = 0;
 
-	while (!_mavlink->_task_should_exit) {
+	if (!_mavlink->_task_should_exit) {
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {
@@ -2897,12 +2884,30 @@ MavlinkReceiver::Run()
 			updateParams();
 		}
 
-		int ret = poll(&fds[0], 1, timeout);
-
-		if (ret > 0) {
+		if (::poll(&fds[0], 1, 0) > 0) {
 			if (_mavlink->get_protocol() == Protocol::SERIAL) {
-				/* non-blocking read. read may return negative values */
-				nread = ::read(fds[0].fd, buf, sizeof(buf));
+				if (fds[0].revents & POLLIN) {
+
+					// Check the number of bytes available in the buffer
+					int bytes_available = 0;
+					::ioctl(fds[0].fd, FIONREAD, (unsigned long)&bytes_available);
+
+					// to avoid reading very small chunks wait for data before reading
+					// this is designed to target one message, so >20 bytes at a time
+					const int character_count = 20;
+
+					if (bytes_available < character_count) {
+						//const unsigned sleeptime = character_count * 1000000 / (_mavlink->get_baudrate() / 10);
+
+						// TODO: fix
+						//ScheduleDelayed(sleeptime);
+						return;
+
+					} else {
+						// non-blocking read. read may return negative values
+						nread = ::read(fds[0].fd, buf, sizeof(buf));
+					}
+				}
 
 				if (nread == -1 && errno == ENOTCONN) { // Not connected (can happen for USB)
 					usleep(100000);
@@ -2957,21 +2962,6 @@ MavlinkReceiver::Run()
 						/* handle generic messages and commands */
 						handle_message(&msg);
 
-						/* handle packet with mission manager */
-						_mission_manager.handle_message(&msg);
-
-
-						/* handle packet with parameter component */
-						_parameters_manager.handle_message(&msg);
-
-						if (_mavlink->ftp_enabled()) {
-							/* handle packet with ftp component */
-							_mavlink_ftp.handle_message(&msg);
-						}
-
-						/* handle packet with log component */
-						_mavlink_log_handler.handle_message(&msg);
-
 						/* handle packet with timesync component */
 						_mavlink_timesync.handle_message(&msg);
 
@@ -2989,57 +2979,10 @@ MavlinkReceiver::Run()
 			}
 
 #endif // MAVLINK_UDP
-
-		} else if (ret == -1) {
-			usleep(10000);
-		}
-
-		hrt_abstime t = hrt_absolute_time();
-
-		if (t - last_send_update > timeout * 1000) {
-			_mission_manager.check_active_mission();
-			_mission_manager.send(t);
-
-			_parameters_manager.send(t);
-
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send(t);
-			}
-
-			_mavlink_log_handler.send(t);
-			last_send_update = t;
 		}
 
 		if (_tune_publisher != nullptr) {
-			_tune_publisher->publish_next_tune(t);
+			_tune_publisher->publish_next_tune(hrt_absolute_time());
 		}
 	}
-}
-
-void *
-MavlinkReceiver::start_helper(void *context)
-{
-	MavlinkReceiver rcv{(Mavlink *)context};
-	rcv.Run();
-
-	return nullptr;
-}
-
-void
-MavlinkReceiver::receive_start(pthread_t *thread, Mavlink *parent)
-{
-	pthread_attr_t receiveloop_attr;
-	pthread_attr_init(&receiveloop_attr);
-
-	struct sched_param param;
-	(void)pthread_attr_getschedparam(&receiveloop_attr, &param);
-	param.sched_priority = SCHED_PRIORITY_MAX - 80;
-	(void)pthread_attr_setschedparam(&receiveloop_attr, &param);
-
-	pthread_attr_setstacksize(&receiveloop_attr,
-				  PX4_STACK_ADJUSTED(sizeof(MavlinkReceiver) + 2840 + MAVLINK_RECEIVER_NET_ADDED_STACK));
-
-	pthread_create(thread, &receiveloop_attr, MavlinkReceiver::start_helper, (void *)parent);
-
-	pthread_attr_destroy(&receiveloop_attr);
 }

@@ -43,11 +43,12 @@
 #include <cstdbool>
 #include <v2.0/mavlink_types.h>
 #include <drivers/drv_hrt.h>
+#include "mavlink_stream.h"
 
 class Mavlink;
 
 // MAVLink LOG_* Message Handler
-class MavlinkLogHandler
+class MavlinkLogHandler : public MavlinkStream
 {
 public:
 	MavlinkLogHandler(Mavlink *mavlink);
@@ -56,13 +57,19 @@ public:
 	// Handle possible LOG message
 	void handle_message(const mavlink_message_t *msg);
 
+	static constexpr const char *get_name_static() { return "MAVLINK_LOG_HANDLER"; }
+	const char *get_name() const override { return MavlinkLogHandler::get_name_static(); }
+
 	/**
 	 * Handle sending of messages. Call this regularly at a fixed frequency.
 	 * @param t current time
 	 */
-	void send(const hrt_abstime t);
+	bool send(const hrt_abstime t) override;
 
-	unsigned get_size();
+	static constexpr uint16_t get_id_static() { return 118; /*MAVLINK_MSG_ID_LOG_ENTRY;*/ }
+	uint16_t get_id() override { return get_id_static(); }
+
+	unsigned get_size() override;
 
 private:
 	enum class LogHandlerState {
@@ -92,7 +99,6 @@ private:
 	size_t _log_send_data();
 
 	LogHandlerState _current_status{LogHandlerState::Inactive};
-	Mavlink *_mavlink;
 
 	int         _next_entry{0};
 	int         _last_entry{0};
