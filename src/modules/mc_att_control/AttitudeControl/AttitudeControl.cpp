@@ -52,15 +52,15 @@ void AttitudeControl::setProportionalGain(const matrix::Vector3f &proportional_g
 	}
 }
 
-matrix::Vector3f AttitudeControl::update(matrix::Quatf q, matrix::Quatf qd, const float yawspeed_feedforward)
+Vector3f AttitudeControl::update(Quatf q, Quatf qd, float yawspeed_feedforward)
 {
 	// ensure input quaternions are exactly normalized because acosf(1.00001) == NaN
 	q.normalize();
 	qd.normalize();
 
 	// calculate reduced desired attitude neglecting vehicle's yaw to prioritize roll and pitch
-	const Vector3f e_z = q.dcm_z();
-	const Vector3f e_z_d = qd.dcm_z();
+	const Vector3f e_z{q.dcm_z()};
+	const Vector3f e_z_d{qd.dcm_z()};
 	Quatf qd_red(e_z, e_z_d);
 
 	if (fabsf(qd_red(1)) > (1.f - 1e-5f) || fabsf(qd_red(2)) > (1.f - 1e-5f)) {
@@ -75,7 +75,7 @@ matrix::Vector3f AttitudeControl::update(matrix::Quatf q, matrix::Quatf qd, cons
 	}
 
 	// mix full and reduced desired attitude
-	Quatf q_mix = qd_red.inversed() * qd;
+	Quatf q_mix{qd_red.inversed() *qd};
 	q_mix.canonicalize();
 	// catch numerical problems with the domain of acosf and asinf
 	q_mix(0) = math::constrain(q_mix(0), -1.f, 1.f);
@@ -83,14 +83,14 @@ matrix::Vector3f AttitudeControl::update(matrix::Quatf q, matrix::Quatf qd, cons
 	qd = qd_red * Quatf(cosf(_yaw_w * acosf(q_mix(0))), 0, 0, sinf(_yaw_w * asinf(q_mix(3))));
 
 	// quaternion attitude control law, qe is rotation from q to qd
-	const Quatf qe = q.inversed() * qd;
+	const Quatf qe{q.inversed() *qd};
 
 	// using sin(alpha/2) scaled rotation axis as attitude error (see quaternion definition by axis angle)
 	// also taking care of the antipodal unit quaternion ambiguity
-	const Vector3f eq = 2.f * qe.canonical().imag();
+	const Vector3f eq{2.f * qe.canonical().imag()};
 
 	// calculate angular rates setpoint
-	matrix::Vector3f rate_setpoint = eq.emult(_proportional_gain);
+	Vector3f rate_setpoint{eq.emult(_proportional_gain)};
 
 	// Feed forward the yaw setpoint rate.
 	// yaw_sp_move_rate is the feed forward commanded rotation around the world z-axis,

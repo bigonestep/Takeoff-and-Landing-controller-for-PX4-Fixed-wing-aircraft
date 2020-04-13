@@ -88,19 +88,12 @@ private:
 	 */
 	void		parameters_updated();
 
-	void		publish_rates_setpoint();
-
 	float		throttle_curve(float throttle_stick_input);
 
 	/**
 	 * Generate & publish an attitude setpoint from stick inputs
 	 */
-	void		generate_attitude_setpoint(float dt, bool reset_yaw_sp);
-
-	/**
-	 * Attitude controller.
-	 */
-	void		control_attitude();
+	void		generate_attitude_setpoint(const matrix::Quatf &q, float dt, bool reset_yaw_sp);
 
 	AttitudeControl _attitude_control; ///< class for attitude control calculations
 
@@ -117,9 +110,7 @@ private:
 	uORB::Publication<vehicle_rates_setpoint_s>	_v_rates_sp_pub{ORB_ID(vehicle_rates_setpoint)};			/**< rate setpoint publication */
 	uORB::Publication<vehicle_attitude_setpoint_s>	_vehicle_attitude_setpoint_pub;
 
-	struct vehicle_attitude_s		_v_att {};		/**< vehicle attitude */
 	struct vehicle_attitude_setpoint_s	_v_att_sp {};		/**< vehicle attitude setpoint */
-	struct vehicle_rates_setpoint_s		_v_rates_sp {};		/**< vehicle rates setpoint */
 	struct manual_control_setpoint_s	_manual_control_sp {};	/**< manual control setpoint */
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
@@ -127,7 +118,7 @@ private:
 
 	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
-	matrix::Vector3f _rates_sp;			/**< angular rates setpoint */
+	uint8_t _prev_quat_reset_counter{0};
 
 	float _man_yaw_sp{0.f};				/**< current yaw setpoint in manual mode */
 

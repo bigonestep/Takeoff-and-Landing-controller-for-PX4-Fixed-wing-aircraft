@@ -3173,13 +3173,6 @@ Commander::update_control_mode()
 					!offboard_control_mode.ignore_velocity ||
 					!offboard_control_mode.ignore_acceleration_force;
 
-			// TO-DO: Add support for other modes than yawrate control
-			control_mode.flag_control_yawrate_override_enabled =
-				offboard_control_mode.ignore_bodyrate_x &&
-				offboard_control_mode.ignore_bodyrate_y &&
-				!offboard_control_mode.ignore_bodyrate_z &&
-				!offboard_control_mode.ignore_attitude;
-
 			control_mode.flag_control_rattitude_enabled = false;
 
 			control_mode.flag_control_acceleration_enabled = !offboard_control_mode.ignore_acceleration_force &&
