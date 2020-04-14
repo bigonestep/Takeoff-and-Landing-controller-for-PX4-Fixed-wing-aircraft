@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,22 +32,16 @@
 ############################################################################
 
 add_subdirectory(Takeoff)
-add_subdirectory(PositionControl)
 
 px4_add_module(
-	MODULE modules__mc_pos_control
-	MAIN mc_pos_control
+	MODULE modules__flight_mode_manager
+	MAIN flight_mode_manager
 	COMPILE_FLAGS
-		-Wno-implicit-fallthrough # TODO: fix and remove
 	SRCS
-		mc_pos_control_main.cpp
+		FlightModeManager.cpp
+		FlightModeManager.hpp
 	DEPENDS
-		PositionControl
-		controllib
 		FlightTasks
-		git_ecl
-		ecl_geo
-		WeatherVane
-		CollisionPrevention
-		Takeoff2
+		Takeoff
+		px4_work_queue
 	)

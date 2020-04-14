@@ -33,7 +33,6 @@
 
 /**
  * @file mc_rate_control_params.c
- * Parameters for multicopter attitude controller.
  *
  * @author Lorenz Meier <lorenz@px4.io>
  * @author Anton Babushkin <anton@px4.io>
