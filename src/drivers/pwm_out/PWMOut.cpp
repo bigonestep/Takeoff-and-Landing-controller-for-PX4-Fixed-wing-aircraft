@@ -403,7 +403,7 @@ void PWMOut::update_current_rate()
 	const int update_interval_in_us = math::constrain(1000000 / max_rate, 500, 100000);
 
 	_current_update_rate = max_rate;
-	_mixing_output.setMaxTopicUpdateRate(update_interval_in_us);
+	_mixing_output.setMaxTopicUpdateRate(update_interval_in_us / 2);
 }
 
 void PWMOut::update_pwm_rev_mask()
