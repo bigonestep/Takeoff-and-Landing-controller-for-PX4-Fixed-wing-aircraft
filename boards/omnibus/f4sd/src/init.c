@@ -268,23 +268,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_BLUE);
 	}
 
-
 	/* Configure SPI-based devices */
 
-	// SPI1: MPU6000
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 1\n");
-		led_on(LED_BLUE);
-		return -ENODEV;
-	}
-
-	/* Default SPI1 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
 
 	// SPI2: SDCard
 	/* Get the SPI port for the microSD slot */
@@ -304,29 +289,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		syslog(LOG_ERR, "[boot] FAILED to bind SPI port 2 to the MMCSD driver\n");
 		return -ENODEV;
 	}
-
-	up_udelay(20);
-
-
-	// SPI3: OSD / Baro
-	spi3 = stm32_spibus_initialize(3);
-
-	if (!spi3) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 3\n");
-		led_on(LED_BLUE);
-		return -ENODEV;
-	}
-
-	/* Copied from fmu-v4
-	 * Default SPI3 to 12MHz and de-assert the known chip selects.
-	 * MS5611 has max SPI clock speed of 20MHz
-	 */
-
-	// BMP280 max SPI speed is 10 MHz
-	SPI_SETFREQUENCY(spi3, 10 * 1000 * 1000);
-	SPI_SETBITS(spi3, 8);
-	SPI_SETMODE(spi3, SPIDEV_MODE3);
-	up_udelay(20);
 
 #if defined(FLASH_BASED_PARAMS)
 	static sector_descriptor_t params_sector_map[] = {

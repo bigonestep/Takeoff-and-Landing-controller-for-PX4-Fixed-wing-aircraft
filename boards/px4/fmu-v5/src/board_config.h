@@ -194,11 +194,8 @@
 #define HW_INFO_INIT         {'V','5','x', 'x',0}
 #define HW_INFO_INIT_VER     2
 #define HW_INFO_INIT_REV     3
-/* CAN Silence
- *
- * Silent mode control \ ESC Mux select
- */
 
+/* CAN Silence - Silent mode control \ ESC Mux select */
 #define GPIO_CAN1_SILENT_S0  /* PH2  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN2)
 #define GPIO_CAN2_SILENT_S1  /* PH3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN3)
 #define GPIO_CAN3_SILENT_S2  /* PH4  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN4)
@@ -303,7 +300,6 @@
 #define GPIO_PPM_IN             /* PI5 T8C1 */ GPIO_TIM8_CH1IN_2
 
 /* RC Serial port */
-
 #define RC_SERIAL_PORT                     "/dev/ttyS4"
 #define RC_SERIAL_SINGLEWIRE
 
@@ -427,7 +423,6 @@
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
 
 #define PX4_GPIO_INIT_LIST { \
@@ -456,6 +451,7 @@
 		GPIO_VDD_5V_WIFI_EN,              \
 		GPIO_VDD_3V3_SD_CARD_EN,          \
 		GPIO_TONE_ALARM_IDLE,             \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_RSSI_IN_INIT,                \
 		GPIO_nSAFETY_SWITCH_LED_OUT_INIT, \
 		GPIO_SAFETY_SWITCH_IN,            \
@@ -470,19 +466,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -493,20 +477,6 @@ __BEGIN_DECLS
  ****************************************************************************/
 
 int stm32_sdio_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

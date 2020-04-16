@@ -92,17 +92,13 @@
 #define GPIO_VDD_BRICK_VALID         (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN5)
 #define GPIO_VDD_USB_VALID           (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN0)
 
-/* Tone alarm output. */
+/* Tone alarm output */
 #define TONE_ALARM_TIMER             2    /* timer 2 */
 #define TONE_ALARM_CHANNEL           1    /* channel 1 */
 #define GPIO_TONE_ALARM_IDLE         (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15)
 #define GPIO_TONE_ALARM              (GPIO_ALT|GPIO_AF1|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN15)
 
-/**
- * PWM:
- *
- * Six PWM outputs are configured.
- */
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS   6
 #define DIRECT_INPUT_TIMER_CHANNELS  6
 
@@ -120,7 +116,6 @@
 #define GPIO_PPM_IN                  (GPIO_ALT|GPIO_AF2|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN0)
 
 /* RC Serial port */
-
 #define RC_SERIAL_PORT               "/dev/ttyS4"
 
 /* PWM input driver. Use FMU AUX5 pins attached to timer4 channel 2. */
@@ -149,7 +144,6 @@
 #define GPIO_HEATER_OUTPUT           (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTC|GPIO_PIN6)
 
 /* Power switch controls */
-
 #define SPEKTRUM_POWER(_on_true)     px4_arch_gpiowrite(GPIO_SPEKTRUM_PWR_EN, (!_on_true))
 
 /**
@@ -160,7 +154,6 @@
  * Inversion is possible via the 74LVC2G86 controlled by the FMU
  * The FMU can drive  GPIO PPM_IN as an output
  */
-
 #define GPIO_PPM_IN_AS_OUT           (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN0)
 #define SPEKTRUM_RX_AS_GPIO_OUTPUT() px4_arch_configgpio(GPIO_PPM_IN_AS_OUT)
 #define SPEKTRUM_RX_AS_UART()       /* Can be left as uart */
@@ -183,39 +176,14 @@
 /* This board provides a DMA pool and APIs */
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
+/* This board provides the board_on_reset interface */
 #define BOARD_HAS_ON_RESET 1
 
 #define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5};
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

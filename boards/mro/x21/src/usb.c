@@ -52,44 +52,10 @@
 #include <nuttx/usb/usbdev_trace.h>
 
 #include <up_arch.h>
-#include <stm32.h>
+#include <chip.h>
+#include <stm32_gpio.h>
 
 #include "board_config.h"
-
-/************************************************************************************
- * Definitions
- ************************************************************************************/
-
-/************************************************************************************
- * Private Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Public Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Name: stm32_usbinitialize
- *
- * Description:
- *   Called to setup USB-related GPIO pins for the PX4FMU board.
- *
- ************************************************************************************/
-
-__EXPORT void stm32_usbinitialize(void)
-{
-	/* The OTG FS has an internal soft pull-up */
-
-	/* Configure the OTG FS VBUS sensing GPIO, Power On, and Overcurrent GPIOs */
-
-#ifdef CONFIG_STM32_OTGFS
-	px4_arch_configgpio(GPIO_OTGFS_VBUS);
-	/* XXX We only support device mode
-	px4_arch_configgpio(GPIO_OTGFS_PWRON);
-	px4_arch_configgpio(GPIO_OTGFS_OVER);
-	*/
-#endif
-}
 
 /************************************************************************************
  * Name:  stm32_usbsuspend
@@ -104,5 +70,5 @@ __EXPORT void stm32_usbinitialize(void)
 
 __EXPORT void stm32_usbsuspend(FAR struct usbdev_s *dev, bool resume)
 {
-	//ulldbg("resume: %d\n", resume);
+	uinfo("resume: %d\n", resume);
 }

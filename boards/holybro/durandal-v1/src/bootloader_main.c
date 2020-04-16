@@ -62,12 +62,9 @@ extern int sercon_main(int c, char **argv);
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	/* configure USB interfaces */
 
-	stm32_usbinitialize();
 }
 
 __EXPORT int board_app_initialize(uintptr_t arg)

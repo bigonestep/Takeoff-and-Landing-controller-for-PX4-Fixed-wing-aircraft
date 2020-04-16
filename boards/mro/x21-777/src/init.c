@@ -229,7 +229,6 @@ stm32_boardinitialize(void)
 	board_on_reset(-1); /* Reset PWM first thing */
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
@@ -251,15 +250,6 @@ stm32_boardinitialize(void)
 	/* configure CAN interface */
 	px4_arch_configgpio(GPIO_CAN1_RX);
 	px4_arch_configgpio(GPIO_CAN1_TX);
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
-	/* configure USB interfaces */
-
-	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -286,8 +276,6 @@ stm32_boardinitialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	px4_platform_init();

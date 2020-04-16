@@ -64,7 +64,6 @@ __END_DECLS
 __EXPORT void led_init(void)
 {
 	/* Configure LED0-3 GPIOs for output */
-
 	stm32_configgpio(GPIO_LED0);
 	stm32_configgpio(GPIO_LED1);
 	stm32_configgpio(GPIO_LED2);

@@ -50,7 +50,6 @@
 /****************************************************************************************************
  * Definitions
  ****************************************************************************************************/
-/* Configuration ************************************************************************************/
 
 /* PX4IO connection configuration */
 #define BOARD_USES_PX4IO_VERSION       2
@@ -73,55 +72,53 @@
 #define GPIO_LED1		(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN12)
 #define BOARD_OVERLOAD_LED     LED_RED
 
-/*
- * ADC channels
- *
- * These are the channel numbers of the ADCs of the microcontroller that can be used by the Px4 Firmware in the adc driver
+/**
+ * ADC channels:
+ * These are the channel numbers of the ADCs of the microcontroller that can be used by the Px4 Firmware in the adc driver.
  */
 #define ADC_CHANNELS (1 << 2) | (1 << 3) | (1 << 4) | (1 << 13) | (1 << 14) | (1 << 15)
 
-// ADC defines to be used in sensors.cpp to read from a particular channel
+/* ADC defines to be used in sensors.cpp to read from a particular channel. */
 #define ADC_BATTERY_VOLTAGE_CHANNEL  2
 #define ADC_BATTERY_CURRENT_CHANNEL  3
 #define ADC_5V_RAIL_SENSE            4
 #define ADC_AIRSPEED_VOLTAGE_CHANNEL 15
 
 /* Power supply control and monitoring GPIOs */
-// Signal is not connected
-#define GPIO_VDD_5V_PERIPH_EN	(GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)
-#define GPIO_VDD_BRICK_VALID	(GPIO_INPUT|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN5)
-#define GPIO_VDD_3V3_SENSORS_EN	(GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTE|GPIO_PIN3)
-#define GPIO_VDD_5V_PERIPH_OC	(GPIO_INPUT|GPIO_PULLUP|GPIO_PORTE|GPIO_PIN15)
+#define GPIO_VDD_5V_PERIPH_EN        (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)
+#define GPIO_VDD_BRICK_VALID         (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN5)
+#define GPIO_VDD_3V3_SENSORS_EN      (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTE|GPIO_PIN3)
+#define GPIO_VDD_5V_PERIPH_OC        (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTE|GPIO_PIN15)
 
 /* Tone alarm output */
-#define TONE_ALARM_TIMER	2	/* timer 2 */
-#define TONE_ALARM_CHANNEL	1	/* channel 1 */
-#define GPIO_TONE_ALARM_IDLE	(GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15)
-#define GPIO_TONE_ALARM		(GPIO_ALT|GPIO_AF1|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN15)
+#define TONE_ALARM_TIMER             2    /* timer 2 */
+#define TONE_ALARM_CHANNEL           1    /* channel 1 */
+#define GPIO_TONE_ALARM_IDLE         (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15)
+#define GPIO_TONE_ALARM              (GPIO_ALT|GPIO_AF1|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN15)
 
-/* PWM
- */
-#define DIRECT_PWM_OUTPUT_CHANNELS	6
+/* PWM */
+#define DIRECT_PWM_OUTPUT_CHANNELS   6
 #define DIRECT_INPUT_TIMER_CHANNELS  6
 
-/* USB OTG FS
- *
- * PA9  OTG_FS_VBUS VBUS sensing (also connected to the green LED)
+/**
+ * USB OTG FS:
+ * PA9  OTG_FS_VBUS VBUS sensing. (also connected to the green LED)
  */
-#define GPIO_OTGFS_VBUS		(GPIO_INPUT|GPIO_FLOAT|GPIO_SPEED_100MHz|GPIO_OPENDRAIN|GPIO_PORTA|GPIO_PIN9)
+#define GPIO_OTGFS_VBUS              (GPIO_INPUT|GPIO_FLOAT|GPIO_SPEED_100MHz|GPIO_OPENDRAIN|GPIO_PORTA|GPIO_PIN9)
 
 /* High-resolution timer */
-#define HRT_TIMER		8	/* use timer8 for the HRT */
-#define HRT_TIMER_CHANNEL	1	/* use capture/compare channel */
+#define HRT_TIMER                    8  /* use timer8 for the HRT */
+#define HRT_TIMER_CHANNEL            1  /* use capture/compare channel */
 
 /* PWM input driver. Use FMU AUX5 pins attached to timer4 channel 2 */
 #define PWMIN_TIMER		4
 #define PWMIN_TIMER_CHANNEL	2
 #define GPIO_PWM_IN		GPIO_TIM4_CH2IN_2
 
-/* By Providing BOARD_ADC_USB_CONNECTED this board support the ADC
- * system_power interface, and therefore provides the true logic
- * GPIO BOARD_ADC_xxxx macros.
+/**
+ * By Providing BOARD_ADC_USB_CONNECTED (using the px4_arch abstraction)
+ * this board support the ADC system_power interface, and therefore
+ * provides the true logic GPIO BOARD_ADC_xxxx macros.
  */
 #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
 #define BOARD_ADC_BRICK_VALID   (!px4_arch_gpioread(GPIO_VDD_BRICK_VALID))
@@ -129,56 +126,24 @@
 #define BOARD_ADC_PERIPH_5V_OC  (!px4_arch_gpioread(GPIO_VDD_5V_PERIPH_OC))
 #define BOARD_ADC_HIPOWER_5V_OC (0)
 
-#define BOARD_HAS_PWM	DIRECT_PWM_OUTPUT_CHANNELS
+#define BOARD_HAS_PWM    DIRECT_PWM_OUTPUT_CHANNELS
 
 /* This board provides a DMA pool and APIs */
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
 
 #define BOARD_HAS_STATIC_MANIFEST 1
 
+#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5};
+
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-extern void board_peripheral_reset(int ms);
-
-/****************************************************************************************************
- * Name: stm32_usbinitialize
- *
- * Description:
- *   Called to configure USB IO.
- *
- ****************************************************************************************************/
-
-extern void stm32_usbinitialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
 
 #include <px4_platform_common/board_common.h>
 
 #endif /* __ASSEMBLY__ */
+
 __END_DECLS

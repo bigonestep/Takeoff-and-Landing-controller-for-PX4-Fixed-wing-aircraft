@@ -53,14 +53,6 @@
  * Definitions
  ****************************************************************************************************/
 
-/* Configuration ************************************************************************************/
-
-// NA on ModalAI FC-v1
-
-/* PX4FMU GPIOs ***********************************************************************************/
-
-#undef TRACE_PINS
-
 /* LEDs are driven with push open drain to support Anode to 5V or 3.3V or used as TRACE0-2 */
 
 #if !defined(TRACE_PINS)
@@ -128,7 +120,6 @@
 	 (1 << ADC_HW_REV_SENSE_CHANNEL))
 
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
-
 #define HW_REV_VER_ADC_BASE STM32_ADC3_BASE
 
 #define SYSTEM_ADC_BASE STM32_ADC1_BASE
@@ -146,11 +137,11 @@
 #define HW_INFO_INIT_VER       2 /* Offset in above string of the VER */
 #define HW_INFO_INIT_REV       3 /* Offset in above string of the REV */
 
-/* PWM
- */
-
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS  8
 #define DIRECT_INPUT_TIMER_CHANNELS  8
+
+#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7};
 
 #define GPIO_CAN1_SILENT                /* PI11 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTI|GPIO_PIN11)
 
@@ -158,12 +149,10 @@
 #define GPIO_VDD_3V3_SD_CARD_EN         /* PC13 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTC|GPIO_PIN13)
 
 /* For primary/backup signaling with VOXL, 2 pins on J4 are exposed */
-
 #define GPIO_VOXL_STATUS_OUT            /* PE4 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN4)
 #define GPIO_VOXL_STATUS_IN             /* PE3 */ (GPIO_INPUT|GPIO_FLOAT|GPIO_PORTE|GPIO_PIN3)
 
 /* Define True logic Power Control in arch agnostic form */
-
 #define VDD_3V3_SPEKTRUM_POWER_EN(on_true) px4_arch_gpiowrite(GPIO_VDD_3V3_SPEKTRUM_POWER_EN, (on_true))
 #define READ_VDD_3V3_SPEKTRUM_POWER_EN()   px4_arch_gpioread(GPIO_VDD_3V3_SPEKTRUM_POWER_EN)
 #define VDD_3V3_SD_CARD_EN(on_true)        px4_arch_gpiowrite(GPIO_VDD_3V3_SD_CARD_EN, (on_true))
@@ -182,15 +171,14 @@
 #define GPIO_PPM_IN             /* PI5 T8C1 */ GPIO_TIM8_CH1IN_2
 
 /* RC Serial port */
-
 #define RC_SERIAL_PORT                     "/dev/ttyS5"
+#define RC_SERIAL_SINGLEWIRE
 
 /* Safety Switch: Enable the FMU to control it as there is no px4io in ModalAI FC-v1 */
 #define GPIO_SAFETY_SWITCH_IN              /* PF3 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTF|GPIO_PIN3)
 #define GPIO_BTN_SAFETY GPIO_SAFETY_SWITCH_IN /* Enable the FMU to control it if there is no px4io */
 
 /* Power switch controls ******************************************************/
-
 #define SPEKTRUM_POWER(_on_true)           VDD_3V3_SPEKTRUM_POWER_EN(_on_true)
 
 /*
@@ -202,7 +190,6 @@
  */
 
 #define GPIO_PPM_IN_AS_OUT             (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTI|GPIO_PIN5)
-
 #define SPEKTRUM_RX_AS_OUT             (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN7)
 #define SPEKTRUM_RX_AS_GPIO_OUTPUT()   px4_arch_configgpio(SPEKTRUM_RX_AS_OUT)
 #define SPEKTRUM_RX_AS_UART()          /* Can be left as uart */
@@ -241,7 +228,6 @@
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
 
 #define PX4_GPIO_INIT_LIST { \
@@ -251,6 +237,7 @@
 		GPIO_CAN1_RX,                     \
 		GPIO_VDD_3V3_SPEKTRUM_POWER_EN,   \
 		GPIO_VDD_3V3_SD_CARD_EN,          \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_A71CH_nRST,                  \
 		GPIO_VOXL_STATUS_OUT,             \
 		GPIO_VOXL_STATUS_IN,              \
@@ -263,23 +250,9 @@
 
 #define BOARD_NUM_IO_TIMERS 5
 
-#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7};
-
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -290,20 +263,6 @@ __BEGIN_DECLS
  ****************************************************************************/
 
 int stm32_sdio_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

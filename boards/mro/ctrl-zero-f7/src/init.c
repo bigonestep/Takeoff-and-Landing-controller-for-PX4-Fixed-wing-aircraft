@@ -161,12 +161,6 @@ stm32_boardinitialize(void)
 	/* configure pins */
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	/* configure SPI interfaces */
-	stm32_spiinitialize();
-
-	/* configure USB interfaces */
-	stm32_usbinitialize();
 }
 
 /****************************************************************************
@@ -193,12 +187,9 @@ stm32_boardinitialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
-	board_control_spi_sensors_power(true, 0xffff);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
 	px4_platform_init();

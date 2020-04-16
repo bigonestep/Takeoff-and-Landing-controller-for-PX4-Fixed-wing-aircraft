@@ -49,21 +49,13 @@
 
 #include <stm32_gpio.h>
 
-/****************************************************************************************************
- * Definitions
- ****************************************************************************************************/
-
-/* GPIOs ***********************************************************************************/
-
 /* LEDs are driven with push open drain to support Anode to 5V or 3.3V */
-
 #define GPIO_nLED_BLUE       /* PA2 */  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTA|GPIO_PIN2)
 
 #define BOARD_HAS_CONTROL_STATUS_LEDS      1
 #define BOARD_ARMED_STATE_LED  LED_BLUE
 
-#define  FLASH_BASED_PARAMS
-
+#define FLASH_BASED_PARAMS
 
 /*
  * ADC channels
@@ -92,13 +84,11 @@
 	 (1 << ADC_BATTERY_CURRENT_CHANNEL)       | \
 	 (1 << ADC_RSSI_IN_CHANNEL))
 
-/* Define Battery 1 Voltage Divider and A per V
- */
+/* Define Battery 1 Voltage Divider and A per V */
 #define BOARD_BATTERY1_V_DIV         (10.9f)
 #define BOARD_BATTERY1_A_PER_V       (17.f)
 
-/* PWM
- */
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS  6
 #define DIRECT_INPUT_TIMER_CHANNELS  6
 
@@ -117,7 +107,6 @@
 #define HRT_TIMER_CHANNEL       1  /* use capture/compare channel 1 */
 
 /* RC Serial port */
-
 #define RC_SERIAL_PORT                     "/dev/ttyS4"
 
 #define GPIO_RSSI_IN                       /* PC5  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN5)
@@ -132,7 +121,7 @@
 
 #define PX4_GPIO_INIT_LIST { \
 		PX4_ADC_GPIO,                     \
-		GPIO_TONE_ALARM_IDLE,             \
+		GPIO_TONE_ALARM_IDLE,            \
 		GPIO_RSSI_IN,                \
 	}
 
@@ -142,33 +131,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

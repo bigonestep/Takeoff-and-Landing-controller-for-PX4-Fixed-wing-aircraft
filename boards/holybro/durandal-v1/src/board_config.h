@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,7 +71,6 @@
 /* Configuration ************************************************************************************/
 
 #  define BOARD_HAS_LTC44XX_VALIDS      2 // No LTC or N Bricks
-#  define BOARD_HAS_USB_VALID           1 // LTC Has No USB valid
 #  define BOARD_HAS_NBAT_V              2 // Only one Vbat to ADC
 #  define BOARD_HAS_NBAT_I              2 // No Ibat ADC
 
@@ -162,11 +161,7 @@
 #define HW_INFO_INIT_VER     2
 #define HW_INFO_INIT_REV     3
 
-/* CAN Silence
- *
- * Silent mode control \ ESC Mux select
- */
-
+/* CAN Silence - Silent mode control \ ESC Mux select */
 #define GPIO_CAN1_SILENT_S0  /* PH2  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN2)
 #define GPIO_CAN2_SILENT_S1  /* PH3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN3)
 
@@ -252,10 +247,7 @@
 #define HRT_TIMER               8  /* use timer8 for the HRT */
 #define HRT_TIMER_CHANNEL       3  /* use capture/compare channel 3 */
 
-/* RC Serial port */
-
 /* Input Capture Channels. */
-
 #define INPUT_CAP1_TIMER                  2
 #define INPUT_CAP1_CHANNEL     /* T2C4 */ 4
 #define GPIO_INPUT_CAP1        /* PB11 */ GPIO_TIM2_CH4_IN
@@ -281,7 +273,6 @@
 #define GPIO_INPUT_CAP6        /* PD14 */ GPIO_TIM4_CH3_IN
 
 /* PWM input driver. Use FMU AUX5 pins attached to timer4 channel 2 */
-
 #define PWMIN_TIMER                       4
 #define PWMIN_TIMER_CHANNEL    /* T4C2 */ 2
 #define GPIO_PWM_IN            /* PD13 */ GPIO_TIM4_CH2IN
@@ -337,8 +328,8 @@
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
+
 #define SDMMC_PIN_OFF(def) (((def) & (GPIO_PORT_MASK | GPIO_PIN_MASK)) | (GPIO_INPUT|GPIO_FLOAT|GPIO_SPEED_2MHz))
 
 #define PX4_GPIO_INIT_LIST { \
@@ -367,6 +358,7 @@
 		SDMMC_PIN_OFF(GPIO_SDMMC1_CMD),   \
 		GPIO_VDD_3V3_SD_CARD_EN,          \
 		GPIO_TONE_ALARM_IDLE,             \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_RSSI_IN,                     \
 		GPIO_nSAFETY_SWITCH_LED_OUT,      \
 		GPIO_SAFETY_SWITCH_IN,            \
@@ -376,19 +368,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -399,41 +379,6 @@ __BEGIN_DECLS
  ****************************************************************************/
 
 int stm32_sdio_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the Holybro Durandal V1
- *   board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
-
-
-/****************************************************************************
- * Name: nsh_archinitialize
- *
- * Description:
- *   Perform architecture specific initialization for NSH.
- *
- *   CONFIG_NSH_ARCHINIT=y :
- *     Called from the NSH library
- *
- *   CONFIG_BOARD_INITIALIZE=y, CONFIG_NSH_LIBRARY=y, &&
- *   CONFIG_NSH_ARCHINIT=n :
- *     Called from board_initialize().
- *
- ****************************************************************************/
-
-#ifdef CONFIG_NSH_LIBRARY
-int nsh_archinitialize(void);
-#endif
 
 #include <px4_platform_common/board_common.h>
 

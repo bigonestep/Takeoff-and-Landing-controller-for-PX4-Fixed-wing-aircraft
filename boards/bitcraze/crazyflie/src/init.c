@@ -86,14 +86,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
 /************************************************************************************
  * Name: stm32_boardinitialize
  *
@@ -103,19 +95,10 @@ __END_DECLS
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	/* configure LEDs */
-
 	board_autoled_initialize();
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
-	stm32_usbinitialize();
 }
 
 /****************************************************************************
@@ -125,7 +108,6 @@ stm32_boardinitialize(void)
  *   Perform architecture specific initialization
  *
  ****************************************************************************/
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	px4_platform_init();
@@ -159,15 +141,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
-
-#ifdef CONFIG_SPI
-	int ret = stm32_spi_bus_initialize();
-
-	if (ret != OK) {
-		return ret;
-	}
-
-#endif
 
 	return OK;
 }

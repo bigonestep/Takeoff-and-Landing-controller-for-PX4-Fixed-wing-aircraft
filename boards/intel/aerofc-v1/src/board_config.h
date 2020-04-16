@@ -97,26 +97,17 @@
 #define DIRECT_PWM_OUTPUT_CHANNELS	1
 #define BOARD_HAS_PWM			0
 
-/*
- * USB OTG FS
- */
-
-/*
- * RC Serial port
- */
+/* RC Serial port */
 #define RC_SERIAL_PORT		"/dev/ttyS2" /* No HW invert support */
-/*
- * High-resolution timer
- */
+
+/* High-resolution timer */
 #define HRT_TIMER		3	/* use timer3 for the HRT */
 #define HRT_TIMER_CHANNEL	4	/* use capture/compare channel */
 
-#define  FLASH_BASED_PARAMS
-#define  FLASH_BASED_DATAMAN
+#define FLASH_BASED_PARAMS
+#define FLASH_BASED_DATAMAN
 
-/*
- * ESCs do not respond
- */
+/* ESCs do not respond */
 #define BOARD_TAP_ESC_MODE 1
 
 #define MEMORY_CONSTRAINED_SYSTEM
@@ -125,41 +116,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-#define board_peripheral_reset(ms)
-
-/************************************************************************************
- * Name: board_sdio_initialize
- *
- * Description:
- *   Called to configure SDIO.
- *
- ************************************************************************************/
-
-extern int board_sdio_initialize(void);
 
 #include <px4_platform_common/board_common.h>
 

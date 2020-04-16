@@ -38,7 +38,7 @@
  * board_app_initializ() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
- * subsystems and perform board-specific initialization.
+ * subsystems and perform board-specific initialisation.
  */
 
 /****************************************************************************
@@ -65,22 +65,20 @@
 #include <arch/board/board.h>
 #include "up_internal.h"
 
-#include <px4_arch/io_timer.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
 #include <systemlib/px4_macros.h>
+#include <px4_arch/io_timer.h>
 #include <px4_platform_common/init.h>
-#include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/gpio.h>
+#include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/board_dma_alloc.h>
 
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
 
-/* Configuration ************************************************************/
-
-/*
+/**
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
@@ -92,36 +90,6 @@ extern void led_init(void);
 extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
-
-
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	// NA, rails not controlled in ModalAI FC-v1
-
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
-
-	// NA, rails not controlled in ModalAI FC-v1
-
-}
 
 /************************************************************************************
  * Name: board_on_reset
@@ -145,31 +113,6 @@ __EXPORT void board_on_reset(int status)
 	}
 }
 
-/****************************************************************************
- * Name: board_app_finalinitialize
- *
- * Description:
- *   Perform application specific initialization.  This function is never
- *   called directly from application code, but only indirectly via the
- *   (non-standard) boardctl() interface using the command
- *   BOARDIOC_FINALINIT.
- *
- * Input Parameters:
- *   arg - The argument has no meaning.
- *
- * Returned Value:
- *   Zero (OK) is returned on success; a negated errno value is returned on
- *   any failure to indicate the nature of the failure.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_BOARDCTL_FINALINIT
-int board_app_finalinitialize(uintptr_t arg)
-{
-	return 0;
-}
-#endif
-
 /************************************************************************************
  * Name: stm32_boardinitialize
  *
@@ -179,29 +122,20 @@ int board_app_finalinitialize(uintptr_t arg)
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
+
+	/* SPI completely off to ensure clean reset */
+	board_spi_disable();
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
-	/* configure USB interfaces */
-
-	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -228,17 +162,13 @@ stm32_boardinitialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
-
 	VDD_3V3_SD_CARD_EN(true);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
 	/* Need hrt running before using the ADC */
-
 	px4_platform_init();
 
 	if (OK == board_determine_hw_info()) {
@@ -250,19 +180,19 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
 
+#if defined(SERIAL_HAVE_RXDMA)
 	/* set up the serial DMA polling */
 	static struct hrt_call serial_dma_call;
-	struct timespec ts;
 
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
+	struct timespec ts;
 	ts.tv_sec = 0;
 	ts.tv_nsec = 1000000;
 
@@ -271,7 +201,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		       ts_to_abstime(&ts),
 		       (hrt_callout)stm32_serial_dma_poll,
 		       NULL);
-
+#endif
 
 	/* initial LED state */
 	drv_led_start();
@@ -282,6 +212,9 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	/* configure SPI interfaces (after we determined the HW version) */
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();

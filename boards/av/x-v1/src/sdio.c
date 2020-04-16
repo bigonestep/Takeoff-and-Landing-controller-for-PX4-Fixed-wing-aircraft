@@ -90,9 +90,7 @@ static bool g_sd_inserted = 0xff; /* Impossible value */
 #ifdef HAVE_NCD
 static int stm32_ncd_interrupt(int irq, FAR void *context)
 {
-	bool present;
-
-	present = !stm32_gpioread(GPIO_SDMMC1_NCD);
+	bool present = !stm32_gpioread(GPIO_SDMMC1_NCD);
 
 	if (sdio_dev && present != g_sd_inserted) {
 		sdio_mediachange(sdio_dev, present);

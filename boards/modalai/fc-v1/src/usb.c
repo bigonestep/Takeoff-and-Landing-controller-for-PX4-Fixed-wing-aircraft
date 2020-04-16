@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4fmu_usb.c
+ * @file usb.c
  *
  * Board-specific USB functions.
  */
@@ -55,38 +55,8 @@
 #include <chip.h>
 #include <stm32_gpio.h>
 #include <stm32_otg.h>
+
 #include "board_config.h"
-
-/************************************************************************************
- * Definitions
- ************************************************************************************/
-
-/************************************************************************************
- * Private Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Public Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Name: stm32_usbinitialize
- *
- * Description:
- *   Called to setup USB-related GPIO pins for the PX4FMU board.
- *
- ************************************************************************************/
-
-__EXPORT void stm32_usbinitialize(void)
-{
-	/* The OTG FS has an internal soft pull-up */
-
-	/* Configure the OTG FS VBUS sensing GPIO, Power On, and Overcurrent GPIOs */
-
-#ifdef CONFIG_STM32F7_OTGFS
-	stm32_configgpio(GPIO_OTGFS_VBUS);
-#endif
-}
 
 /************************************************************************************
  * Name:  stm32_usbsuspend

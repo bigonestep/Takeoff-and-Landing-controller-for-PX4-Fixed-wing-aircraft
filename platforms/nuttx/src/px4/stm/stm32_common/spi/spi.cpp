@@ -93,93 +93,17 @@ static const px4_spi_bus_t *_spi_bus4;
 static const px4_spi_bus_t *_spi_bus5;
 static const px4_spi_bus_t *_spi_bus6;
 
-static void spi_bus_configgpio_cs(const px4_spi_bus_t *bus)
+static void spi_bus_configgpio_cs_drdy(const px4_spi_bus_t *bus)
 {
 	for (int i = 0; i < SPI_BUS_MAX_DEVICES; ++i) {
 		if (bus->devices[i].cs_gpio != 0) {
 			px4_arch_configgpio(bus->devices[i].cs_gpio);
 		}
-	}
-}
 
-__EXPORT void stm32_spiinitialize()
-{
-	px4_set_spi_buses_from_hw_version();
-	board_control_spi_sensors_power_configgpio();
-	board_control_spi_sensors_power(true, 0xffff);
-
-	for (int i = 0; i < SPI_BUS_MAX_BUS_ITEMS; ++i) {
-		switch (px4_spi_buses[i].bus) {
-		case 1: _spi_bus1 = &px4_spi_buses[i]; break;
-
-		case 2: _spi_bus2 = &px4_spi_buses[i]; break;
-
-		case 3: _spi_bus3 = &px4_spi_buses[i]; break;
-
-		case 4: _spi_bus4 = &px4_spi_buses[i]; break;
-
-		case 5: _spi_bus5 = &px4_spi_buses[i]; break;
-
-		case 6: _spi_bus6 = &px4_spi_buses[i]; break;
+		if (bus->devices[i].drdy_gpio != 0) {
+			px4_arch_configgpio(bus->devices[i].drdy_gpio);
 		}
 	}
-
-#ifdef CONFIG_STM32_SPI1
-	ASSERT(_spi_bus1);
-
-	if (board_has_bus(BOARD_SPI_BUS, 1)) {
-		spi_bus_configgpio_cs(_spi_bus1);
-	}
-
-#endif // CONFIG_STM32_SPI1
-
-
-#if defined(CONFIG_STM32_SPI2)
-	ASSERT(_spi_bus2);
-
-	if (board_has_bus(BOARD_SPI_BUS, 2)) {
-		spi_bus_configgpio_cs(_spi_bus2);
-	}
-
-#endif // CONFIG_STM32_SPI2
-
-#ifdef CONFIG_STM32_SPI3
-	ASSERT(_spi_bus3);
-
-	if (board_has_bus(BOARD_SPI_BUS, 3)) {
-		spi_bus_configgpio_cs(_spi_bus3);
-	}
-
-#endif // CONFIG_STM32_SPI3
-
-#ifdef CONFIG_STM32_SPI4
-	ASSERT(_spi_bus4);
-
-	if (board_has_bus(BOARD_SPI_BUS, 4)) {
-		spi_bus_configgpio_cs(_spi_bus4);
-	}
-
-#endif // CONFIG_STM32_SPI4
-
-
-#ifdef CONFIG_STM32_SPI5
-	ASSERT(_spi_bus5);
-
-	if (board_has_bus(BOARD_SPI_BUS, 5)) {
-		spi_bus_configgpio_cs(_spi_bus5);
-	}
-
-#endif // CONFIG_STM32_SPI5
-
-
-#ifdef CONFIG_STM32_SPI6
-	ASSERT(_spi_bus6);
-
-	if (board_has_bus(BOARD_SPI_BUS, 6)) {
-		spi_bus_configgpio_cs(_spi_bus6);
-	}
-
-#endif // CONFIG_STM32_SPI6
 }
 
 static inline void stm32_spixselect(const px4_spi_bus_t *bus, struct spi_dev_s *dev, uint32_t devid, bool selected)
@@ -195,7 +119,6 @@ static inline void stm32_spixselect(const px4_spi_bus_t *bus, struct spi_dev_s *
 		}
 	}
 }
-
 
 /************************************************************************************
  * Name: stm32_spi1select and stm32_spi1status
@@ -315,8 +238,7 @@ __EXPORT uint8_t stm32_spi6status(FAR struct spi_dev_s *dev, uint32_t devid)
 }
 #endif // CONFIG_STM32_SPI6
 
-
-void board_control_spi_sensors_power(bool enable_power, int bus_mask)
+static void board_control_spi_sensors_power(bool enable_power, int bus_mask)
 {
 	const px4_spi_bus_t *buses = px4_spi_buses;
 	// this might be called very early on boot where we have not yet determined the hw version
@@ -346,7 +268,7 @@ void board_control_spi_sensors_power(bool enable_power, int bus_mask)
 	}
 }
 
-void board_control_spi_sensors_power_configgpio()
+static void board_control_spi_sensors_power_configgpio()
 {
 	const px4_spi_bus_t *buses = px4_spi_buses;
 	// this might be called very early on boot where we have yet not determined the hw version
@@ -373,11 +295,126 @@ void board_control_spi_sensors_power_configgpio()
 	}
 }
 
+__EXPORT void board_spi_initialize()
+{
+	px4_set_spi_buses_from_hw_version();
+	board_control_spi_sensors_power_configgpio();
+	board_control_spi_sensors_power(true, 0xffff);
+
+	for (int i = 0; i < SPI_BUS_MAX_BUS_ITEMS; ++i) {
+		switch (px4_spi_buses[i].bus) {
+		case 1: _spi_bus1 = &px4_spi_buses[i]; break;
+
+		case 2: _spi_bus2 = &px4_spi_buses[i]; break;
+
+		case 3: _spi_bus3 = &px4_spi_buses[i]; break;
+
+		case 4: _spi_bus4 = &px4_spi_buses[i]; break;
+
+		case 5: _spi_bus5 = &px4_spi_buses[i]; break;
+
+		case 6: _spi_bus6 = &px4_spi_buses[i]; break;
+		}
+	}
+
+#ifdef CONFIG_STM32_SPI1
+	ASSERT(_spi_bus1);
+
+	if (board_has_bus(BOARD_SPI_BUS, 1)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus1);
+
+		px4_arch_configgpio(GPIO_SPI1_SCK);
+		px4_arch_configgpio(GPIO_SPI1_MISO);
+		px4_arch_configgpio(GPIO_SPI1_MOSI);
+
+		px4_spibus_initialize(1);
+	}
+
+#endif // CONFIG_STM32_SPI1
+
+#if defined(CONFIG_STM32_SPI2)
+	ASSERT(_spi_bus2);
+
+	if (board_has_bus(BOARD_SPI_BUS, 2)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus2);
+
+		px4_arch_configgpio(GPIO_SPI2_SCK);
+		px4_arch_configgpio(GPIO_SPI2_MISO);
+		px4_arch_configgpio(GPIO_SPI2_MOSI);
+
+		px4_spibus_initialize(2);
+	}
+
+#endif // CONFIG_STM32_SPI2
+
+#ifdef CONFIG_STM32_SPI3
+	ASSERT(_spi_bus3);
+
+	if (board_has_bus(BOARD_SPI_BUS, 3)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus3);
+
+		px4_arch_configgpio(GPIO_SPI3_SCK);
+		px4_arch_configgpio(GPIO_SPI3_MISO);
+		px4_arch_configgpio(GPIO_SPI3_MOSI);
+
+		px4_spibus_initialize(3);
+	}
+
+#endif // CONFIG_STM32_SPI3
+
+#ifdef CONFIG_STM32_SPI4
+	ASSERT(_spi_bus4);
+
+	if (board_has_bus(BOARD_SPI_BUS, 4)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus4);
+
+		px4_arch_configgpio(GPIO_SPI4_SCK);
+		px4_arch_configgpio(GPIO_SPI4_MISO);
+		px4_arch_configgpio(GPIO_SPI4_MOSI);
+
+		px4_spibus_initialize(4);
+	}
+
+#endif // CONFIG_STM32_SPI4
+
+#ifdef CONFIG_STM32_SPI5
+	ASSERT(_spi_bus5);
+
+	if (board_has_bus(BOARD_SPI_BUS, 5)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus5);
+
+		px4_arch_configgpio(GPIO_SPI5_SCK);
+		px4_arch_configgpio(GPIO_SPI5_MISO);
+		px4_arch_configgpio(GPIO_SPI5_MOSI);
+
+		px4_spibus_initialize(5);
+	}
+
+#endif // CONFIG_STM32_SPI5
+
+#ifdef CONFIG_STM32_SPI6
+	ASSERT(_spi_bus6);
+
+	if (board_has_bus(BOARD_SPI_BUS, 6)) {
+		spi_bus_configgpio_cs_drdy(_spi_bus6);
+
+		px4_arch_configgpio(GPIO_SPI6_SCK);
+		px4_arch_configgpio(GPIO_SPI6_MISO);
+		px4_arch_configgpio(GPIO_SPI6_MOSI);
+
+		px4_spibus_initialize(6);
+	}
+
+#endif // CONFIG_STM32_SPI6
+}
+
 #define _PIN_OFF(def) (((def) & (GPIO_PORT_MASK | GPIO_PIN_MASK)) | (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_2MHz))
 
-__EXPORT void board_spi_reset(int ms, int bus_mask)
+__EXPORT void board_spi_disable()
 {
 	bool has_power_enable = false;
+
+	static constexpr int bus_mask = 0xffff; // ALL buses
 
 	// disable SPI bus
 	for (int bus = 0; bus < SPI_BUS_MAX_BUS_ITEMS; ++bus) {
@@ -468,96 +505,4 @@ __EXPORT void board_spi_reset(int ms, int bus_mask)
 
 	// set the sensor rail(s) off
 	board_control_spi_sensors_power(false, bus_mask);
-
-	// wait for the sensor rail to reach GND
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	// switch the sensor rail back on
-	board_control_spi_sensors_power(true, bus_mask);
-
-	/* wait a bit before starting SPI, different times didn't influence results */
-	usleep(100);
-
-	/* reconfigure the SPI pins */
-	for (int bus = 0; bus < SPI_BUS_MAX_BUS_ITEMS; ++bus) {
-		if (px4_spi_buses[bus].bus == -1) {
-			break;
-		}
-
-		const bool bus_requested = bus_mask & (1 << (px4_spi_buses[bus].bus - 1));
-
-		if (px4_spi_buses[bus].power_enable_gpio == 0 ||
-		    !board_has_bus(BOARD_SPI_BUS, px4_spi_buses[bus].bus) ||
-		    !bus_requested) {
-			continue;
-		}
-
-		for (int i = 0; i < SPI_BUS_MAX_DEVICES; ++i) {
-			if (px4_spi_buses[bus].devices[i].cs_gpio != 0) {
-				px4_arch_configgpio(px4_spi_buses[bus].devices[i].cs_gpio);
-			}
-
-			if (px4_spi_buses[bus].devices[i].drdy_gpio != 0) {
-				px4_arch_configgpio(px4_spi_buses[bus].devices[i].drdy_gpio);
-			}
-		}
-
-#if defined(CONFIG_STM32_SPI1)
-
-		if (px4_spi_buses[bus].bus == 1) {
-			px4_arch_configgpio(GPIO_SPI1_SCK);
-			px4_arch_configgpio(GPIO_SPI1_MISO);
-			px4_arch_configgpio(GPIO_SPI1_MOSI);
-		}
-
-#endif
-#if defined(CONFIG_STM32_SPI2)
-
-		if (px4_spi_buses[bus].bus == 2) {
-			px4_arch_configgpio(GPIO_SPI2_SCK);
-			px4_arch_configgpio(GPIO_SPI2_MISO);
-			px4_arch_configgpio(GPIO_SPI2_MOSI);
-		}
-
-#endif
-#if defined(CONFIG_STM32_SPI3)
-
-		if (px4_spi_buses[bus].bus == 3) {
-			px4_arch_configgpio(GPIO_SPI3_SCK);
-			px4_arch_configgpio(GPIO_SPI3_MISO);
-			px4_arch_configgpio(GPIO_SPI3_MOSI);
-		}
-
-#endif
-#if defined(CONFIG_STM32_SPI4)
-
-		if (px4_spi_buses[bus].bus == 4) {
-			px4_arch_configgpio(GPIO_SPI4_SCK);
-			px4_arch_configgpio(GPIO_SPI4_MISO);
-			px4_arch_configgpio(GPIO_SPI4_MOSI);
-		}
-
-#endif
-#if defined(CONFIG_STM32_SPI5)
-
-		if (px4_spi_buses[bus].bus == 5) {
-			px4_arch_configgpio(GPIO_SPI5_SCK);
-			px4_arch_configgpio(GPIO_SPI5_MISO);
-			px4_arch_configgpio(GPIO_SPI5_MOSI);
-		}
-
-#endif
-#if defined(CONFIG_STM32_SPI6)
-
-		if (px4_spi_buses[bus].bus == 6) {
-			px4_arch_configgpio(GPIO_SPI6_SCK);
-			px4_arch_configgpio(GPIO_SPI6_MISO);
-			px4_arch_configgpio(GPIO_SPI6_MOSI);
-		}
-
-#endif
-	}
 }

@@ -33,21 +33,20 @@
  ****************************************************************************/
 
 /**
- * @file aerofc-v1_init.c
+ * @file init.c
  *
  * aerofc-specific early startup code.  This file implements the
  * board_app_initialize() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
- * subsystems and perform board-specific initialization.
+ * subsystems and perform board-specific initialisation.
  */
 
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/tasks.h>
+#include "board_config.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -55,21 +54,28 @@
 #include <debug.h>
 #include <errno.h>
 
+#include <nuttx/config.h>
 #include <nuttx/board.h>
+#include <nuttx/spi/spi.h>
+#include <nuttx/sdio.h>
+#include <nuttx/mmcsd.h>
 #include <nuttx/analog/adc.h>
-
-#include "board_config.h"
-#include "stm32_uart.h"
-
+#include <nuttx/mm/gran.h>
+#include <chip.h>
+#include <stm32_uart.h>
 #include <arch/board/board.h>
+#include "up_internal.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
+#include <systemlib/px4_macros.h>
+#include <px4_arch/io_timer.h>
+#include <px4_platform_common/init.h>
+#include <px4_platform/gpio.h>
+#include <px4_platform/board_determine_hw_info.h>
+#include <px4_platform/board_dma_alloc.h>
 
 #include <dataman/dataman.h>
-
-#include <systemlib/px4_macros.h>
-#include <px4_platform_common/init.h>
 
 # if defined(FLASH_BASED_PARAMS)
 #  include <parameters/flashparams/flashfs.h>
@@ -79,7 +85,7 @@
  * Pre-Processor Definitions
  ****************************************************************************/
 
-/*
+/**
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
@@ -105,14 +111,6 @@ static int _bootloader_force_pin_callback(int irq, void *context, void *args)
 	return 0;
 }
 
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
 /************************************************************************************
  * Name: stm32_boardinitialize
  *
@@ -122,21 +120,16 @@ static int _bootloader_force_pin_callback(int irq, void *context, void *args)
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
 __EXPORT void stm32_boardinitialize(void)
 {
 	stm32_configgpio(GPIO_FORCE_BOOTLOADER);
 	_bootloader_force_pin_callback(0, NULL, NULL);
 
+	/* SPI completely off to ensure clean sensor reset */
+	board_spi_disable();
+
 	/* configure LEDs */
 	board_autoled_initialize();
-
-	/* turn sensors on */
-	stm32_configgpio(GPIO_VDD_5V_SENSORS_EN);
-
-	/* configure SPI interfaces */
-	stm32_spiinitialize();
-
 }
 
 /****************************************************************************
@@ -156,14 +149,15 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	px4_platform_init();
 
+#if defined(SERIAL_HAVE_RXDMA)
 	/* set up the serial DMA polling */
 	static struct hrt_call serial_dma_call;
-	struct timespec ts;
 
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
+	struct timespec ts;
 	ts.tv_sec = 0;
 	ts.tv_nsec = 1000000;
 
@@ -172,12 +166,15 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		       ts_to_abstime(&ts),
 		       (hrt_callout)stm32_serial_dma_poll,
 		       NULL);
-
+#endif
 
 	/* initial LED state */
 	drv_led_start();
 	led_off(LED_AMBER);
 	led_off(LED_BLUE);
+
+	/* configure SPI interfaces (after we determined the HW version) */
+	board_spi_initialize();
 
 	/*
 	 * Bootloader(sector 0):

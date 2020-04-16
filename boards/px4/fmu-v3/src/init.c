@@ -32,21 +32,20 @@
  ****************************************************************************/
 
 /**
- * @file px4fmu2_init.c
+ * @file init.c
  *
  * PX4FMUv2-specific early startup code.  This file implements the
  * board_app_initialize() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
- * subsystems and perform board-specific initialization.
+ * subsystems and perform board-specific initialisation.
  */
 
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/tasks.h>
+#include "board_config.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -54,33 +53,32 @@
 #include <debug.h>
 #include <errno.h>
 
+#include <nuttx/config.h>
 #include <nuttx/board.h>
 #include <nuttx/spi/spi.h>
-#include <nuttx/i2c/i2c_master.h>
 #include <nuttx/sdio.h>
 #include <nuttx/mmcsd.h>
 #include <nuttx/analog/adc.h>
-
-#include <stm32.h>
-#include "board_config.h"
+#include <nuttx/mm/gran.h>
+#include <chip.h>
 #include <stm32_uart.h>
-
 #include <arch/board/board.h>
+#include "up_internal.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
-
 #include <systemlib/px4_macros.h>
-
 #include <px4_arch/io_timer.h>
 #include <px4_platform_common/init.h>
+#include <px4_platform/gpio.h>
+#include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/board_dma_alloc.h>
 
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
 
-/*
+/**
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
@@ -101,29 +99,7 @@ static int hw_revision = 0;
 static char hw_type[4] = HW_VER_TYPE_INIT;
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-	stm32_configgpio(GPIO_VDD_5V_PERIPH_EN);
-	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 1);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 0);
-}
-
-/************************************************************************************
-  * Name: board_on_reset
+ * Name: board_on_reset
  *
  * Description:
  * Optionally provided function called on entry to board_system_reset
@@ -133,17 +109,15 @@ __EXPORT void board_peripheral_reset(int ms)
  *          0 if just resetting
  *
  ************************************************************************************/
-
 __EXPORT void board_on_reset(int status)
 {
-	UNUSED(status);
-
 	/* configure the GPIO pins to outputs and keep them low */
 	for (int i = 0; i < DIRECT_PWM_OUTPUT_CHANNELS; ++i) {
 		px4_arch_configgpio(io_timer_channel_get_gpio_output(i));
 	}
 
-	/* On resets invoked from system (not boot) insure we establish a low
+	/*
+	 * On resets invoked from system (not boot) insure we establish a low
 	 * output state (discharge the pins) on PWM pins before they become inputs.
 	 *
 	 * We also delay the onset of the that 3.1 Ms pulse as boot. This has
@@ -155,12 +129,11 @@ __EXPORT void board_on_reset(int status)
 	 * the initialize the IO lines in the clock config.
 	 *
 	 */
-
 	if (status >= 0) {
-		up_mdelay(400);
-
 		/* on reboot (status >= 0) reset sensors and peripherals */
-		board_spi_reset(10, 0xffff);
+		board_spi_disable();
+
+		up_mdelay(400);
 	}
 }
 
@@ -285,21 +258,22 @@ __EXPORT int board_get_hw_revision()
  *
  * Description:
  *   All STM32 architectures must provide the following entry point.  This entry point
- *   is called early in the intitialization -- after all memory has been configured
+ *   is called early in the initialization -- after all memory has been configured
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
+	/* Reset PWM first thing */
 	board_on_reset(-1);
+
+	/* SPI completely off to ensure clean sensor reset */
+	board_spi_disable();
 
 	/* configure LEDs */
 	board_autoled_initialize();
 
 	/* configure ADC pins */
-
 	stm32_configgpio(GPIO_ADC1_IN2);	/* BATT_VOLTAGE_SENS */
 	stm32_configgpio(GPIO_ADC1_IN3);	/* BATT_CURRENT_SENS */
 	stm32_configgpio(GPIO_ADC1_IN4);	/* VDD_5V_SENS */
@@ -309,8 +283,6 @@ stm32_boardinitialize(void)
 
 	/* configure power supply control/sense pins */
 	stm32_configgpio(GPIO_VDD_5V_PERIPH_EN);
-	board_control_spi_sensors_power_configgpio();
-	board_control_spi_sensors_power(true, 0xffff);
 	stm32_configgpio(GPIO_VDD_BRICK_VALID);
 	stm32_configgpio(GPIO_VDD_SERVO_VALID);
 	stm32_configgpio(GPIO_VDD_USB_VALID);
@@ -328,6 +300,8 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_CAN2_RX | GPIO_PULLUP);
 	stm32_configgpio(GPIO_CAN2_TX);
 
+	/* Configure the OTG FS VBUS sensing GPIO */
+	stm32_configgpio(GPIO_OTGFS_VBUS);
 }
 
 /****************************************************************************
@@ -355,9 +329,6 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-static struct spi_dev_s *spi1;
-static struct spi_dev_s *spi2;
-static struct spi_dev_s *spi4;
 static struct sdio_dev_s *sdio;
 
 __EXPORT int board_app_initialize(uintptr_t arg)
@@ -375,43 +346,33 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 			hw_type[2] = '0';
 
 			/* Has CAN2 transceiver Remove pull up */
-
 			stm32_configgpio(GPIO_CAN2_RX);
-
 			break;
 
 		case HW_VER_FMUV2MINI_STATE:
 
 			/* Detection for a Pixhack3 */
-
 			stm32_configgpio(HW_VER_PA8);
 			up_udelay(10);
 			bool isph3 = stm32_gpioread(HW_VER_PA8);
 			stm32_configgpio(HW_VER_PA8_INIT);
 
-
 			if (isph3) {
-
 				/* Pixhack3 looks like a FMuV3 Cube */
-
 				hw_version = HW_VER_FMUV3_STATE;
 				hw_type[1]++;
 				hw_type[2] = '0';
 				syslog(LOG_INFO, "\nPixhack V3 detected, forcing to fmu-v3");
 
 			} else {
-
 				/* It is a mini */
-
 				hw_type[2] = 'M';
 			}
 
 			break;
 
 		default:
-
 			/* questionable px4_fmu-v2 hardware, try forcing regular FMUv2 (not much else we can do) */
-
 			syslog(LOG_ERR, "\nbad version detected, forcing to fmu-v2");
 			hw_version = HW_VER_FMUV2_STATE;
 			break;
@@ -420,25 +381,22 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		syslog(LOG_DEBUG, "\nFMUv2 ver 0x%1X : Rev %x %s\n", hw_version, hw_revision, hw_type);
 	}
 
-	/* configure SPI interfaces (after the hw is determined) */
-	stm32_spiinitialize();
-
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
-		syslog(LOG_ERR, "DMA alloc FAILED\n");
+		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
 
+#if defined(SERIAL_HAVE_RXDMA)
 	/* set up the serial DMA polling */
 	static struct hrt_call serial_dma_call;
-	struct timespec ts;
 
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
+	struct timespec ts;
 	ts.tv_sec = 0;
 	ts.tv_nsec = 1000000;
 
@@ -447,6 +405,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		       ts_to_abstime(&ts),
 		       (hrt_callout)stm32_serial_dma_poll,
 		       NULL);
+#endif
 
 	/* initial LED state */
 	drv_led_start();
@@ -456,56 +415,11 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_AMBER);
 	}
 
-	/* Configure SPI-based devices */
-
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 1);
-		led_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI1 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
-
-	/* Get the SPI port for the FRAM */
-
-	spi2 = stm32_spibus_initialize(2);
-
-	if (!spi2) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 2);
-		led_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI2 to 37.5 MHz (40 MHz rounded to nearest valid divider, F4 max)
-	 * and de-assert the known chip selects. */
-
-	// XXX start with 10.4 MHz in FRAM usage and go up to 37.5 once validated
-	SPI_SETFREQUENCY(spi2, 12 * 1000 * 1000);
-	SPI_SETBITS(spi2, 8);
-	SPI_SETMODE(spi2, SPIDEV_MODE3);
-
-	spi4 = stm32_spibus_initialize(4);
-
-	if (!spi4) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 4);
-		led_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI4 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi4, 10000000);
-	SPI_SETBITS(spi4, 8);
-	SPI_SETMODE(spi4, SPIDEV_MODE3);
+	/* configure SPI interfaces (after we determined the HW version) */
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	/* First, get an instance of the SDIO interface */
-
 	sdio = sdio_initialize(CONFIG_NSH_MMCSDSLOTNO);
 
 	if (!sdio) {
@@ -525,8 +439,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	/* Then let's guess and say that there is a card in the slot. There is no card detect GPIO. */
 	sdio_mediachange(sdio, true);
-
-#endif
+#endif /* CONFIG_MMCSD */
 
 	return OK;
 }

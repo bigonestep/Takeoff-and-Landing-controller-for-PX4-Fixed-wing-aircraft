@@ -71,7 +71,6 @@
 /* Configuration ************************************************************************************/
 
 #define BOARD_HAS_LTC44XX_VALIDS      2 //  N Bricks
-#define BOARD_HAS_USB_VALID           1 // LTC Has USB valid
 #define BOARD_HAS_NBAT_V              2d // 2 Digital Voltage
 #define BOARD_HAS_NBAT_I              2d // 2 Digital Current
 
@@ -166,12 +165,9 @@
 	 (1 << ADC_ADC1_3V3_CHANNEL))
 
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
-
 #define HW_REV_VER_ADC_BASE STM32_ADC3_BASE
 
 #define SYSTEM_ADC_BASE STM32_ADC1_BASE
-
-
 
 #define BOARD_ADC_OPEN_CIRCUIT_V     (5.6f)
 
@@ -215,15 +211,14 @@
 #if !defined(TRACE_PINS)
 #  define BOARD_INDICATE_ARMED_STATE(on_armed)  px4_arch_configgpio((on_armed) ? GPIO_nARMED : GPIO_nARMED_INIT)
 #endif
-/* PWM
- */
+
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS  8
 #define DIRECT_INPUT_TIMER_CHANNELS  8
 
 #define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7};
 
 /* Power supply control and monitoring GPIOs */
-
 #define GPIO_nPOWER_IN_A                /* PG1  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTG|GPIO_PIN1)
 #define GPIO_nPOWER_IN_B                /* PG2  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTG|GPIO_PIN2)
 #define GPIO_nPOWER_IN_C                /* PG3  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTG|GPIO_PIN3)
@@ -243,20 +238,16 @@
 #define GPIO_VDD_3V3_SD_CARD_EN         /* PC13 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTC|GPIO_PIN13)
 
 /* Spare GPIO */
-
 #define GPIO_PH11                       /* PH11  */  (GPIO_INPUT|GPIO_FLOAT|GPIO_PORTH|GPIO_PIN1)
 
 /* ETHERNET GPIO */
-
 #define GPIO_ETH_POWER_EN              /* PG15 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTG|GPIO_PIN15)
 
 /* NFC GPIO */
-
 #define GPIO_NFC_GPIO                   /* PH3 */ (GPIO_INPUT|GPIO_FLOAT|GPIO_EXTI|GPIO_PORTH|GPIO_PIN3)
 
 
 /* Define True logic Power Control in arch agnostic form */
-
 #define VDD_5V_PERIPH_EN(on_true)          px4_arch_gpiowrite(GPIO_VDD_5V_PERIPH_nEN, !(on_true))
 #define VDD_5V_HIPOWER_EN(on_true)         px4_arch_gpiowrite(GPIO_VDD_5V_HIPOWER_nEN, !(on_true))
 #define VDD_3V3_SENSORS4_EN(on_true)       px4_arch_gpiowrite(GPIO_VDD_3V3_SENSORS4_EN, (on_true))
@@ -291,7 +282,6 @@
 #define GPIO_PPM_IN             /* PI5 T8C1 */ GPIO_TIM8_CH1IN_2
 
 /* RC Serial port */
-
 #define RC_SERIAL_PORT                     "/dev/ttyS5"
 #define RC_SERIAL_SINGLEWIRE
 
@@ -320,7 +310,6 @@
 #define GPIO_BTN_SAFETY GPIO_SAFETY_SWITCH_IN /* Enable the FMU to control it if there is no px4io */
 
 /* Power switch controls ******************************************************/
-
 #define SPEKTRUM_POWER(_on_true)           VDD_3V3_SPEKTRUM_POWER_EN(_on_true)
 
 /*
@@ -393,7 +382,6 @@
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
 
 #define PX4_GPIO_INIT_LIST { \
@@ -420,6 +408,7 @@
 		GPIO_ETH_POWER_EN,                \
 		GPIO_NFC_GPIO,                    \
 		GPIO_TONE_ALARM_IDLE,             \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_nSAFETY_SWITCH_LED_OUT_INIT, \
 		GPIO_SAFETY_SWITCH_IN,            \
 		GPIO_SE050_nRST,                  \
@@ -432,19 +421,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -455,20 +432,6 @@ __BEGIN_DECLS
  ****************************************************************************/
 
 int stm32_sdio_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

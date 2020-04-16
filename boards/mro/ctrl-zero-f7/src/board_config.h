@@ -105,9 +105,7 @@
 /* CAN Silence: Silent mode control \ ESC Mux select */
 #define GPIO_CAN1_SILENT_S0  /* PF5  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTF|GPIO_PIN5)
 
-/* PWM
- *
- */
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS  8
 #define DIRECT_INPUT_TIMER_CHANNELS  8
 
@@ -211,34 +209,6 @@
 __BEGIN_DECLS
 
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************
- * Name: stm32_sdio_initialize
- *
- * Description:
- *   Initialize SDIO-based MMC/SD card support
- *
- ****************************************************************************/
-
-int stm32_sdio_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
 
 #include <px4_platform_common/board_common.h>
 

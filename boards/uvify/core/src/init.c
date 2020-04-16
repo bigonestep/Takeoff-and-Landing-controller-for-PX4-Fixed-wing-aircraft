@@ -296,63 +296,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	// Power down the heater.
 	stm32_gpiowrite(GPIO_HEATER_OUTPUT, 0);
 
-	// Configure SPI-based devices.
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 1\n");
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-
-	// Default SPI1 to 1MHz and de-assert the known chip selects.
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
-
-	// Get the SPI port for the FRAM.
-	spi2 = stm32_spibus_initialize(2);
-
-	if (!spi2) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 2\n");
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/**
-	 * Default SPI2 to 12MHz and de-assert the known chip selects.
-	 * MS5611 has max SPI clock speed of 20MHz.
-	 */
-
-	// XXX start with 10.4 MHz and go up to 20 once validated.
-	SPI_SETFREQUENCY(spi2, 20 * 1000 * 1000);
-	SPI_SETBITS(spi2, 8);
-	SPI_SETMODE(spi2, SPIDEV_MODE3);
-
-#if defined(CONFIG_STM32_SPI4)
-
-	if (stm32_gpioread(GPIO_PB4) == 0) {
-		syslog(LOG_INFO, "[boot] GPIO_PB4 - Low Initialize SPI port 4 \n");
-
-		// Configure SPI-based devices.
-		spi4 = stm32_spibus_initialize(4);
-
-		if (!spi4) {
-			syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 4\n");
-
-		} else {
-			// Default SPI4 to 20 MHz and de-assert the known chip selects.
-			SPI_SETFREQUENCY(spi4, 20 * 1000 * 1000);
-			SPI_SETBITS(spi4, 8);
-			SPI_SETMODE(spi4, SPIDEV_MODE3);
-		}
-	}
-
-#endif /* defined(CONFIG_STM32_SPI4) */
-
-
 #ifdef CONFIG_MMCSD
 
 	// First, get an instance of the SDIO interface.

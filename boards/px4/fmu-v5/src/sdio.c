@@ -90,9 +90,7 @@ static bool g_sd_inserted = 0xff; /* Impossible value */
 #ifdef HAVE_NCD
 static int stm32_ncd_interrupt(int irq, FAR void *context)
 {
-	bool present;
-
-	present = !stm32_gpioread(GPIO_SDMMC1_NCD);
+	bool present = !stm32_gpioread(GPIO_SDMMC1_NCD);
 
 	if (sdio_dev && present != g_sd_inserted) {
 		sdio_mediachange(sdio_dev, present);
@@ -121,21 +119,17 @@ int stm32_sdio_initialize(void)
 
 #ifdef HAVE_NCD
 	/* Card detect */
-
 	bool cd_status;
 
 	/* Configure the card detect GPIO */
-
 	stm32_configgpio(GPIO_SDMMC1_NCD);
 
 	/* Register an interrupt handler for the card detect pin */
-
 	stm32_gpiosetevent(GPIO_SDMMC1_NCD, true, true, true, stm32_ncd_interrupt);
 #endif
 
 	/* Mount the SDIO-based MMC/SD block driver */
 	/* First, get an instance of the SDIO interface */
-
 	finfo("Initializing SDIO slot %d\n", SDIO_SLOTNO);
 
 	sdio_dev = sdio_initialize(SDIO_SLOTNO);

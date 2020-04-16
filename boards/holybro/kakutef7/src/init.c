@@ -96,17 +96,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	UNUSED(ms);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -137,29 +126,17 @@ __EXPORT void board_on_reset(int status)
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
-	/* configure USB interfaces */
-
-	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -186,15 +163,11 @@ stm32_boardinitialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
-
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}

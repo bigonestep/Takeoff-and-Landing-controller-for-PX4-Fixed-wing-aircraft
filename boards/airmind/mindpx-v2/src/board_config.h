@@ -52,7 +52,6 @@
  ****************************************************************************************************/
 /* Configuration ************************************************************************************/
 
-
 /* PX4FMU GPIOs ***********************************************************************************/
 /* LEDs */
 #define GPIO_LED1		(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)
@@ -92,18 +91,15 @@
 #define GPIO_TONE_ALARM_IDLE	(GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN7)
 #define GPIO_TONE_ALARM		(GPIO_ALT|GPIO_AF9|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN7)
 
-/* AUX PWMs
- */
+/* AUX PWMs */
 #define DIRECT_PWM_OUTPUT_CHANNELS	8
 #define DIRECT_INPUT_TIMER_CHANNELS	8
 
-/* USB OTG FS
- *
- * PA9  OTG_FS_VBUS VBUS sensing
+/**
+ * USB OTG FS:
+ * PA9  OTG_FS_VBUS VBUS sensing.
  */
 #define GPIO_OTGFS_VBUS		(GPIO_INPUT|GPIO_FLOAT|GPIO_SPEED_100MHz|GPIO_OPENDRAIN|GPIO_PORTA|GPIO_PIN9)
-
-
 
 /* High-resolution timer */
 #define HRT_TIMER		8	/* use timer8 for the HRT */
@@ -159,40 +155,11 @@
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
 /* This board provides the board_on_reset interface */
-
 #define BOARD_HAS_ON_RESET 1
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-
-#define board_peripheral_reset(ms)
-
 
 #include <px4_platform_common/board_common.h>
 

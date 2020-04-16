@@ -39,20 +39,11 @@
 
 #pragma once
 
-/******************************************************************************
- * Included Files
- ******************************************************************************/
-
 #include <px4_platform_common/px4_config.h>
 #include <nuttx/compiler.h>
 #include <stdint.h>
 
 #include <px4_platform_common/board_common.h>
-
-/******************************************************************************
- * Definitions
- ******************************************************************************/
-/* Configuration **************************************************************/
 
 /******************************************************************************
  * Serial
@@ -71,7 +62,6 @@
  ******************************************************************************/
 
 /* LEDS  **********************************************************************/
-
 #define GPIO_LED1 (GPIO_OUTPUT|GPIO_CNF_OUTOD|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN14)
 #define GPIO_LED2 (GPIO_OUTPUT|GPIO_CNF_OUTOD|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN15)
 #define GPIO_LED3 (GPIO_OUTPUT|GPIO_CNF_OUTOD|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN13)
@@ -101,11 +91,9 @@
 #define GPIO_USART1_RX_SPEKTRUM		(GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTA|GPIO_PIN10)
 
 /* Safety switch button *******************************************************/
-
 #define GPIO_BTN_SAFETY (GPIO_INPUT|GPIO_CNF_INFLOAT|GPIO_MODE_INPUT|GPIO_PORTB|GPIO_PIN5)
 
 /* Power switch controls ******************************************************/
-
 #define GPIO_SPEKTRUM_PWR_EN         (GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN13)
 #define SPEKTRUM_POWER(_on_true)     px4_arch_gpiowrite(GPIO_SPEKTRUM_PWR_EN, (_on_true))
 
@@ -116,7 +104,6 @@
 #define GPIO_SERVO_FAULT_DETECT (GPIO_INPUT|GPIO_CNF_INPULLUP|GPIO_MODE_INPUT|GPIO_PORTA|GPIO_PIN15)
 
 /* Analog inputs **************************************************************/
-
 #define GPIO_ADC_VSERVO (GPIO_INPUT|GPIO_CNF_ANALOGIN|GPIO_MODE_INPUT|GPIO_PORTA|GPIO_PIN4)
 
 /* the same rssi signal goes to both an adc and a timer input */
@@ -124,7 +111,6 @@
 #define GPIO_TIM_RSSI   (GPIO_INPUT|GPIO_CNF_INFLOAT|GPIO_MODE_INPUT|GPIO_PORTA|GPIO_PIN12)
 
 /* PWM pins  **************************************************************/
-
 #define GPIO_PPM (GPIO_INPUT|GPIO_CNF_INFLOAT|GPIO_MODE_INPUT|GPIO_PORTA|GPIO_PIN8)
 
 #define GPIO_PWM1 (GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN0)
@@ -145,9 +131,7 @@
 #define GPIO_SBUS_OUTPUT  (GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN10)
 #define GPIO_SBUS_OENABLE (GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN4)
 
-/*
- * High-resolution timer
- */
+/* High-resolution timer */
 #define HRT_TIMER		1	/* use timer1 for the HRT */
 #define HRT_TIMER_CHANNEL	2	/* use capture/compare channel 2 */
 #define HRT_PPM_CHANNEL		1	/* use capture/compare channel 1 PA8 */
@@ -155,7 +139,6 @@
 
 /* LED definitions ******************************************************************/
 /* PX4 has two LEDs that we will encode as: */
-
 #define LED_STARTED       0  /* LED? */
 #define LED_HEAPALLOCATE  1  /* LED? */
 #define LED_IRQSENABLED   2  /* LED? + LED? */

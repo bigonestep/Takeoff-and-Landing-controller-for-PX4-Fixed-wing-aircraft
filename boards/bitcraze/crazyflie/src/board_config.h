@@ -123,9 +123,7 @@
 #define GPIO_TONE_ALARM		(GPIO_ALT|GPIO_AF2|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN2)
 #define GPIO_TONE_ALARM_NEG (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN3)
 
-/* PWM
-*/
-
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS	4
 
 /* This board overrides the defaults by providing
@@ -160,70 +158,7 @@
 
 __BEGIN_DECLS
 
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *   Called to reset the periferal bus
- *
- ****************************************************************************************************/
-
-#define board_peripheral_reset(ms)
-
-/****************************************************************************************************
- * Name: stm32_usbinitialize
- *
- * Description:
- *   Called to configure USB IO.
- *
- ****************************************************************************************************/
-
-extern void stm32_usbinitialize(void);
-
-/****************************************************************************
- * Name: board_i2c_initialize
- *
- * Description:
- *   Called to set I2C bus frequencies.
- *
- ****************************************************************************/
-
-int board_i2c_initialize(void);
-
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-/************************************************************************************
- * Name: stm32_spi_bus_initialize
- *
- * Description:
- *   Called to configure SPI Buses.
- *
- ************************************************************************************/
-
-extern int stm32_spi_bus_initialize(void);
-
 
 #include <px4_platform_common/board_common.h>
 
