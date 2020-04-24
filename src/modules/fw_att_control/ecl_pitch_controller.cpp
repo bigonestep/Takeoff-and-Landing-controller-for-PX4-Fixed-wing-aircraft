@@ -85,7 +85,7 @@ float ECL_PitchController::control_bodyrate(const struct ECL_ControlData &ctl_da
 	float dt = (float)dt_micros * 1e-6f;
 
 	/* lock integral for long intervals */
-	bool lock_integrator = ctl_data.lock_integrator;
+	bool lock_integrator = false;
 
 	if (dt_micros > 500000) {
 		lock_integrator = true;
