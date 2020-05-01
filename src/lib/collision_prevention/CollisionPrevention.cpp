@@ -73,7 +73,7 @@ CollisionPrevention::CollisionPrevention(ModuleParams *parent) :
 
 	// initialize internal obstacle map
 	_obstacle_map_body_frame.timestamp = getTime();
-	_obstacle_map_body_frame.frame = obstacle_distance_s::MAV_FRAME_BODY_FRD;
+	_obstacle_map_body_frame.frame = obstacle_distance_s::MAV_FRAME_BODY_OFFSET_NED;
 	_obstacle_map_body_frame.increment = INTERNAL_MAP_INCREMENT_DEG;
 	_obstacle_map_body_frame.min_distance = UINT16_MAX;
 	_obstacle_map_body_frame.max_distance = 0;
@@ -136,7 +136,7 @@ CollisionPrevention::_addObstacleSensorData(const obstacle_distance_s &obstacle,
 			}
 		}
 
-	} else if (obstacle.frame == obstacle.MAV_FRAME_BODY_FRD) {
+	} else if (obstacle.frame == obstacle.MAV_FRAME_BODY_OFFSET_NED) {
 		// Obstacle message arrives in body frame (front aligned)
 		// corresponding data index (shift by msg offset)
 		for (int i = 0; i < INTERNAL_MAP_USED_BINS; i++) {

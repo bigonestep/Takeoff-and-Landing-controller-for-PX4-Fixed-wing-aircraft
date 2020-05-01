@@ -1022,7 +1022,7 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 		/* Dcm rotation matrix from body frame to local NED frame */
 		matrix::Dcm<float> Rbl;
 
-		/* since odom.child_frame_id == MAV_FRAME_BODY_FRD, WRT to estimated vehicle body-fixed frame */
+		/* since odom.child_frame_id == MAV_FRAME_BODY_OFFSET_NED, WRT to estimated vehicle body-fixed frame */
 		/* get quaternion from the msg quaternion itself and build DCM matrix from it */
 		/* No need to transform the covariance matrices since the non-diagonal values are all zero */
 		Rbl = matrix::Dcm<float>(matrix::Quatf(odom_msg.q)).I();

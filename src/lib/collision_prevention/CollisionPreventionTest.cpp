@@ -808,7 +808,7 @@ TEST_F(CollisionPreventionTest, addObstacleSensorData_bodyframe)
 	TestCollisionPrevention cp;
 	cp.getObstacleMap().increment = 10.f;
 	obstacle_distance_s obstacle_msg {};
-	obstacle_msg.frame = obstacle_msg.MAV_FRAME_BODY_FRD; //north aligned
+	obstacle_msg.frame = obstacle_msg.MAV_FRAME_BODY_OFFSET_NED; //north aligned
 	obstacle_msg.increment = 5.f;
 	obstacle_msg.min_distance = 20;
 	obstacle_msg.max_distance = 2000;
