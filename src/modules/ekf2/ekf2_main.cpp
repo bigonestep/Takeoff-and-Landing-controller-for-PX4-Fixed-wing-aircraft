@@ -62,6 +62,7 @@
 #include <uORB/topics/estimator_innovations.h>
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/estimator_status_flags.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
@@ -120,7 +121,7 @@ private:
 	void fillGpsMsgWithVehicleGpsPosData(gps_message &msg, const vehicle_gps_position_s &data);
 
 	PreFlightChecker _preflt_checker;
-	void runPreFlightChecks(float dt, const filter_control_status_u &control_status,
+	void runPreFlightChecks(float dt, const filter_control_status &control_status,
 				const vehicle_status_s &vehicle_status,
 				const estimator_innovations_s &innov);
 	void resetPreFlightChecks();
@@ -274,6 +275,7 @@ private:
 	uORB::Publication<estimator_innovations_s>		_estimator_innovations_pub{ORB_ID(estimator_innovations)};
 	uORB::Publication<estimator_sensor_bias_s>		_estimator_sensor_bias_pub{ORB_ID(estimator_sensor_bias)};
 	uORB::Publication<estimator_status_s>			_estimator_status_pub{ORB_ID(estimator_status)};
+	uORB::Publication<estimator_status_flags_s>		_estimator_status_flags_pub{ORB_ID(estimator_status_flags)};
 	uORB::Publication<vehicle_attitude_s>			_att_pub{ORB_ID(vehicle_attitude)};
 	uORB::Publication<vehicle_odometry_s>			_vehicle_odometry_pub{ORB_ID(vehicle_odometry)};
 	uORB::Publication<yaw_estimator_status_s>		_yaw_est_pub{ORB_ID(yaw_estimator_status)};
@@ -1218,11 +1220,10 @@ void Ekf2::Run()
 
 		if (ekf_updated) {
 
-			filter_control_status_u control_status;
-			_ekf.get_control_mode(&control_status.value);
+			const estimator::filter_control_status &control_status = _ekf.getControlMode();
 
 			// only publish position after successful alignment
-			if (control_status.flags.tilt_align) {
+			if (control_status.tilt_align) {
 				// generate vehicle local position data
 				vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
 
@@ -1499,12 +1500,17 @@ void Ekf2::Run()
 			status.n_states = 24;
 			_ekf.covariances_diagonal().copyTo(status.covariances);
 			_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
-			_ekf.get_gps_check_status(&status.gps_check_fail_flags);
+
+			// &status.gps_check_fail_flags = _ekf.getGPSCheckStatus();
+
 			// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
 			// the GPS Fix bit, which is always checked)
-			status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
-			status.control_mode_flags = control_status.value;
-			_ekf.get_filter_fault_status(&status.filter_fault_flags);
+			//status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
+
+			// status.control_mode_flags = control_status.value; // TODO
+
+			// const estimator::fault_status &faults = _ekf.getFilterFaultStatus();
+
 			_ekf.get_innovation_test_status(status.innovation_check_flags, status.mag_test_ratio,
 							status.vel_test_ratio, status.pos_test_ratio,
 							status.hgt_test_ratio, status.tas_test_ratio,
@@ -1512,18 +1518,27 @@ void Ekf2::Run()
 
 			status.pos_horiz_accuracy = _vehicle_local_position_pub.get().eph;
 			status.pos_vert_accuracy = _vehicle_local_position_pub.get().epv;
-			_ekf.get_ekf_soln_status(&status.solution_status_flags);
+
 			_ekf.getImuVibrationMetrics().copyTo(status.vibe);
+
 			status.time_slip = _last_time_slip_us * 1e-6f;
+
 			status.health_flags = 0.0f; // unused
 			status.timeout_flags = 0.0f; // unused
+
 			status.pre_flt_fail_innov_heading = _preflt_checker.hasHeadingFailed();
 			status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
 			status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
 			status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
-			status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
+			status.pre_flt_fail_mag_field_disturbed = control_status.mag_field_disturbed;
 
 			_estimator_status_pub.publish(status);
+
+
+			estimator_status_flags_s status_flags{};
+			status_flags.timestamp = now;
+
+			_estimator_status_flags_pub.publish(status_flags);
 
 			// publish GPS drift data only when updated to minimise overhead
 			float gps_drift[3];
@@ -1547,7 +1562,7 @@ void Ekf2::Run()
 				if (!_vehicle_land_detected.landed && // not on ground
 				    (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
 				    !status.filter_fault_flags && // there are no filter faults
-				    control_status.flags.mag_3D) { // the EKF is operating in the correct mode
+				    control_status.mag_3D) { // the EKF is operating in the correct mode
 
 					if (_last_magcal_us == 0) {
 						_last_magcal_us = now;
@@ -1732,17 +1747,17 @@ void Ekf2::fillGpsMsgWithVehicleGpsPosData(gps_message &msg, const vehicle_gps_p
 }
 
 void Ekf2::runPreFlightChecks(const float dt,
-			      const filter_control_status_u &control_status,
+			      const filter_control_status &control_status,
 			      const vehicle_status_s &vehicle_status,
 			      const estimator_innovations_s &innov)
 {
 	const bool can_observe_heading_in_flight = (vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
 
 	_preflt_checker.setVehicleCanObserveHeadingInFlight(can_observe_heading_in_flight);
-	_preflt_checker.setUsingGpsAiding(control_status.flags.gps);
-	_preflt_checker.setUsingFlowAiding(control_status.flags.opt_flow);
-	_preflt_checker.setUsingEvPosAiding(control_status.flags.ev_pos);
-	_preflt_checker.setUsingEvVelAiding(control_status.flags.ev_vel);
+	_preflt_checker.setUsingGpsAiding(control_status.gps);
+	_preflt_checker.setUsingFlowAiding(control_status.opt_flow);
+	_preflt_checker.setUsingEvPosAiding(control_status.ev_pos);
+	_preflt_checker.setUsingEvVelAiding(control_status.ev_vel);
 
 	_preflt_checker.update(dt, innov);
 }

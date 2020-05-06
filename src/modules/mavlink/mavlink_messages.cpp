@@ -2738,6 +2738,7 @@ protected:
 		estimator_status_s est;
 
 		if (_est_sub.update(&est)) {
+			// TODO:
 			mavlink_estimator_status_t est_msg{};
 			est_msg.time_usec = est.timestamp;
 			est_msg.vel_ratio = est.vel_test_ratio;
@@ -2748,7 +2749,8 @@ protected:
 			est_msg.tas_ratio = est.tas_test_ratio;
 			est_msg.pos_horiz_accuracy = est.pos_horiz_accuracy;
 			est_msg.pos_vert_accuracy = est.pos_vert_accuracy;
-			est_msg.flags = est.solution_status_flags;
+
+			// est_msg.flags = est.solution_status_flags;
 			mavlink_msg_estimator_status_send_struct(_mavlink->get_channel(), &est_msg);
 
 			return true;
