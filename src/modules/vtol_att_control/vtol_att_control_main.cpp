@@ -135,6 +135,10 @@ VtolAttitudeControl::init()
 		return false;
 	}
 
+	// limit module to 400 Hz
+	_actuator_inputs_mc.set_interval_us(2500);
+	_actuator_inputs_fw.set_interval_us(2500);
+
 	return true;
 }
 
