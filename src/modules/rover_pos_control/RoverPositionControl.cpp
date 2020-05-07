@@ -353,6 +353,7 @@ RoverPositionControl::control_attitude(const vehicle_attitude_s &att, const vehi
 	const Eulerf euler_sp = qe;
 
 	float control_effort = euler_sp(2) / _param_max_turn_angle.get();
+	//TODO: Switch control effort to desired rate control
 	control_effort = math::constrain(control_effort, -1.0f, 1.0f);
 
 	const float control_throttle = math::constrain(att_sp.thrust_body[0], -1.0f, 1.0f);
@@ -374,11 +375,16 @@ RoverPositionControl::control_rates(const vehicle_angular_velocity_s &rates, con
 {
 	//TODO: Add PID for rate controls
 	PX4_INFO("controlling rates");
-	float control_effort = rates_sp.yaw; //Should I make control effort a global?
+	float desired_rate = rates_sp.yaw;
+	float rate_error = rates_sp.yaw - rates.yaw;
+
+	//TODO: Add integration error
+	const float control_effort = rates_sp.yaw * kff + rate_error * kp;
+
 	control_effort = math::constrain(control_effort, -1.0f, 1.0f);
 
 	const float control_throttle = math::constrain(rates_sp.thrust_body[0], -1.0f, 1.0f);
-	PX4_INFO("  - thrust0: %f", double(rates_sp.thrust_body[0]));
+	PX4_INFO("  - thrust: %f", double(rates_sp.thrust_body[0]));
 	PX4_INFO("  - rates : %f", double(control_effort));
 
 	if (control_throttle >= 0.0f) {
@@ -536,9 +542,9 @@ RoverPositionControl::run()
 				control_attitude(_vehicle_att, _att_sp);
 
 			} else if (!manual_mode && _control_mode.flag_control_rates_enabled
-			    && !_control_mode.flag_control_attitude_enabled
-			    && !_control_mode.flag_control_position_enabled
-			    && !_control_mode.flag_control_velocity_enabled) {
+				   && !_control_mode.flag_control_attitude_enabled
+				   && !_control_mode.flag_control_position_enabled
+				   && !_control_mode.flag_control_velocity_enabled) {
 
 				control_rates(_vehicle_rate, _rates_sp);
 
@@ -571,7 +577,7 @@ RoverPositionControl::run()
 			/* Only publish if any of the proper modes are enabled */
 			if (_control_mode.flag_control_velocity_enabled ||
 			    _control_mode.flag_control_attitude_enabled ||
-    			    _control_mode.flag_control_rates_enabled ||
+			    _control_mode.flag_control_rates_enabled ||
 			    manual_mode) {
 				/* publish the actuator controls */
 				_actuator_controls_pub.publish(_act_controls);
