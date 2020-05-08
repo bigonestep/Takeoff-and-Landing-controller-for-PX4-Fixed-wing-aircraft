@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,49 +31,51 @@
  *
  ****************************************************************************/
 
+#include "MS5611.hpp"
+
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 #include <px4_platform_common/module.h>
 
+#include <drivers/device/i2c.h>
+#include <drivers/device/spi.h>
 
-#include "MS5611.hpp"
-#include "ms5611.h"
+#define MS5611_ADDRESS_1 0x76 /* address select pins pulled high (PX4FMU series v1.6+) */
+#define MS5611_ADDRESS_2 0x77 /* address select pins pulled low (PX4FMU prototypes) */
 
 I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 				      int runtime_instance)
 {
-	ms5611::prom_u prom_buf;
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = MS5611_i2c_interface(prom_buf, iterator.devid(), iterator.bus(), cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), MS5611_ADDRESS_1, cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = MS5611_spi_interface(prom_buf, iterator.devid(), iterator.bus(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
-	if (interface == nullptr) {
-		PX4_ERR("alloc failed");
+	if (interface) {
+		if (interface->init() != PX4_OK) {
+			delete interface;
+			return nullptr;
+		}
+
+	} else {
 		return nullptr;
 	}
 
-	if (interface->init() != OK) {
-		delete interface;
-		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
-		return nullptr;
-	}
-
-	MS5611 *dev = new MS5611(interface, prom_buf, (MS56XX_DEVICE_TYPES)cli.type, iterator.configuredBusOption(),
-				 iterator.bus());
+	MS5611 *dev = new MS5611(interface, iterator.configuredBusOption(), iterator.bus());
 
 	if (dev == nullptr) {
-		delete interface;
 		return nullptr;
 	}
 
-	if (OK != dev->init()) {
+	if (dev->init() != PX4_OK) {
 		delete dev;
+		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
 		return nullptr;
 	}
 
@@ -86,34 +88,21 @@ void MS5611::print_usage()
 	PRINT_MODULE_USAGE_SUBCATEGORY("baro");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
-	PRINT_MODULE_USAGE_PARAM_STRING('T', "5611", "5607|5611", "Device type", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
 extern "C" int ms5611_main(int argc, char *argv[])
 {
-	using ThisDriver = MS5611;
 	int ch;
+	using ThisDriver = MS5611;
 	BusCLIArguments cli{true, true};
-	cli.type = MS5611_DEVICE;
-	cli.default_i2c_frequency = 400000;
-	cli.default_spi_frequency = 20 * 1000 * 1000;
-	uint16_t dev_type_driver = DRV_BARO_DEVTYPE_MS5611;
+	cli.default_i2c_frequency = I2C_SPEED;
+	cli.default_spi_frequency = SPI_SPEED;
 
-	while ((ch = cli.getopt(argc, argv, "T:")) != EOF) {
+	while ((ch = cli.getopt(argc, argv, "R:")) != EOF) {
 		switch (ch) {
-		case 'T': {
-				int val = atoi(cli.optarg());
-
-				if (val == 5611) {
-					cli.type = MS5611_DEVICE;
-					dev_type_driver = DRV_BARO_DEVTYPE_MS5611;
-
-				} else if (val == 5607) {
-					cli.type = MS5607_DEVICE;
-					dev_type_driver = DRV_BARO_DEVTYPE_MS5607;
-				}
-			}
+		case 'R':
+			cli.rotation = (enum Rotation)atoi(cli.optarg());
 			break;
 		}
 	}
@@ -125,7 +114,7 @@ extern "C" int ms5611_main(int argc, char *argv[])
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, dev_type_driver);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_BARO_DEVTYPE_MS5611);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);

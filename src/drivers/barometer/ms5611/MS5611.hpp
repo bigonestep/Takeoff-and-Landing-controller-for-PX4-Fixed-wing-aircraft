@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,125 +31,68 @@
  *
  ****************************************************************************/
 
+/**
+ * @file MS5611.hpp
+ * Driver for the MS5611 barometric pressure sensor connected via I2C or SPI.
+ */
+
 #pragma once
 
-#include <drivers/device/device.h>
+#include <drivers/drv_hrt.h>
+#include <lib/drivers/device/Device.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/i2c_spi_buses.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <systemlib/err.h>
 
-#include "ms5611.h"
+#include "TE_MS5611_registers.hpp"
 
-enum MS56XX_DEVICE_TYPES {
-	MS5611_DEVICE	= 5611,
-	MS5607_DEVICE	= 5607,
-};
-
-/* helper macro for handling report buffer indices */
-#define INCREMENT(_x, _lim)	do { __typeof__(_x) _tmp = _x+1; if (_tmp >= _lim) _tmp = 0; _x = _tmp; } while(0)
-
-/* helper macro for arithmetic - returns the square of the argument */
-#define POW2(_x)		((_x) * (_x))
-
-/*
- * MS5611/MS5607 internal constants and data structures.
- */
-#define ADDR_CMD_CONVERT_D1_OSR256		0x40	/* write to this address to start pressure conversion */
-#define ADDR_CMD_CONVERT_D1_OSR512		0x42	/* write to this address to start pressure conversion */
-#define ADDR_CMD_CONVERT_D1_OSR1024		0x44	/* write to this address to start pressure conversion */
-#define ADDR_CMD_CONVERT_D1_OSR2048		0x46	/* write to this address to start pressure conversion */
-#define ADDR_CMD_CONVERT_D1_OSR4096		0x48	/* write to this address to start pressure conversion */
-#define ADDR_CMD_CONVERT_D2_OSR256		0x50	/* write to this address to start temperature conversion */
-#define ADDR_CMD_CONVERT_D2_OSR512		0x52	/* write to this address to start temperature conversion */
-#define ADDR_CMD_CONVERT_D2_OSR1024		0x54	/* write to this address to start temperature conversion */
-#define ADDR_CMD_CONVERT_D2_OSR2048		0x56	/* write to this address to start temperature conversion */
-#define ADDR_CMD_CONVERT_D2_OSR4096		0x58	/* write to this address to start temperature conversion */
-
-/*
-  use an OSR of 1024 to reduce the self-heating effect of the
-  sensor. Information from MS tells us that some individual sensors
-  are quite sensitive to this effect and that reducing the OSR can
-  make a big difference
- */
-#define ADDR_CMD_CONVERT_D1			ADDR_CMD_CONVERT_D1_OSR1024
-#define ADDR_CMD_CONVERT_D2			ADDR_CMD_CONVERT_D2_OSR1024
-
-/*
- * Maximum internal conversion time for OSR 1024 is 2.28 ms. We set an update
- * rate of 100Hz which is be very safe not to read the ADC before the
- * conversion finished
- */
-#define MS5611_CONVERSION_INTERVAL	10000	/* microseconds */
-#define MS5611_MEASUREMENT_RATIO	3	/* pressure measurements per temperature measurement */
+using namespace TE_MS5611;
 
 class MS5611 : public I2CSPIDriver<MS5611>
 {
 public:
-	MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type,
-	       I2CSPIBusOption bus_option, int bus);
+	MS5611(device::Device *interface, I2CSPIBusOption bus_option, int bus);
 	~MS5611() override;
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 					     int runtime_instance);
 	static void print_usage();
 
-	int		init();
-
-	/**
-	 * Perform a poll cycle; collect from the previous measurement
-	 * and start a new one.
-	 *
-	 * This is the heart of the measurement state machine.  This function
-	 * alternately starts a measurement, or collects the data from the
-	 * previous measurement.
-	 *
-	 * When the interval between measurements is greater than the minimum
-	 * measurement interval, a gap is inserted between collection
-	 * and measurement to provide the most recent measurement possible
-	 * at the next interval.
-	 */
-	void			RunImpl();
-
-protected:
+	int init();
 	void print_status() override;
+	void RunImpl();
 
-	PX4Barometer		_px4_barometer;
+private:
+	bool read_prom();
 
-	device::Device		*_interface;
+	// MS5611 crc4 cribbed from the datasheet
+	bool crc4(uint16_t *n_prom);
 
-	ms5611::prom_s		_prom;
+	device::Device *_interface;
+	PX4Barometer _px4_barometer;
 
-	enum MS56XX_DEVICE_TYPES _device_type;
-	bool			_collect_phase{false};
-	unsigned		_measure_phase{false};
+	enum class STATE : uint8_t {
+		RESET,
+		READ_PROM,
+		CONVERT_TEMPERATURE,
+		READ_TEMPERATURE,
+		CONVERT_PRESSURE,
+		READ_PRESSURE,
+	} _state{STATE::RESET};
 
-	/* intermediate temperature values per MS5611/MS5607 datasheet */
-	int64_t			_OFF{0};
-	int64_t			_SENS{0};
+	hrt_abstime _timestamp_sample{0};
+	hrt_abstime _last_temperature_update{0};
 
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_measure_perf;
-	perf_counter_t		_comms_errors;
+	TE_MS5611::PROM _prom{};
 
-	/**
-	 * Initialize the automatic measurement state machine and start it.
-	 *
-	 * @note This function is called at open and error time.  It might make sense
-	 *       to make it more aggressive about resetting the bus in case of errors.
-	 */
-	void			start();
+	int32_t _pressure_previous{0};
 
-	/**
-	 * Issue a measurement command for the current state.
-	 *
-	 * @return		OK if the measurement command was successful.
-	 */
-	int			measure();
+	/* intermediate temperature values per MS5611 datasheet */
+	int64_t _OFF{0};
+	int64_t _SENS{0};
 
-	/**
-	 * Collect the result of the most recent measurement.
-	 */
-	int			collect();
+	perf_counter_t _reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": reset")};
+	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": read")};
+	perf_counter_t _measure_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": measure")};
+	perf_counter_t _comms_errors{perf_alloc(PC_COUNT, MODULE_NAME": com_err")};
 };
