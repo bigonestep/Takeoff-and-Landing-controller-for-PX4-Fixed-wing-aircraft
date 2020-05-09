@@ -382,13 +382,51 @@ RoverPositionControl::control_rates(const vehicle_angular_velocity_s &rates, con
 {
 	//TODO: Add PID for rate controls
 	PX4_INFO("controlling rates");
-	_k_p = 0.3;
-	_k_ff = 0.7;
+	_k_p = 0.5;
+	_k_ff = 0.0;
+	_k_i = 1.0;
+	_integrator_max = 1.0;
+	min_throttle = 0.1;
+
+	/* get the usual dt estimate */
+	uint64_t dt_micros = hrt_elapsed_time(&_last_run);
+	_last_run = hrt_absolute_time();
+	float dt = (float)dt_micros * 1e-6f;
+
+	bool lock_integrator = false;
+
+	if (dt_micros > 500000) {
+		lock_integrator = true;
+	}
+
 	//TODO: Add integration error
 	float rate_error = rates_sp.yaw - rates.xyz[2];
-	float control_effort = rates_sp.yaw * _k_ff + rate_error * _k_p;
+
+	if (!lock_integrator && _k_i > 0.0f && abs(rates_sp.thrust_body[0]) > min_throttle) {
+
+		float id = rate_error * dt;
+
+		/*
+		 * anti-windup: do not allow integrator to increase if actuator is at limit
+		 */
+		if (_last_output < -1.0f) {
+			/* only allow motion to center: increase value */
+			id = math::max(id, 0.0f);
+
+		} else if (_last_output > 1.0f) {
+			/* only allow motion to center: decrease value */
+			id = math::min(id, 0.0f);
+		}
+
+		/* add and constrain */
+		_integrator = math::constrain(_integrator + id * _k_i, -_integrator_max, _integrator_max);
+	}
+
+	//TODO: Need groundspeed scaling
+	float control_effort = rates_sp.yaw * _k_ff + rate_error * _k_p + _integrator;
 
 	control_effort = math::constrain(control_effort, -1.0f, 1.0f);
+	_last_output = control_effort;
 
 	const float control_throttle = math::constrain(rates_sp.thrust_body[0], -1.0f, 1.0f);
 	PX4_INFO("  - thrust	    : %f", double(rates_sp.thrust_body[0]));
