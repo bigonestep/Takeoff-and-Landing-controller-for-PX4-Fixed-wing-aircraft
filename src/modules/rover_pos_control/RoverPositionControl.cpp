@@ -375,17 +375,20 @@ RoverPositionControl::control_rates(const vehicle_angular_velocity_s &rates, con
 {
 	//TODO: Add PID for rate controls
 	PX4_INFO("controlling rates");
-	float desired_rate = rates_sp.yaw;
-	float rate_error = rates_sp.yaw - rates.yaw;
-
+	float _k_p = 0.3;
+	float _k_ff = 0.7;
 	//TODO: Add integration error
-	const float control_effort = rates_sp.yaw * kff + rate_error * kp;
+	float rate_error = rates_sp.yaw - rates.xyz[2];
+	float control_effort = rates_sp.yaw * _k_ff + rate_error * _k_p;
 
 	control_effort = math::constrain(control_effort, -1.0f, 1.0f);
 
 	const float control_throttle = math::constrain(rates_sp.thrust_body[0], -1.0f, 1.0f);
-	PX4_INFO("  - thrust: %f", double(rates_sp.thrust_body[0]));
-	PX4_INFO("  - rates : %f", double(control_effort));
+	PX4_INFO("  - thrust	    : %f", double(rates_sp.thrust_body[0]));
+	PX4_INFO("  - current rates : %f", double(rates.xyz[2]));
+	PX4_INFO("  - rate sp	    : %f", double(rates_sp.yaw));
+	PX4_INFO("  - rate error    : %f", double(rate_error));
+	PX4_INFO("  - cmd 	    : %f", double(control_effort));
 
 	if (control_throttle >= 0.0f) {
 		_act_controls.control[actuator_controls_s::INDEX_YAW] = control_effort;
