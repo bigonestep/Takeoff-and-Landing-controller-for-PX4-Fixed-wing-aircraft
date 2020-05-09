@@ -146,6 +146,16 @@ private:
 
 	bool _waypoint_reached{false};
 
+	float _k_ff;
+	float _k_p;
+	float _k_i;
+	uint64_t _last_run = 0;
+	float min_throttle;
+	float _last_output;
+	float _integrator;
+	float _integrator_max;
+	float _max_rate;
+
 	enum UGV_POSCTRL_MODE {
 		UGV_POSCTRL_MODE_AUTO,
 		UGV_POSCTRL_MODE_OTHER

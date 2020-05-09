@@ -90,6 +90,13 @@ void RoverPositionControl::parameters_update(bool force)
 				   _param_speed_d.get(),
 				   _param_speed_imax.get(),
 				   _param_gndspeed_max.get());
+
+		/* wheel control parameters */
+		_k_i = _param_gnd_wr_p.get();
+		_k_p = _param_gnd_wr_i.get();
+		_k_ff = _param_gnd_wr_ff.get();
+		_integrator_max = _param_gnd_wr_imax.get();
+		_max_rate = _param_gnd_w_rmax.get();
 	}
 }
 
@@ -375,8 +382,8 @@ RoverPositionControl::control_rates(const vehicle_angular_velocity_s &rates, con
 {
 	//TODO: Add PID for rate controls
 	PX4_INFO("controlling rates");
-	float _k_p = 0.3;
-	float _k_ff = 0.7;
+	_k_p = 0.3;
+	_k_ff = 0.7;
 	//TODO: Add integration error
 	float rate_error = rates_sp.yaw - rates.xyz[2];
 	float control_effort = rates_sp.yaw * _k_ff + rate_error * _k_p;
