@@ -49,45 +49,65 @@
 
 namespace uORB
 {
-
-class SubscriptionCallback;
-
-// Base subscription wrapper class
-class Subscription
+class SubscriptionBase
 {
 public:
-
-	/**
-	 * Constructor
-	 *
-	 * @param id The uORB ORB_ID enum for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	Subscription(ORB_ID id, uint8_t instance = 0) :
-		_orb_id(id),
-		_instance(instance)
-	{
-	}
-
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	Subscription(const orb_metadata *meta, uint8_t instance = 0) :
-		_orb_id((meta == nullptr) ? ORB_ID::INVALID : static_cast<ORB_ID>(meta->o_id)),
-		_instance(instance)
-	{
-	}
-
-	~Subscription()
+	~SubscriptionBase()
 	{
 		unsubscribe();
 	}
 
-	bool subscribe();
-	void unsubscribe();
+	bool subscribe()
+	{
+		// check if already subscribed
+		if (_node != nullptr) {
+			return true;
+		}
+
+		if (_orb_id != ORB_ID::INVALID) {
+
+			DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
+
+			if (device_master != nullptr) {
+
+				if (!device_master->deviceNodeExists(_orb_id, _instance)) {
+					return false;
+				}
+
+				uORB::DeviceNode *node = device_master->getDeviceNode(get_topic(), _instance);
+
+				if (node != nullptr) {
+					_node = node;
+					_node->add_internal_subscriber();
+
+					// If there were any previous publications, allow the subscriber to read them
+					const unsigned curr_gen = _node->published_message_count();
+					const uint8_t q_size = _node->get_queue_size();
+
+					if (q_size < curr_gen) {
+						_last_generation = curr_gen - q_size;
+
+					} else {
+						_last_generation = 0;
+					}
+
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	void unsubscribe()
+	{
+		if (_node != nullptr) {
+			_node->remove_internal_subscriber();
+		}
+
+		_node = nullptr;
+		_last_generation = 0;
+	}
 
 	bool valid() const { return _node != nullptr; }
 	bool advertised()
@@ -112,39 +132,86 @@ public:
 	 * */
 	bool updated() { return advertised() ? (_node->published_message_count() != _last_generation) : false; }
 
+	uint8_t  get_instance() const { return _instance; }
+	orb_id_t get_topic() const { return get_orb_meta(_orb_id); }
+	ORB_PRIO get_priority() { return advertised() ? _node->get_priority() : ORB_PRIO_UNINITIALIZED; }
+
+protected:
+
+	/**
+	 * Constructor
+	 *
+	 * @param id The uORB ORB_ID enum for the topic.
+	 * @param instance The instance for multi sub.
+	 */
+	SubscriptionBase(ORB_ID id, uint8_t instance = 0) :
+		_orb_id(id),
+		_instance(instance)
+	{
+	}
+
+	DeviceNode *get_node() { return _node; }
+
+	DeviceNode *_node{nullptr};
+	unsigned _last_generation{0}; /**< last generation the subscriber has seen */
+	ORB_ID _orb_id{ORB_ID::INVALID};
+	uint8_t _instance{0};
+};
+
+class SubscriptionCallback;
+
+// Base subscription wrapper class
+template<typename T>
+class Subscriber : public SubscriptionBase
+{
+public:
+
+	/**
+	 * Constructor
+	 *
+	 * @param id The uORB ORB_ID enum for the topic.
+	 * @param instance The instance for multi sub.
+	 */
+	Subscriber(ORB_ID id, uint8_t instance = 0) :
+		SubscriptionBase(id, instance)
+	{
+		//static_assert(sizeof(T) == )
+	}
+
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param instance The instance for multi sub.
+	 */
+	Subscriber(const orb_metadata *meta, uint8_t instance = 0) :
+		SubscriptionBase((meta == nullptr) ? ORB_ID::INVALID : static_cast<ORB_ID>(meta->o_id), instance)
+	{
+	}
+
 	/**
 	 * Update the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool update(void *dst) { return updated() ? copy(dst) : false; }
+	bool update(T *dst) { return updated() ? copy(dst) : false; }
 
 	/**
 	 * Copy the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool copy(void *dst) { return advertised() ? _node->copy(dst, _last_generation) : false; }
-
-	uint8_t		get_instance() const { return _instance; }
-	orb_id_t	get_topic() const { return get_orb_meta(_orb_id); }
-	ORB_PRIO	get_priority() { return advertised() ? _node->get_priority() : ORB_PRIO_UNINITIALIZED; }
+	bool copy(T *dst) { return advertised() ? _node->copy(dst, _last_generation) : false; }
 
 protected:
 
 	friend class SubscriptionCallback;
 
-	DeviceNode		*get_node() { return _node; }
-
-	DeviceNode		*_node{nullptr};
-
-	unsigned _last_generation{0}; /**< last generation the subscriber has seen */
-
-	ORB_ID _orb_id{ORB_ID::INVALID};
-	uint8_t _instance{0};
 };
+
+using Subscription = Subscriber<void>;
 
 // Subscription wrapper class with data
 template<class T>
-class SubscriptionData : public Subscription
+class SubscriptionData : public Subscriber<T>
 {
 public:
 	/**
@@ -154,7 +221,7 @@ public:
 	 * @param instance The instance for multi sub.
 	 */
 	SubscriptionData(ORB_ID id, uint8_t instance = 0) :
-		Subscription(id, instance)
+		Subscriber<T>(id, instance)
 	{
 		copy(&_data);
 	}
@@ -166,9 +233,9 @@ public:
 	 * @param instance The instance for multi sub.
 	 */
 	SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
-		Subscription(meta, instance)
+		Subscriber<T>(meta, instance)
 	{
-		copy(&_data);
+		Subscriber<T>::copy(&_data);
 	}
 
 	~SubscriptionData() = default;
@@ -180,7 +247,7 @@ public:
 	SubscriptionData &operator=(SubscriptionData &&) = delete;
 
 	// update the embedded struct.
-	bool update() { return Subscription::update((void *)(&_data)); }
+	bool update() { return Subscriber<T>::update(&_data); }
 
 	const T &get() const { return _data; }
 

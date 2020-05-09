@@ -332,7 +332,7 @@ public:
 	}
 
 private:
-	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscriber<vehicle_status_s> _status_sub{ORB_ID(vehicle_status)};
 
 	/* do not allow top copying this class */
 	MavlinkStreamHeartbeat(MavlinkStreamHeartbeat &) = delete;
