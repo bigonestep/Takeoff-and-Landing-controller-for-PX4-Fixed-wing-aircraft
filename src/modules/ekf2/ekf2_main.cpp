@@ -1229,9 +1229,8 @@ void Ekf2::Run()
 				// generate vehicle odometry data
 				vehicle_odometry_s odom{};
 
-				lpos.timestamp = now;
+				lpos.timestamp_sample = now;
 
-				odom.timestamp = hrt_absolute_time();
 				odom.timestamp_sample = now;
 
 				odom.local_frame = odom.LOCAL_FRAME_NED;
@@ -1399,9 +1398,11 @@ void Ekf2::Run()
 				odom.velocity_covariance[odom.COVARIANCE_MATRIX_VZ_VARIANCE] = covariances[6];
 
 				// publish vehicle local position data
+				lpos.timestamp = hrt_absolute_time();
 				_vehicle_local_position_pub.update();
 
 				// publish vehicle odometry data
+				odom.timestamp = hrt_absolute_time();
 				_vehicle_odometry_pub.publish(odom);
 
 				// publish external visual odometry after fixed frame alignment if new odometry is received
@@ -1436,7 +1437,7 @@ void Ekf2::Run()
 					// generate and publish global position data
 					vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
 
-					global_pos.timestamp = now;
+					global_pos.timestamp_sample = now;
 
 					if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
 						map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
@@ -1465,13 +1466,14 @@ void Ekf2::Run()
 
 					global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
 
+					global_pos.timestamp = hrt_absolute_time();
 					_vehicle_global_position_pub.update();
 				}
 			}
 
 			{
 				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				bias.timestamp = now;
+				bias.timestamp_sample = now;
 
 				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
 				if (_imu_sub_index < 0) {
@@ -1489,12 +1491,13 @@ void Ekf2::Run()
 				bias.mag_bias[1] = _last_valid_mag_cal[1];
 				bias.mag_bias[2] = _last_valid_mag_cal[2];
 
+				bias.timestamp = hrt_absolute_time();
 				_estimator_sensor_bias_pub.publish(bias);
 			}
 
 			// publish estimator status
 			estimator_status_s status;
-			status.timestamp = now;
+			status.timestamp_sample = now;
 			_ekf.getStateAtFusionHorizonAsVector().copyTo(status.states);
 			status.n_states = 24;
 			_ekf.covariances_diagonal().copyTo(status.covariances);
@@ -1522,7 +1525,7 @@ void Ekf2::Run()
 			status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
 			status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
 			status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
-
+			status.timestamp = hrt_absolute_time();
 			_estimator_status_pub.publish(status);
 
 			// publish GPS drift data only when updated to minimise overhead
@@ -1625,7 +1628,7 @@ void Ekf2::Run()
 			{
 				// publish estimator innovation data
 				estimator_innovations_s innovations;
-				innovations.timestamp = now;
+				innovations.timestamp_sample = now;
 				_ekf.getGpsVelPosInnov(&innovations.gps_hvel[0], innovations.gps_vvel, &innovations.gps_hpos[0],
 						       innovations.gps_vpos);
 				_ekf.getEvVelPosInnov(&innovations.ev_hvel[0], innovations.ev_vvel, &innovations.ev_hpos[0], innovations.ev_vpos);
@@ -1646,7 +1649,7 @@ void Ekf2::Run()
 
 				// publish estimator innovation variance data
 				estimator_innovations_s innovation_var;
-				innovation_var.timestamp = now;
+				innovation_var.timestamp_sample = now;
 				_ekf.getGpsVelPosInnovVar(&innovation_var.gps_hvel[0], innovation_var.gps_vvel, &innovation_var.gps_hpos[0],
 							  innovation_var.gps_vpos);
 				_ekf.getEvVelPosInnovVar(&innovation_var.ev_hvel[0], innovation_var.ev_vvel, &innovation_var.ev_hpos[0],
@@ -1669,7 +1672,7 @@ void Ekf2::Run()
 
 				// publish estimator innovation test ratio data
 				estimator_innovations_s test_ratios;
-				test_ratios.timestamp = now;
+				test_ratios.timestamp_sample = now;
 				_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
 							    test_ratios.gps_vpos);
 				_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0],
@@ -1698,8 +1701,13 @@ void Ekf2::Run()
 					resetPreFlightChecks();
 				}
 
+				innovations.timestamp = hrt_absolute_time();
 				_estimator_innovations_pub.publish(innovations);
+
+				innovation_var.timestamp = hrt_absolute_time();
 				_estimator_innovation_variances_pub.publish(innovation_var);
+
+				test_ratios.timestamp = hrt_absolute_time();
 				_estimator_innovation_test_ratios_pub.publish(test_ratios);
 
 			}
@@ -1774,13 +1782,14 @@ void Ekf2::publish_attitude(const hrt_abstime &timestamp)
 	if (_ekf.attitude_valid()) {
 		// generate vehicle attitude quaternion data
 		vehicle_attitude_s att;
-		att.timestamp = timestamp;
+		att.timestamp_sample = timestamp;
 
 		const Quatf q{_ekf.calculate_quaternion()};
 		q.copyTo(att.q);
 
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 
+		att.timestamp = hrt_absolute_time();
 		_att_pub.publish(att);
 
 	}  else if (_replay_mode) {

@@ -5,6 +5,8 @@
 
 uint64 timestamp		# time since system start (microseconds)
 
+uint64 timestamp_sample		# the timestamp of the raw data (microseconds)
+
 # In-run bias estimates (subtract from uncorrected data)
 
 uint32 gyro_device_id		# unique device ID for the sensor that does not change between power cycles
