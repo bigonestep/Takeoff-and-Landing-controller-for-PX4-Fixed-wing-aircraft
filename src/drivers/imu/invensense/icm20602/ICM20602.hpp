@@ -73,20 +73,22 @@ private:
 	void exit_and_cleanup() override;
 
 	// Sensor Configuration
-	static constexpr float FIFO_SAMPLE_DT{125.f};
-	static constexpr uint32_t SAMPLES_PER_TRANSFER{2};       // ensure at least 1 new accel sample per transfer
-	static constexpr float GYRO_RATE{1e6f / FIFO_SAMPLE_DT}; // 8 kHz gyro
-	static constexpr float ACCEL_RATE{GYRO_RATE / 2.f};      // 4 kHz accel
+	static constexpr float FIFO_SAMPLE_DT{1e6f / 8000.f};
+	static constexpr uint32_t SAMPLES_PER_TRANSFER{2};                   // ensure at least 1 new accel sample per transfer
+	static constexpr float GYRO_RATE{1e6f / FIFO_SAMPLE_DT};             // 8000 Hz gyro
+	static constexpr float ACCEL_RATE{GYRO_RATE / SAMPLES_PER_TRANSFER}; // 4000 Hz accel
 
 	static constexpr uint32_t FIFO_MAX_SAMPLES{math::min(FIFO::SIZE / sizeof(FIFO::DATA), sizeof(PX4Gyroscope::FIFOSample::x) / sizeof(PX4Gyroscope::FIFOSample::x[0]))};
 
 	// Transfer data
 	struct FIFOTransferBuffer {
-		uint8_t cmd{static_cast<uint8_t>(Register::FIFO_R_W) | DIR_READ};
+		uint8_t cmd{static_cast<uint8_t>(Register::FIFO_COUNTH) | DIR_READ};
+		uint8_t FIFO_COUNTH{0};
+		uint8_t FIFO_COUNTL{0};
 		FIFO::DATA f[FIFO_MAX_SAMPLES] {};
 	};
 	// ensure no struct padding
-	static_assert(sizeof(FIFOTransferBuffer) == (1 + FIFO_MAX_SAMPLES *sizeof(FIFO::DATA)));
+	static_assert(sizeof(FIFOTransferBuffer) == (3 + FIFO_MAX_SAMPLES *sizeof(FIFO::DATA)));
 
 	struct register_config_t {
 		Register reg;
@@ -133,17 +135,20 @@ private:
 	perf_counter_t _transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
 	perf_counter_t _bad_register_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad register")};
 	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad transfer")};
+	perf_counter_t _fifo_count_read_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO count read")};
 	perf_counter_t _fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO empty")};
 	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO overflow")};
 	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO reset")};
-	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval")};
+	perf_counter_t _drdy_interval_perf{nullptr};
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
-	hrt_abstime _fifo_watermark_interrupt_timestamp{0};
 	hrt_abstime _temperature_update_timestamp{0};
+	unsigned _consecutive_failures{0};
+	unsigned _total_failures{0};
 
-	px4::atomic<uint8_t> _fifo_read_samples{0};
+	hrt_abstime _drdy_interrupt_timestamp{0};
+	px4::atomic<uint8_t> _drdy_fifo_read_samples{0};
 	bool _data_ready_interrupt_enabled{false};
 
 	enum class STATE : uint8_t {

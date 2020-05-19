@@ -48,6 +48,10 @@ MPU6000::MPU6000(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rota
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
+	if (drdy_gpio != 0) {
+		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval");
+	}
+
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 }
 
@@ -77,6 +81,7 @@ int MPU6000::init()
 bool MPU6000::Reset()
 {
 	_state = STATE::RESET;
+	DataReadyInterruptDisable();
 	ScheduleClear();
 	ScheduleNow();
 	return true;
@@ -91,8 +96,7 @@ void MPU6000::exit_and_cleanup()
 void MPU6000::print_status()
 {
 	I2CSPIDriverBase::print_status();
-	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us,
-		 static_cast<double>(1000000 / _fifo_empty_interval_us));
+	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us, 1e6 / _fifo_empty_interval_us);
 
 	perf_print_counter(_transfer_perf);
 	perf_print_counter(_bad_register_perf);
@@ -125,6 +129,8 @@ void MPU6000::RunImpl()
 		// PWR_MGMT_1: Device Reset
 		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::DEVICE_RESET);
 		_reset_timestamp = hrt_absolute_time();
+		_consecutive_failures = 0;
+		_total_failures = 0;
 		_state = STATE::WAIT_FOR_RESET;
 		ScheduleDelayed(100_ms);
 		break;
@@ -189,15 +195,22 @@ void MPU6000::RunImpl()
 			hrt_abstime timestamp_sample = 0;
 
 			if (_data_ready_interrupt_enabled) {
+				const uint8_t drdy_samples = _drdy_fifo_read_samples.fetch_and(0);
+				const hrt_abstime drdy_timestamp_sample = _drdy_interrupt_timestamp;
+
+				if ((drdy_samples >= SAMPLES_PER_TRANSFER)
+				    && (hrt_elapsed_time(&drdy_timestamp_sample) < (_fifo_empty_interval_us / 2))) {
+
+					// use timestamp set in data ready interrupt
+					timestamp_sample = drdy_timestamp_sample;
+					perf_count_interval(_drdy_interval_perf, drdy_timestamp_sample);
+				}
+
 				// re-schedule as watchdog timeout
 				ScheduleDelayed(10_ms);
 			}
 
-			if (_data_ready_interrupt_enabled && (hrt_elapsed_time(&timestamp_sample) < (_fifo_empty_interval_us / 2))) {
-				// use timestamp from data ready interrupt if enabled and seems valid
-				timestamp_sample = _fifo_watermark_interrupt_timestamp;
-
-			} else {
+			if (!_data_ready_interrupt_enabled || (timestamp_sample == 0)) {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
 				timestamp_sample = hrt_absolute_time();
 			}
@@ -227,17 +240,33 @@ void MPU6000::RunImpl()
 				perf_count(_fifo_empty_perf);
 			}
 
+			if (failure) {
+				_total_failures++;
+				_consecutive_failures++;
+
+				// full reset if things are failing consecutively
+				if (_consecutive_failures > 100 || _total_failures > 1000) {
+					Reset();
+					return;
+				}
+
+			} else {
+				_consecutive_failures = 0;
+			}
+
 			if (failure || hrt_elapsed_time(&_last_config_check_timestamp) > 10_ms) {
 				// check registers incrementally
-				if (RegisterCheck(_register_cfg[_checked_register], true)) {
+				if (RegisterCheck(_register_cfg[_checked_register])) {
 					_last_config_check_timestamp = timestamp_sample;
 					_checked_register = (_checked_register + 1) % size_register_cfg;
 
 				} else {
-					// register check failed, force reconfigure
-					PX4_DEBUG("Health check failed, reconfiguring");
-					_state = STATE::CONFIGURE;
-					ScheduleNow();
+					// register check failed, force reset
+					PX4_DEBUG("Health check failed, resetting");
+					perf_count(_bad_register_perf);
+					_px4_accel.increase_error_count();
+					_px4_gyro.increase_error_count();
+					Reset();
 				}
 
 			} else {
@@ -253,36 +282,36 @@ void MPU6000::RunImpl()
 	}
 }
 
-void MPU6000::ConfigureAccel()
+void MPU6000::ConfigureAccel(uint8_t register_value)
 {
-	const uint8_t AFS_SEL = RegisterRead(Register::ACCEL_CONFIG) & (Bit4 | Bit3); // [4:3] AFS_SEL[1:0]
+	const uint8_t AFS_SEL = register_value; // [4:3] AFS_SEL[1:0]
 
 	switch (AFS_SEL) {
 	case AFS_SEL_2G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384);
-		_px4_accel.set_range(2 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384.f);
+		_px4_accel.set_range(2.f * CONSTANTS_ONE_G);
 		break;
 
 	case AFS_SEL_4G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192);
-		_px4_accel.set_range(4 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192.f);
+		_px4_accel.set_range(4.f * CONSTANTS_ONE_G);
 		break;
 
 	case AFS_SEL_8G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096);
-		_px4_accel.set_range(8 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096.f);
+		_px4_accel.set_range(8.f * CONSTANTS_ONE_G);
 		break;
 
 	case AFS_SEL_16G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048);
-		_px4_accel.set_range(16 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048.f);
+		_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
 		break;
 	}
 }
 
-void MPU6000::ConfigureGyro()
+void MPU6000::ConfigureGyro(uint8_t register_value)
 {
-	const uint8_t GYRO_FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] FS_SEL[1:0]
+	const uint8_t GYRO_FS_SEL = register_value; // [4:3] FS_SEL[1:0]
 
 	switch (GYRO_FS_SEL) {
 	case FS_SEL_250_DPS:
@@ -317,12 +346,12 @@ void MPU6000::ConfigureSampleRate(int sample_rate)
 	const float min_interval = SAMPLES_PER_TRANSFER * FIFO_SAMPLE_DT;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);
 
-	_fifo_gyro_samples = math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_gyro_samples = roundf(math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES));
 
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_gyro_samples * (1e6f / GYRO_RATE);
 
-	_fifo_accel_samples = math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_accel_samples = roundf(math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES));
 
 	_px4_accel.set_update_rate(1e6f / _fifo_empty_interval_us);
 	_px4_gyro.set_update_rate(1e6f / _fifo_empty_interval_us);
@@ -338,9 +367,6 @@ bool MPU6000::Configure()
 		}
 	}
 
-	ConfigureAccel();
-	ConfigureGyro();
-
 	return success;
 }
 
@@ -352,12 +378,13 @@ int MPU6000::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU6000::DataReady()
 {
-	perf_count(_drdy_interval_perf);
+	const uint8_t count = _drdy_count.fetch_add(1) + 1;
 
-	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
-		_data_ready_count.store(0);
-		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
-		_fifo_read_samples.store(_fifo_gyro_samples);
+	// at least the required number of samples in the FIFO
+	if ((count >= _fifo_gyro_samples) && (_drdy_fifo_read_samples.load() == 0)) {
+		_drdy_count.store(0);
+		_drdy_interrupt_timestamp = hrt_absolute_time();
+		_drdy_fifo_read_samples.store(_fifo_gyro_samples);
 		ScheduleNow();
 	}
 }
@@ -369,7 +396,7 @@ bool MPU6000::DataReadyInterruptConfigure()
 	}
 
 	// Setup data ready on falling edge
-	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &MPU6000::DataReadyInterruptCallback, this) == 0;
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
 }
 
 bool MPU6000::DataReadyInterruptDisable()
@@ -381,7 +408,7 @@ bool MPU6000::DataReadyInterruptDisable()
 	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
 }
 
-bool MPU6000::RegisterCheck(const register_config_t &reg_cfg, bool notify)
+bool MPU6000::RegisterCheck(const register_config_t &reg_cfg)
 {
 	bool success = true;
 
@@ -400,10 +427,12 @@ bool MPU6000::RegisterCheck(const register_config_t &reg_cfg, bool notify)
 	if (!success) {
 		RegisterSetAndClearBits(reg_cfg.reg, reg_cfg.set_bits, reg_cfg.clear_bits);
 
-		if (notify) {
-			perf_count(_bad_register_perf);
-			_px4_accel.increase_error_count();
-			_px4_gyro.increase_error_count();
+	} else {
+		if (reg_cfg.reg == Register::GYRO_CONFIG) {
+			ConfigureGyro(reg_value);
+
+		} else if (reg_cfg.reg == Register::ACCEL_CONFIG) {
+			ConfigureAccel(reg_value);
 		}
 	}
 
@@ -460,7 +489,6 @@ uint16_t MPU6000::FIFOReadCount()
 bool MPU6000::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
 {
 	perf_begin(_transfer_perf);
-
 	FIFOTransferBuffer buffer{};
 	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
 	set_frequency(SPI_SPEED_SENSOR);
@@ -488,9 +516,9 @@ void MPU6000::FIFOReset()
 	RegisterSetAndClearBits(Register::USER_CTRL, USER_CTRL_BIT::FIFO_RESET, USER_CTRL_BIT::FIFO_EN);
 
 	// reset while FIFO is disabled
-	_data_ready_count.store(0);
-	_fifo_watermark_interrupt_timestamp = 0;
-	_fifo_read_samples.store(0);
+	_drdy_count.store(0);
+	_drdy_interrupt_timestamp = 0;
+	_drdy_fifo_read_samples.store(0);
 
 	// FIFO_EN: enable both gyro and accel
 	// USER_CTRL: re-enable FIFO
@@ -512,7 +540,7 @@ bool MPU6000::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTransf
 	// FIFO contains 8 duplicated accel samples per gyro sample
 	int accel_samples = 0;
 
-	for (int i = 0; i < samples; i = i + 8) {
+	for (int i = 0; i < samples; i = i + SAMPLES_PER_TRANSFER) {
 		const FIFO::DATA &fifo_sample = buffer.f[i];
 		int16_t accel_x = combine(fifo_sample.ACCEL_XOUT_H, fifo_sample.ACCEL_XOUT_L);
 		int16_t accel_y = combine(fifo_sample.ACCEL_YOUT_H, fifo_sample.ACCEL_YOUT_L);

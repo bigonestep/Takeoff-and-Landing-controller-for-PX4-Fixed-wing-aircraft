@@ -74,8 +74,6 @@ enum class Register : uint8_t {
 	INT_PIN_CFG   = 0x37,
 	INT_ENABLE    = 0x38,
 
-	INT_STATUS    = 0x3A,
-
 	TEMP_OUT_H    = 0x41,
 	TEMP_OUT_L    = 0x42,
 
@@ -97,6 +95,10 @@ enum CONFIG_BIT : uint8_t {
 
 // GYRO_CONFIG
 enum GYRO_CONFIG_BIT : uint8_t {
+	XG_ST           = Bit7,
+	YG_ST           = Bit6,
+	ZG_ST           = Bit5,
+
 	// FS_SEL [4:3]
 	FS_SEL_250_DPS	= 0,           // 0b00000
 	FS_SEL_500_DPS	= Bit3,        // 0b01000
@@ -106,6 +108,10 @@ enum GYRO_CONFIG_BIT : uint8_t {
 
 // ACCEL_CONFIG
 enum ACCEL_CONFIG_BIT : uint8_t {
+	XA_ST       = Bit7,
+	YA_ST       = Bit6,
+	ZA_ST       = Bit5,
+
 	// AFS_SEL [4:3]
 	AFS_SEL_2G  = 0,           // 0b00000
 	AFS_SEL_4G  = Bit3,        // 0b01000
@@ -120,26 +126,19 @@ enum FIFO_EN_BIT : uint8_t {
 	YG_FIFO_EN    = Bit5,
 	ZG_FIFO_EN    = Bit4,
 	ACCEL_FIFO_EN = Bit3,
+	SLV2_FIFO_EN  = Bit2,
+	SLV1_FIFO_EN  = Bit1,
+	SLV0_FIFO_EN  = Bit0,
 };
 
 // INT_PIN_CFG
 enum INT_PIN_CFG_BIT : uint8_t {
 	INT_LEVEL    = Bit7,
-
-	INT_RD_CLEAR = Bit4,
-
 };
 
 // INT_ENABLE
 enum INT_ENABLE_BIT : uint8_t {
-	FIFO_OFLOW_EN   = Bit4,
 	DATA_RDY_INT_EN = Bit0
-};
-
-// INT_STATUS
-enum INT_STATUS_BIT : uint8_t {
-	FIFO_OFLOW_INT = Bit4,
-	DATA_RDY_INT   = Bit0,
 };
 
 // SIGNAL_PATH_RESET
