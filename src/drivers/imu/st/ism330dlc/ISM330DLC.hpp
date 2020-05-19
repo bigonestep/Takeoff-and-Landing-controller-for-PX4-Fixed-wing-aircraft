@@ -113,7 +113,7 @@ private:
 	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
 	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
 	perf_counter_t _drdy_count_perf{perf_alloc(PC_COUNT, MODULE_NAME": drdy count")};
-	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
+	perf_counter_t _drdy_interval_perf{nullptr};
 
 	hrt_abstime _time_data_ready{0};
 	hrt_abstime _time_last_temperature_update{0};

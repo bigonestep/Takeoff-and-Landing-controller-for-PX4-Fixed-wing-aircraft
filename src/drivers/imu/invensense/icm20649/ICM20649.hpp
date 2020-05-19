@@ -111,7 +111,7 @@ private:
 	void ConfigureGyro();
 	void ConfigureSampleRate(int sample_rate);
 
-	void SelectRegisterBank(enum REG_BANK_SEL_BIT bank);
+	void SelectRegisterBank(enum REG_BANK_SEL_BIT bank, bool force = false);
 	void SelectRegisterBank(Register::BANK_0 reg) { SelectRegisterBank(REG_BANK_SEL_BIT::USER_BANK_0); }
 	void SelectRegisterBank(Register::BANK_2 reg) { SelectRegisterBank(REG_BANK_SEL_BIT::USER_BANK_2); }
 
@@ -146,17 +146,17 @@ private:
 	perf_counter_t _fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO empty")};
 	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO overflow")};
 	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO reset")};
-	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval")};
+	perf_counter_t _drdy_interval_perf{nullptr};
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
-	hrt_abstime _fifo_watermark_interrupt_timestamp{0};
 	hrt_abstime _temperature_update_timestamp{0};
 
 	enum REG_BANK_SEL_BIT _last_register_bank {REG_BANK_SEL_BIT::USER_BANK_0};
 
+	hrt_abstime _drdy_interrupt_timestamp{0};
+	px4::atomic<uint8_t> _drdy_fifo_read_samples{0};
 	px4::atomic<uint8_t> _data_ready_count{0};
-	px4::atomic<uint8_t> _fifo_read_samples{0};
 	bool _data_ready_interrupt_enabled{false};
 	bool _force_fifo_count_check{true};
 
@@ -176,21 +176,20 @@ private:
 	uint8_t _checked_register_bank0{0};
 	static constexpr uint8_t size_register_bank0_cfg{6};
 	register_bank0_config_t _register_bank0_cfg[size_register_bank0_cfg] {
-		// Register                       | Set bits, Clear bits
-		{ Register::BANK_0::USER_CTRL,     USER_CTRL_BIT::FIFO_EN | USER_CTRL_BIT::I2C_IF_DIS, USER_CTRL_BIT::I2C_MST_EN },
-		{ Register::BANK_0::PWR_MGMT_1,    PWR_MGMT_1_BIT::CLKSEL_0, PWR_MGMT_1_BIT::DEVICE_RESET | PWR_MGMT_1_BIT::SLEEP },
-		{ Register::BANK_0::INT_PIN_CFG,   INT_PIN_CFG_BIT::INT1_ACTL, 0 },
-		{ Register::BANK_0::INT_ENABLE_1,  INT_ENABLE_1_BIT::RAW_DATA_0_RDY_EN, 0 },
-		{ Register::BANK_0::FIFO_EN_2,     FIFO_EN_2_BIT::ACCEL_FIFO_EN | FIFO_EN_2_BIT::GYRO_Z_FIFO_EN | FIFO_EN_2_BIT::GYRO_Y_FIFO_EN | FIFO_EN_2_BIT::GYRO_X_FIFO_EN, FIFO_EN_2_BIT::TEMP_FIFO_EN },
-		{ Register::BANK_0::FIFO_MODE,     FIFO_MODE_BIT::Snapshot, 0 },
-		// { Register::BANK_0::FIFO_CFG,      FIFO_CFG_BIT::FIFO_CFG, 0 }, // TODO: enable data ready interrupt
+		// Register                             | Set bits, Clear bits
+		{ Register::BANK_0::USER_CTRL,          USER_CTRL_BIT::FIFO_EN | USER_CTRL_BIT::I2C_IF_DIS, USER_CTRL_BIT::I2C_MST_EN },
+		{ Register::BANK_0::PWR_MGMT_1,         PWR_MGMT_1_BIT::CLKSEL_0, PWR_MGMT_1_BIT::DEVICE_RESET | PWR_MGMT_1_BIT::SLEEP },
+		{ Register::BANK_0::INT_PIN_CFG,        INT_PIN_CFG_BIT::INT1_ACTL, 0 },
+		{ Register::BANK_0::INT_ENABLE_1,       INT_ENABLE_1_BIT::RAW_DATA_0_RDY_EN, 0 },
+		{ Register::BANK_0::FIFO_EN_2,          FIFO_EN_2_BIT::ACCEL_FIFO_EN | FIFO_EN_2_BIT::GYRO_Z_FIFO_EN | FIFO_EN_2_BIT::GYRO_Y_FIFO_EN | FIFO_EN_2_BIT::GYRO_X_FIFO_EN, FIFO_EN_2_BIT::TEMP_FIFO_EN },
+		{ Register::BANK_0::FIFO_MODE,          FIFO_MODE_BIT::Snapshot, 0 },
 	};
 
 	uint8_t _checked_register_bank2{0};
 	static constexpr uint8_t size_register_bank2_cfg{2};
 	register_bank2_config_t _register_bank2_cfg[size_register_bank2_cfg] {
-		// Register                       | Set bits, Clear bits
-		{ Register::BANK_2::GYRO_CONFIG_1, GYRO_CONFIG_1_BIT::GYRO_FS_SEL_4000_DPS, GYRO_CONFIG_1_BIT::GYRO_FCHOICE },
-		{ Register::BANK_2::ACCEL_CONFIG,  ACCEL_CONFIG_BIT::ACCEL_FS_SEL_30G, ACCEL_CONFIG_BIT::ACCEL_FCHOICE },
+		// Register                             | Set bits, Clear bits
+		{ Register::BANK_2::GYRO_CONFIG_1,      GYRO_CONFIG_1_BIT::GYRO_FS_SEL_4000_DPS, GYRO_CONFIG_1_BIT::GYRO_FCHOICE },
+		{ Register::BANK_2::ACCEL_CONFIG,       ACCEL_CONFIG_BIT::ACCEL_FS_SEL_30G, ACCEL_CONFIG_BIT::ACCEL_FCHOICE },
 	};
 };

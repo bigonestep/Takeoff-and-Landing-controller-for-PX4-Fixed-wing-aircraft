@@ -48,6 +48,10 @@ ICM40609D::ICM40609D(I2CSPIBusOption bus_option, int bus, uint32_t device, enum 
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
+	if (drdy_gpio != 0) {
+		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval");
+	}
+
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 }
 
@@ -91,8 +95,7 @@ void ICM40609D::exit_and_cleanup()
 void ICM40609D::print_status()
 {
 	I2CSPIDriverBase::print_status();
-	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us,
-		 static_cast<double>(1000000 / _fifo_empty_interval_us));
+	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us, 1e6 / _fifo_empty_interval_us);
 
 	perf_print_counter(_transfer_perf);
 	perf_print_counter(_bad_register_perf);
@@ -181,25 +184,30 @@ void ICM40609D::RunImpl()
 			uint8_t samples = 0;
 
 			if (_data_ready_interrupt_enabled) {
+				samples = _drdy_fifo_read_samples.fetch_and(0);
+				timestamp_sample = _drdy_interrupt_timestamp;
+
+				if ((samples == 0) || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
+					// manually check FIFO count if no samples from DRDY or timestamp looks bogus
+					_force_fifo_count_check = true;
+
+				} else {
+					// timestamp set in data ready interrupt
+					perf_count_interval(_drdy_interval_perf, timestamp_sample);
+				}
+
 				// re-schedule as watchdog timeout
 				ScheduleDelayed(10_ms);
-
-				// timestamp set in data ready interrupt
-				samples = _fifo_read_samples.load();
-				timestamp_sample = _fifo_watermark_interrupt_timestamp;
 			}
 
-			bool failure = false;
-
-			// manually check FIFO count if no samples from DRDY or timestamp looks bogus
-			if (!_data_ready_interrupt_enabled || (samples == 0)
-			    || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
-
+			if (!_data_ready_interrupt_enabled || _force_fifo_count_check) {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
 				timestamp_sample = hrt_absolute_time();
 				const uint16_t fifo_count = FIFOReadCount();
 				samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
 			}
+
+			bool failure = false;
 
 			if (samples > FIFO_MAX_SAMPLES) {
 				// not technically an overflow, but more samples than we expected or can publish
@@ -253,22 +261,22 @@ void ICM40609D::ConfigureAccel()
 	switch (ACCEL_FS_SEL) {
 	case ACCEL_FS_SEL_4G:
 		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192.f);
-		_px4_accel.set_range(4 * CONSTANTS_ONE_G);
+		_px4_accel.set_range(4.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_8G:
 		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096.f);
-		_px4_accel.set_range(8 * CONSTANTS_ONE_G);
+		_px4_accel.set_range(8.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_16G:
 		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048.f);
-		_px4_accel.set_range(16 * CONSTANTS_ONE_G);
+		_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_32G:
 		_px4_accel.set_scale(CONSTANTS_ONE_G / 1024.f);
-		_px4_accel.set_range(32 * CONSTANTS_ONE_G);
+		_px4_accel.set_range(32.f * CONSTANTS_ONE_G);
 		break;
 	}
 }
@@ -369,10 +377,14 @@ int ICM40609D::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM40609D::DataReady()
 {
-	perf_count(_drdy_interval_perf);
-	_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
-	_fifo_read_samples.store(_fifo_gyro_samples);
-	ScheduleNow();
+	const hrt_abstime now = hrt_absolute_time();
+
+	uint8_t expected = 0;
+
+	if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
+		_drdy_interrupt_timestamp = now;
+		ScheduleNow();
+	}
 }
 
 bool ICM40609D::DataReadyInterruptConfigure()
@@ -382,7 +394,7 @@ bool ICM40609D::DataReadyInterruptConfigure()
 	}
 
 	// Setup data ready on falling edge
-	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &ICM40609D::DataReadyInterruptCallback, this) == 0;
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
 }
 
 bool ICM40609D::DataReadyInterruptDisable()
@@ -548,8 +560,8 @@ void ICM40609D::FIFOReset()
 	RegisterSetBits(Register::BANK_0::SIGNAL_PATH_RESET, SIGNAL_PATH_RESET_BIT::FIFO_FLUSH);
 
 	// reset while FIFO is disabled
-	_fifo_watermark_interrupt_timestamp = 0;
-	_fifo_read_samples.store(0);
+	_drdy_interrupt_timestamp = 0;
+	_drdy_fifo_read_samples.store(0);
 }
 
 void ICM40609D::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer,

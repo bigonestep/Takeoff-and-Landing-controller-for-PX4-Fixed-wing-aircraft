@@ -120,7 +120,8 @@ SPI::init()
 	}
 
 	/* tell the world where we are */
-	DEVICE_DEBUG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device), _frequency / 1000);
+	DEVICE_DEBUG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device),
+		     SPI_SETFREQUENCY(_dev, _frequency) / 1000);
 
 	return PX4_OK;
 }

@@ -50,6 +50,10 @@ MPU9250::MPU9250(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rota
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
+	if (drdy_gpio != 0) {
+		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval");
+	}
+
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 
 	if (enable_magnetometer) {
@@ -114,8 +118,7 @@ void MPU9250::exit_and_cleanup()
 void MPU9250::print_status()
 {
 	I2CSPIDriverBase::print_status();
-	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us,
-		 static_cast<double>(1000000 / _fifo_empty_interval_us));
+	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us, 1e6 / _fifo_empty_interval_us);
 
 	perf_print_counter(_transfer_perf);
 	perf_print_counter(_bad_register_perf);
@@ -222,15 +225,22 @@ void MPU9250::RunImpl()
 			hrt_abstime timestamp_sample = 0;
 
 			if (_data_ready_interrupt_enabled) {
+				const uint8_t drdy_samples = _drdy_fifo_read_samples.fetch_and(0);
+				const hrt_abstime drdy_timestamp_sample = _drdy_interrupt_timestamp;
+
+				if ((drdy_samples >= SAMPLES_PER_TRANSFER)
+				    && (hrt_elapsed_time(&drdy_timestamp_sample) < (_fifo_empty_interval_us / 2))) {
+
+					// use timestamp set in data ready interrupt
+					timestamp_sample = drdy_timestamp_sample;
+					perf_count_interval(_drdy_interval_perf, drdy_timestamp_sample);
+				}
+
 				// re-schedule as watchdog timeout
 				ScheduleDelayed(10_ms);
 			}
 
-			if (_data_ready_interrupt_enabled && (hrt_elapsed_time(&timestamp_sample) < (_fifo_empty_interval_us / 2))) {
-				// use timestamp from data ready interrupt if enabled and seems valid
-				timestamp_sample = _fifo_watermark_interrupt_timestamp;
-
-			} else {
+			if (!_data_ready_interrupt_enabled || (timestamp_sample == 0)) {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
 				timestamp_sample = hrt_absolute_time();
 			}
@@ -292,23 +302,23 @@ void MPU9250::ConfigureAccel()
 
 	switch (ACCEL_FS_SEL) {
 	case ACCEL_FS_SEL_2G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384);
-		_px4_accel.set_range(2 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384.f);
+		_px4_accel.set_range(2.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_4G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192);
-		_px4_accel.set_range(4 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192.f);
+		_px4_accel.set_range(4.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_8G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096);
-		_px4_accel.set_range(8 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096.f);
+		_px4_accel.set_range(8.f * CONSTANTS_ONE_G);
 		break;
 
 	case ACCEL_FS_SEL_16G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048);
-		_px4_accel.set_range(16 * CONSTANTS_ONE_G);
+		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048.f);
+		_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
 		break;
 	}
 }
@@ -350,12 +360,12 @@ void MPU9250::ConfigureSampleRate(int sample_rate)
 	const float min_interval = SAMPLES_PER_TRANSFER * FIFO_SAMPLE_DT;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);
 
-	_fifo_gyro_samples = math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_gyro_samples = roundf(math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES));
 
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_gyro_samples * (1e6f / GYRO_RATE);
 
-	_fifo_accel_samples = math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_accel_samples = roundf(math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES));
 
 	_px4_accel.set_update_rate(1e6f / _fifo_empty_interval_us);
 	_px4_gyro.set_update_rate(1e6f / _fifo_empty_interval_us);
@@ -385,12 +395,16 @@ int MPU9250::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU9250::DataReady()
 {
-	perf_count(_drdy_interval_perf);
+	const hrt_abstime now = hrt_absolute_time();
+	const uint8_t data_ready_count = _data_ready_count.fetch_add(1) + 1;
 
-	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
+	// at least the required number of samples in the FIFO and multiple of 8 (only 1 accel per 8 samples)
+	if ((_drdy_fifo_read_samples.load() == 0) && (data_ready_count >= _fifo_gyro_samples)
+	    && (data_ready_count % SAMPLES_PER_TRANSFER == 0)) {
+
 		_data_ready_count.store(0);
-		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
-		_fifo_read_samples.store(_fifo_gyro_samples);
+		_drdy_interrupt_timestamp = now;
+		_drdy_fifo_read_samples.store(data_ready_count);
 		ScheduleNow();
 	}
 }
@@ -402,7 +416,7 @@ bool MPU9250::DataReadyInterruptConfigure()
 	}
 
 	// Setup data ready on falling edge
-	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &MPU9250::DataReadyInterruptCallback, this) == 0;
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
 }
 
 bool MPU9250::DataReadyInterruptDisable()
@@ -493,7 +507,6 @@ uint16_t MPU9250::FIFOReadCount()
 bool MPU9250::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
 {
 	perf_begin(_transfer_perf);
-
 	FIFOTransferBuffer buffer{};
 	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
 	set_frequency(SPI_SPEED_SENSOR);
@@ -522,8 +535,8 @@ void MPU9250::FIFOReset()
 
 	// reset while FIFO is disabled
 	_data_ready_count.store(0);
-	_fifo_watermark_interrupt_timestamp = 0;
-	_fifo_read_samples.store(0);
+	_drdy_interrupt_timestamp = 0;
+	_drdy_fifo_read_samples.store(0);
 
 	// FIFO_EN: enable both gyro and accel
 	// USER_CTRL: re-enable FIFO
