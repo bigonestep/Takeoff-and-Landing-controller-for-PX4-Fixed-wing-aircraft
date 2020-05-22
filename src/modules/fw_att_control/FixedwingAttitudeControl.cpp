@@ -151,6 +151,7 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 			}
 
 			if (!_vcontrol_mode.flag_control_climb_rate_enabled &&
+			    !_vcontrol_mode.flag_control_airspeed_enabled &&
 			    !_vcontrol_mode.flag_control_offboard_enabled) {
 
 				if (_vcontrol_mode.flag_control_attitude_enabled) {

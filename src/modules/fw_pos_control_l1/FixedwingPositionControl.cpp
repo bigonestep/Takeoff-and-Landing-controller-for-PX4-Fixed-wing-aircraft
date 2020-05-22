@@ -227,19 +227,28 @@ float
 FixedwingPositionControl::get_demanded_airspeed()
 {
 	float altctrl_airspeed = 0;
+	float airspeed_stick_setpoint; // position of the stick responsible for airspeed setpoint
+
+	// the airspeed setpoint is read of the throttle stick in all modes beside airspeed mode (pitch stick)
+	if (_control_mode.flag_control_altitude_enabled) {
+		airspeed_stick_setpoint = _manual.z;
+
+	} else {
+		airspeed_stick_setpoint = _manual.x / 2.0f + 0.5f ;
+	}
 
 	// neutral throttle corresponds to trim airspeed
-	if (_manual.z < 0.5f) {
+	if (airspeed_stick_setpoint < 0.5f) {
 		// lower half of throttle is min to trim airspeed
 		altctrl_airspeed = _param_fw_airspd_min.get() +
 				   (_param_fw_airspd_trim.get() - _param_fw_airspd_min.get()) *
-				   _manual.z * 2;
+				   airspeed_stick_setpoint * 2;
 
 	} else {
 		// upper half of throttle is trim to max airspeed
 		altctrl_airspeed = _param_fw_airspd_trim.get() +
 				   (_param_fw_airspd_max.get() - _param_fw_airspd_trim.get()) *
-				   (_manual.z * 2 - 1);
+				   (airspeed_stick_setpoint * 2 - 1);
 	}
 
 	return altctrl_airspeed;
@@ -888,7 +897,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 			_att_sp.yaw_body = 0;
 		}
 
-	} else if (_control_mode.flag_control_altitude_enabled) {
+	} else if (_control_mode.flag_control_altitude_enabled &&
+		   _control_mode.flag_control_airspeed_enabled) {
 		/* ALTITUDE CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed */
 
 		if (_control_mode_current != FW_POSCTRL_MODE_POSITION && _control_mode_current != FW_POSCTRL_MODE_ALTITUDE) {
@@ -931,6 +941,33 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get());
 		_att_sp.yaw_body = 0;
 
+	} else if (_control_mode.flag_control_airspeed_enabled) {
+		/* AIRSPEED CONTROL: pitch stick moves airspeed setpoint, throttle stick sets throttle */
+
+		_control_mode_current = FW_POSCTRL_MODE_AIRSPEED;
+
+		// if we assume that user is taking off then help by demanding altitude setpoint well above ground
+		// and set limit to pitch angle to prevent steering into ground
+		// this will only affect planes and not VTOL
+		float pitch_limit_min = _param_fw_p_lim_min.get();
+		// do_takeoff_help(&_hold_alt, &pitch_limit_min);
+
+		_tecs.set_speed_weight(2.0f);
+
+		tecs_update_pitch_throttle(_current_altitude,
+					   get_demanded_airspeed(),
+					   radians(_param_fw_p_lim_min.get()),
+					   radians(_param_fw_p_lim_max.get()),
+					   0.0f,
+					   1.0f,
+					   _param_fw_thr_cruise.get(),
+					   false,
+					   pitch_limit_min,
+					   tecs_status_s::TECS_MODE_NORMAL);
+
+		_att_sp.roll_body = _manual.y * radians(_param_fw_man_r_max.get());
+		_att_sp.yaw_body = 0;
+
 	} else {
 		_control_mode_current = FW_POSCTRL_MODE_OTHER;
 
@@ -968,6 +1005,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		   pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
 
 		_att_sp.thrust_body[0] = 0.0f;
+
+	} else if (_control_mode_current == FW_POSCTRL_MODE_AIRSPEED) {
+		_att_sp.thrust_body[0] = _manual.z;
 
 	} else if (_control_mode_current == FW_POSCTRL_MODE_OTHER) {
 		_att_sp.thrust_body[0] = min(_att_sp.thrust_body[0], _param_fw_thr_max.get());
@@ -1594,7 +1634,8 @@ FixedwingPositionControl::Run()
 			    _control_mode.flag_control_position_enabled ||
 			    _control_mode.flag_control_velocity_enabled ||
 			    _control_mode.flag_control_acceleration_enabled ||
-			    _control_mode.flag_control_altitude_enabled) {
+			    _control_mode.flag_control_altitude_enabled ||
+			    _control_mode.flag_control_airspeed_enabled) {
 
 				_attitude_sp_pub.publish(_att_sp);
 
@@ -1745,7 +1786,8 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 				   (_control_mode.flag_control_auto_enabled ||
 				    _control_mode.flag_control_offboard_enabled ||
 				    _control_mode.flag_control_velocity_enabled ||
-				    _control_mode.flag_control_altitude_enabled));
+				    _control_mode.flag_control_altitude_enabled ||
+				    _control_mode.flag_control_airspeed_enabled));
 
 	/* update TECS vehicle state estimates */
 	_tecs.update_vehicle_state_estimates(_airspeed, _R_nb,

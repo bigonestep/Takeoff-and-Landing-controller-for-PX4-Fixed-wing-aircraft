@@ -378,6 +378,9 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 			} else if (!strcmp(argv[2], "rattitude")) {
 				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_RATTITUDE);
 
+			} else if (!strcmp(argv[2], "airspeed")) {
+				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AIRSPEED);
+
 			} else if (!strcmp(argv[2], "auto:takeoff")) {
 				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
 						     PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF);
@@ -627,6 +630,10 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 
 					/* OFFBOARD */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_OFFBOARD, status_flags, &_internal_state);
+
+				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_AIRSPEED) {
+					/* AIRSPEED */
+					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_ARSPCTL, status_flags, &_internal_state);
 				}
 
 			} else {
@@ -728,7 +735,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 						    (status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_MANUAL ||
 						     status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_ACRO ||
 						     status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_STAB ||
-						     status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_RATTITUDE)) {
+						     status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_RATTITUDE ||
+						     status_local->nav_state == vehicle_status_s::NAVIGATION_STATE_ARSPCTL)) {
 							mavlink_log_critical(&mavlink_log_pub, "Arming denied! Throttle not zero");
 							cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_DENIED;
 							break;
@@ -1895,7 +1903,8 @@ Commander::run()
 				const bool manual_thrust_mode = _internal_state.main_state == commander_state_s::MAIN_STATE_MANUAL
 								|| _internal_state.main_state == commander_state_s::MAIN_STATE_ACRO
 								|| _internal_state.main_state == commander_state_s::MAIN_STATE_STAB
-								|| _internal_state.main_state == commander_state_s::MAIN_STATE_RATTITUDE;
+								|| _internal_state.main_state == commander_state_s::MAIN_STATE_RATTITUDE
+								|| _internal_state.main_state == commander_state_s::MAIN_STATE_ARSPCTL;
 				const bool rc_wants_disarm = (_stick_off_counter == rc_arm_hyst && _stick_on_counter < rc_arm_hyst)
 							     || arm_switch_to_disarm_transition;
 
@@ -1944,6 +1953,7 @@ Commander::run()
 					    && (_internal_state.main_state != commander_state_s::MAIN_STATE_ALTCTL)
 					    && (_internal_state.main_state != commander_state_s::MAIN_STATE_POSCTL)
 					    && (_internal_state.main_state != commander_state_s::MAIN_STATE_RATTITUDE)
+					    && (_internal_state.main_state != commander_state_s::MAIN_STATE_ARSPCTL)
 					   ) {
 						print_reject_arm("Not arming: Switch to a manual mode first");
 
@@ -2651,7 +2661,8 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 			_internal_state.main_state == commander_state_s::MAIN_STATE_POSCTL ||
 			_internal_state.main_state == commander_state_s::MAIN_STATE_ACRO ||
 			_internal_state.main_state == commander_state_s::MAIN_STATE_RATTITUDE ||
-			_internal_state.main_state == commander_state_s::MAIN_STATE_STAB)) {
+			_internal_state.main_state == commander_state_s::MAIN_STATE_STAB ||
+			_internal_state.main_state == commander_state_s::MAIN_STATE_ARSPCTL)) {
 
 			_last_sp_man.timestamp = _sp_man.timestamp;
 			_last_sp_man.x = _sp_man.x;
@@ -2830,6 +2841,19 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 					/* fall back to stabilized */
 					new_mode = commander_state_s::MAIN_STATE_STAB;
 					print_reject_mode("ALTITUDE CONTROL");
+					res = main_state_transition(status_local, new_mode, status_flags, &_internal_state);
+
+					if (res != TRANSITION_DENIED) {
+						break;
+					}
+				}
+
+
+				if (new_mode == commander_state_s::MAIN_STATE_ARSPCTL) {
+
+					/* fall back to stabilized */
+					new_mode = commander_state_s::MAIN_STATE_STAB;
+					print_reject_mode("AIRSPEED CONTROL");
 					res = main_state_transition(status_local, new_mode, status_flags, &_internal_state);
 
 					if (res != TRANSITION_DENIED) {
@@ -3107,18 +3131,27 @@ Commander::update_control_mode()
 		control_mode.flag_control_rattitude_enabled = true;
 		break;
 
+	case vehicle_status_s::NAVIGATION_STATE_ARSPCTL:
+		control_mode.flag_control_manual_enabled = true;
+		control_mode.flag_control_rates_enabled = true;
+		control_mode.flag_control_attitude_enabled = true;
+		control_mode.flag_control_airspeed_enabled = true;
+		break;
+
 	case vehicle_status_s::NAVIGATION_STATE_ALTCTL:
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_rates_enabled = true;
 		control_mode.flag_control_attitude_enabled = true;
 		control_mode.flag_control_altitude_enabled = true;
 		control_mode.flag_control_climb_rate_enabled = true;
+		control_mode.flag_control_airspeed_enabled = true;
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_POSCTL:
 		control_mode.flag_control_manual_enabled = true;
 		control_mode.flag_control_rates_enabled = true;
 		control_mode.flag_control_attitude_enabled = true;
+		control_mode.flag_control_airspeed_enabled = true;
 		control_mode.flag_control_altitude_enabled = true;
 		control_mode.flag_control_climb_rate_enabled = true;
 		control_mode.flag_control_position_enabled = !status.in_transition_mode;
@@ -3140,6 +3173,7 @@ Commander::update_control_mode()
 		control_mode.flag_control_auto_enabled = true;
 		control_mode.flag_control_rates_enabled = true;
 		control_mode.flag_control_attitude_enabled = true;
+		control_mode.flag_control_airspeed_enabled = true;
 		control_mode.flag_control_altitude_enabled = true;
 		control_mode.flag_control_climb_rate_enabled = true;
 		control_mode.flag_control_position_enabled = !status.in_transition_mode;
@@ -3226,6 +3260,7 @@ Commander::update_control_mode()
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_rates_enabled = true;
 		control_mode.flag_control_attitude_enabled = true;
+		control_mode.flag_control_airspeed_enabled = true;
 		control_mode.flag_control_rattitude_enabled = false;
 		control_mode.flag_control_altitude_enabled = true;
 		control_mode.flag_control_climb_rate_enabled = true;
@@ -4144,7 +4179,7 @@ The commander module contains the state machine for mode switching and failsafe 
 	PRINT_MODULE_USAGE_COMMAND("land");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("transition", "VTOL transition");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("mode", "Change flight mode");
-	PRINT_MODULE_USAGE_ARG("manual|acro|offboard|stabilized|rattitude|altctl|posctl|auto:mission|auto:loiter|auto:rtl|auto:takeoff|auto:land|auto:precland",
+	PRINT_MODULE_USAGE_ARG("manual|acro|offboard|stabilized|rattitude|airspeed|altctl|posctl|auto:mission|auto:loiter|auto:rtl|auto:takeoff|auto:land|auto:precland",
 			"Flight mode", false);
 	PRINT_MODULE_USAGE_COMMAND("lockdown");
 	PRINT_MODULE_USAGE_ARG("off", "Turn lockdown off", true);
