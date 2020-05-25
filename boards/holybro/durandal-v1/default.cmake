@@ -28,10 +28,10 @@ px4_add_board(
 		gps
 		heater
 		#imu # all available imu drivers
-		imu/adis16448
-		imu/adis16477
-		imu/adis16497
-		imu/bmi088
+		#imu/adis16448
+		#imu/adis16477
+		#imu/adis16497
+		#imu/bmi088
 		imu/invensense/icm20689
 		irlock
 		lights/blinkm
