@@ -68,8 +68,7 @@ AK09916::~AK09916()
 	perf_free(_mag_overflows);
 }
 
-int
-AK09916::init()
+int AK09916::init()
 {
 	int ret = I2C::init();
 
@@ -89,8 +88,7 @@ AK09916::init()
 	return PX4_OK;
 }
 
-void
-AK09916::try_measure()
+void AK09916::try_measure()
 {
 	if (!is_ready()) {
 		return;
@@ -99,8 +97,7 @@ AK09916::try_measure()
 	measure();
 }
 
-bool
-AK09916::is_ready()
+bool AK09916::is_ready()
 {
 	uint8_t st1;
 	const int ret = transfer(&AK09916REG_ST1, sizeof(AK09916REG_ST1), &st1, sizeof(st1));
@@ -117,15 +114,13 @@ AK09916::is_ready()
 	return (st1 & AK09916_ST1_DRDY);
 }
 
-void
-AK09916::measure()
+void AK09916::measure()
 {
 	ak09916_regs regs;
 
 	const hrt_abstime now = hrt_absolute_time();
 
-	const int ret = transfer(&AK09916REG_HXL, sizeof(AK09916REG_HXL),
-				 reinterpret_cast<uint8_t *>(&regs), sizeof(regs));
+	const int ret = transfer(&AK09916REG_HXL, sizeof(AK09916REG_HXL), reinterpret_cast<uint8_t *>(&regs), sizeof(regs));
 
 	if (ret != OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
@@ -138,7 +133,16 @@ AK09916::measure()
 	}
 
 	_px4_mag.set_external(external());
-	_px4_mag.update(now, regs.x, regs.y, regs.z);
+
+	// Sensor orientation
+	//  Forward X:=-Y
+	//  Right   Y:=+X
+	//  Up      Z:=+Z
+	float xraw_f = -regs.y;
+	float yraw_f = regs.x;
+	float zraw_f = regs.z;
+
+	_px4_mag.update(now, xraw_f, yraw_f, zraw_f);
 }
 
 void

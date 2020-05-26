@@ -489,10 +489,6 @@ int IST8310::collect()
 
 	perf_begin(_sample_perf);
 
-	float xraw_f;
-	float yraw_f;
-	float zraw_f;
-
 	_px4_mag.set_error_count(perf_event_count(_comms_errors));
 
 	/*
@@ -512,7 +508,6 @@ int IST8310::collect()
 		goto out;
 	}
 
-	/* swap the data we just received */
 	report.x = (((int16_t)report_buffer.x[1]) << 8) | (int16_t)report_buffer.x[0];
 	report.y = (((int16_t)report_buffer.y[1]) << 8) | (int16_t)report_buffer.y[0];
 	report.z = (((int16_t)report_buffer.z[1]) << 8) | (int16_t)report_buffer.z[0];
@@ -529,15 +524,13 @@ int IST8310::collect()
 		goto out;
 	}
 
-	/*
-	 * raw outputs
-	 *
-	 * Sensor doesn't follow right hand rule, swap x and y to make it obey
-	 * it.
-	 */
-	xraw_f = report.y;
-	yraw_f = report.x;
-	zraw_f = report.z;
+	// Sensor orientation
+	//  Forward X:=-Y
+	//  Right   Y:=+X
+	//  Up      Z:=-Z
+	float xraw_f = -report.x;
+	float yraw_f = report.y;
+	float zraw_f = -report.z;
 
 	_px4_mag.update(timestamp_sample, xraw_f, yraw_f, zraw_f);
 

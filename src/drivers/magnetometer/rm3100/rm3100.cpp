@@ -165,6 +165,14 @@ int RM3100::collect()
 	convert_signed(&yraw);
 	convert_signed(&zraw);
 
+	// Sensor orientation
+	//  Forward X:=-X
+	//  Right   Y:=+Y
+	//  Up      Z:=-Z
+	float xraw_f = -report.x;
+	float yraw_f = report.y;
+	float zraw_f = -report.z;
+
 	_px4_mag.update(timestamp_sample, xraw, yraw, zraw);
 
 	ret = OK;

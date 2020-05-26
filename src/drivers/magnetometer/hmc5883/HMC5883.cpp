@@ -279,10 +279,6 @@ int HMC5883::collect()
 
 	uint8_t check_counter;
 
-	float xraw_f;
-	float yraw_f;
-	float zraw_f;
-
 	_px4_mag.set_error_count(perf_event_count(_comms_errors));
 
 	perf_begin(_sample_perf);
@@ -359,25 +355,13 @@ int HMC5883::collect()
 		}
 	}
 
-	/*
-	 * RAW outputs
-	 *
-	 * to align the sensor axes with the board, x and y need to be flipped
-	 * and y needs to be negated
-	 */
-	if (!_px4_mag.external()) {
-		// convert onboard so it matches offboard for the
-		// scaling below
-		report.y = -report.y;
-		report.x = -report.x;
-	}
-
-	/* the standard external mag by 3DR has x pointing to the
-	 * right, y pointing backwards, and z down, therefore switch x
-	 * and y and invert y */
-	xraw_f = -report.y;
-	yraw_f = report.x;
-	zraw_f = report.z;
+	// Sensor orientation
+	//  Forward X:=-X
+	//  Right   Y:=+Y
+	//  Up      Z:=-Z
+	float xraw_f = -report.x;
+	float yraw_f = report.y;
+	float zraw_f = -report.z;
 
 	_px4_mag.update(timestamp_sample, xraw_f, yraw_f, zraw_f);
 

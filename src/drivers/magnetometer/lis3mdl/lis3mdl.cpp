@@ -126,7 +126,15 @@ int LIS3MDL::collect()
 	float temperature = 25.0f + (report.t / 8.0f);
 	_px4_mag.set_temperature(temperature);
 
-	_px4_mag.update(timestamp_sample, report.x, report.y, report.z);
+	// Sensor orientation
+	//  Forward X:=-Y
+	//  Right   Y:=-X
+	//  Up      Z:=-Z
+	float xraw_f = -report.y;
+	float yraw_f = -report.x;
+	float zraw_f = -report.z;
+
+	_px4_mag.update(timestamp_sample, xraw_f, yraw_f, zraw_f);
 
 	return PX4_OK;
 }
