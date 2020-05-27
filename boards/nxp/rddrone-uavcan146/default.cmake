@@ -43,6 +43,7 @@ px4_add_board(
 		#safety_button
 		#tone_alarm
 		#uavcannode # TODO: CAN driver needed
+		uavcan_v1
 	MODULES
 		#ekf2
 		#load_mon
@@ -70,5 +71,5 @@ px4_add_board(
 		#topic_listener
 		#tune_control
 		ver
-		#work_queue
+		work_queue
 )
