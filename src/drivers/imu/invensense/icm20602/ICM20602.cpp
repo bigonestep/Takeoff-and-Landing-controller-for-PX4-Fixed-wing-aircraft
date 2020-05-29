@@ -260,6 +260,9 @@ void ICM20602::RunImpl()
 
 				} else {
 					// register check failed, force reset
+					perf_count(_bad_register_perf);
+					_px4_accel.increase_error_count();
+					_px4_gyro.increase_error_count();
 					PX4_DEBUG("Health check failed, resetting");
 					Reset();
 				}
@@ -433,12 +436,6 @@ bool ICM20602::RegisterCheck(const register_config_t &reg_cfg, bool notify)
 
 	if (!success) {
 		RegisterSetAndClearBits(reg_cfg.reg, reg_cfg.set_bits, reg_cfg.clear_bits);
-
-		if (notify) {
-			perf_count(_bad_register_perf);
-			_px4_accel.increase_error_count();
-			_px4_gyro.increase_error_count();
-		}
 	}
 
 	return success;
@@ -463,13 +460,8 @@ void ICM20602::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t cl
 	const uint8_t orig_val = RegisterRead(reg);
 	uint8_t val = orig_val;
 
-	if (setbits) {
-		val |= setbits;
-	}
-
-	if (clearbits) {
-		val &= ~clearbits;
-	}
+	val &= ~clearbits;
+	val |= setbits;
 
 	RegisterWrite(reg, val);
 }

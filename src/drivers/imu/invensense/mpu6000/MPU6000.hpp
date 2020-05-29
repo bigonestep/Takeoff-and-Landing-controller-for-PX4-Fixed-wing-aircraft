@@ -99,8 +99,8 @@ private:
 	bool Reset();
 
 	bool Configure();
-	void ConfigureAccel(uint8_t config_register_value);
-	void ConfigureGyro(uint8_t config_register_value);
+	void ConfigureAccel();
+	void ConfigureGyro();
 	void ConfigureSampleRate(int sample_rate);
 
 	static int DataReadyInterruptCallback(int irq, void *context, void *arg);

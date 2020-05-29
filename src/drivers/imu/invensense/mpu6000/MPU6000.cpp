@@ -282,9 +282,9 @@ void MPU6000::RunImpl()
 	}
 }
 
-void MPU6000::ConfigureAccel(uint8_t register_value)
+void MPU6000::ConfigureAccel()
 {
-	const uint8_t AFS_SEL = register_value; // [4:3] AFS_SEL[1:0]
+	const uint8_t AFS_SEL = RegisterRead(Register::ACCEL_CONFIG) & (Bit4 | Bit3); // [4:3] AFS_SEL[1:0]
 
 	switch (AFS_SEL) {
 	case AFS_SEL_2G:
@@ -309,9 +309,9 @@ void MPU6000::ConfigureAccel(uint8_t register_value)
 	}
 }
 
-void MPU6000::ConfigureGyro(uint8_t register_value)
+void MPU6000::ConfigureGyro()
 {
-	const uint8_t GYRO_FS_SEL = register_value; // [4:3] FS_SEL[1:0]
+	const uint8_t GYRO_FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] FS_SEL[1:0]
 
 	switch (GYRO_FS_SEL) {
 	case FS_SEL_250_DPS:
@@ -361,9 +361,16 @@ bool MPU6000::Configure()
 {
 	bool success = true;
 
-	for (const auto &reg : _register_cfg) {
-		if (!RegisterCheck(reg)) {
+	for (const auto &r : _register_cfg) {
+		if (!RegisterCheck(r)) {
 			success = false;
+		}
+
+		if (r.reg == Register::GYRO_CONFIG) {
+			ConfigureGyro();
+
+		} else if (r.reg == Register::ACCEL_CONFIG) {
+			ConfigureAccel();
 		}
 	}
 
@@ -426,14 +433,6 @@ bool MPU6000::RegisterCheck(const register_config_t &reg_cfg)
 
 	if (!success) {
 		RegisterSetAndClearBits(reg_cfg.reg, reg_cfg.set_bits, reg_cfg.clear_bits);
-
-	} else {
-		if (reg_cfg.reg == Register::GYRO_CONFIG) {
-			ConfigureGyro(reg_value);
-
-		} else if (reg_cfg.reg == Register::ACCEL_CONFIG) {
-			ConfigureAccel(reg_value);
-		}
 	}
 
 	return success;
@@ -458,17 +457,12 @@ void MPU6000::RegisterWrite(Register reg, uint8_t value)
 void MPU6000::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t clearbits)
 {
 	const uint8_t orig_val = RegisterRead(reg);
-	uint8_t val = orig_val;
 
-	if (setbits) {
-		val |= setbits;
+	uint8_t val = (orig_val & ~clearbits) | setbits;
+
+	if (val != orig_val) {
+		RegisterWrite(reg, val);
 	}
-
-	if (clearbits) {
-		val &= ~clearbits;
-	}
-
-	RegisterWrite(reg, val);
 }
 
 uint16_t MPU6000::FIFOReadCount()
