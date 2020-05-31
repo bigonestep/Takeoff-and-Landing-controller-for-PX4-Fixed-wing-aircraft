@@ -93,32 +93,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-	board_control_spi_sensors_power(false, 0xffff);
-
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
-	board_control_spi_sensors_power(true, 0xffff);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -138,6 +112,11 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(6);
 	}
+
+	board_spi_disable();
+	px4_arch_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 0);
+
+	VDD_3V3_SPEKTRUM_POWER_EN(false);
 }
 
 /************************************************************************************
@@ -150,8 +129,7 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	board_on_reset(-1); /* Reset PWM first thing */
 
@@ -163,6 +141,7 @@ stm32_boardinitialize(void)
 	px4_gpio_init(gpio, arraySize(gpio));
 
 	/* configure SPI interfaces */
+	board_spi_disable();
 	px4_arch_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 0);
 
 	/* configure USB interfaces */
@@ -198,13 +177,9 @@ stm32_boardinitialize(void)
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
-	px4_arch_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 1);
-	board_control_spi_sensors_power(true, 0xffff);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
 	px4_platform_init();
-
-	stm32_spiinitialize();
 
 	/* configure the DMA allocator */
 	if (board_dma_alloc_init() < 0) {
@@ -238,6 +213,9 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	px4_arch_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 1);
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();

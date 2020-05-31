@@ -77,10 +77,6 @@
 #include <px4_platform_common/init.h>
 #include <px4_platform/board_dma_alloc.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -93,45 +89,6 @@ extern void led_init(void);
 extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
-
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral and sensor rails off */
-	stm32_gpiowrite(GPIO_VDD_3V3_PERIPH_EN, 0);
-	board_control_spi_sensors_power(false, 0xffff);
-	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 1);
-	stm32_gpiowrite(GPIO_VDD_5V_HIPOWER_EN, 1);
-
-
-//	bool last = stm32_gpioread(GPIO_SPEKTRUM_PWR_EN);
-	/* Keep Spektum on to discharge rail*/
-//	stm32_gpiowrite(GPIO_SPEKTRUM_PWR_EN, 1);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-//	stm32_gpiowrite(GPIO_SPEKTRUM_PWR_EN, last);
-	stm32_gpiowrite(GPIO_VDD_3V3_PERIPH_EN, 1);
-	board_control_spi_sensors_power(true, 0xffff);
-	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 0);
-	stm32_gpiowrite(GPIO_VDD_5V_HIPOWER_EN, 0);
-}
 
 /************************************************************************************
  * Name: board_on_reset
@@ -167,6 +124,13 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(400);
 	}
+
+	board_spi_disable();
+
+	/* set the peripheral and sensor rails off */
+	stm32_gpiowrite(GPIO_VDD_3V3_PERIPH_EN, 0);
+	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 1);
+	stm32_gpiowrite(GPIO_VDD_5V_HIPOWER_EN, 1);
 }
 
 /************************************************************************************
@@ -179,19 +143,18 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	/* Reset all PWM to Low outputs */
+	/* configure power supply control/sense pins */
+	stm32_configgpio(GPIO_VDD_3V3_PERIPH_EN);
+	stm32_configgpio(GPIO_VDD_5V_PERIPH_EN);
+	stm32_configgpio(GPIO_VDD_5V_HIPOWER_EN);
 
+	/* Reset all PWM to Low outputs */
 	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
-
-	/* Start with Power off */
-	board_control_spi_sensors_power_configgpio();
 
 	/* configure ADC pins */
 	stm32_configgpio(GPIO_ADC1_IN2);	/* BATT_VOLTAGE_SENS */
@@ -201,16 +164,10 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_ADC1_IN13);	/* BATT2_CURRENT_SENS */
 
 	/* configure CAN interfaces */
-
 	stm32_configgpio(GPIO_CAN1_RX);
 	stm32_configgpio(GPIO_CAN1_TX);
 	stm32_configgpio(GPIO_CAN2_RX);
 	stm32_configgpio(GPIO_CAN2_TX);
-
-	/* configure power supply control/sense pins */
-	stm32_configgpio(GPIO_VDD_3V3_PERIPH_EN);
-	stm32_configgpio(GPIO_VDD_5V_PERIPH_EN);
-	stm32_configgpio(GPIO_VDD_5V_HIPOWER_EN);
 
 	stm32_configgpio(GPIO_nVDD_BRICK1_VALID);
 	stm32_configgpio(GPIO_nVDD_BRICK2_VALID);
@@ -226,7 +183,6 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_8266_RST);
 	stm32_configgpio(GPIO_BTN_SAFETY_FMU);
 
-
 	/* configure SPI interfaces
 	 * is deferred to board_app_initialize
 	 * to delay the sensor power up with
@@ -234,7 +190,6 @@ stm32_boardinitialize(void)
 	 */
 
 	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -262,27 +217,21 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-static struct spi_dev_s *spi1;
-static struct spi_dev_s *spi2;
-static struct spi_dev_s *spi5;
-static struct spi_dev_s *spi6;
-static struct sdio_dev_s *sdio;
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
-
-	/* Now it is ok to drvie the pins high
-	 * so configure SPI CPIO */
+	/* switch the peripheral rail on */
+	stm32_gpiowrite(GPIO_SPEKTRUM_PWR_EN, 1);
+	stm32_gpiowrite(GPIO_VDD_3V3_PERIPH_EN, 1);
+	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 0);
+	stm32_gpiowrite(GPIO_VDD_5V_HIPOWER_EN, 0);
 
 	// the temp cal eeprom is unused, so disable the CS from here
 	stm32_configgpio(GPIO_SPI_CS_TEMPCAL_EEPROM);
 	stm32_gpiowrite(GPIO_SPI_CS_TEMPCAL_EEPROM, 1);
-	stm32_spiinitialize();
 
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "DMA alloc FAILED\n");
 	}
@@ -314,74 +263,11 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_RED);
 	}
 
-	/* Configure SPI-based devices */
-
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 1);
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/* Default SPI1 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
-
-	/* Get the SPI port for the FRAM */
-
-	spi2 = stm32_spibus_initialize(2);
-
-	if (!spi2) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 2);
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/* Default SPI2 to 12MHz and de-assert the known chip selects.
-	 */
-
-	// XXX start with 10.4 MHz and go up to 20 once validated
-	SPI_SETFREQUENCY(spi2, 20 * 1000 * 1000);
-	SPI_SETBITS(spi2, 8);
-	SPI_SETMODE(spi2, SPIDEV_MODE3);
-
-	/* Configure SPI 5-based devices */
-
-	spi5 = stm32_spibus_initialize(5);
-
-	if (!spi5) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 5);
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/* Default SPI5 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi5, 10000000);
-	SPI_SETBITS(spi5, 8);
-	SPI_SETMODE(spi5, SPIDEV_MODE3);
-
-	/* Configure SPI 6-based devices */
-
-	spi6 = stm32_spibus_initialize(6);
-
-	if (!spi6) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 6);
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/* Default SPI6 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi6, 10000000);
-	SPI_SETBITS(spi6, 8);
-	SPI_SETMODE(spi6, SPIDEV_MODE3);
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	/* First, get an instance of the SDIO interface */
-
-	sdio = sdio_initialize(CONFIG_NSH_MMCSDSLOTNO);
+	struct sdio_dev_s *sdio = sdio_initialize(CONFIG_NSH_MMCSDSLOTNO);
 
 	if (!sdio) {
 		led_on(LED_RED);

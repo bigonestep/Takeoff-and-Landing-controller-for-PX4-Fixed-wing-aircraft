@@ -65,25 +65,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* Power off Interfaces */
-	stm32_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, true);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-	stm32_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, false);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -103,6 +84,9 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(6);
 	}
+
+	/* Power off Interfaces */
+	stm32_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, true);
 }
 
 /************************************************************************************
@@ -153,7 +137,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	px4_platform_init();
 
-	stm32_spiinitialize();
+	board_spi_initialize();
 
 	/* configure the DMA allocator */
 	if (board_dma_alloc_init() < 0) {

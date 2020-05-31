@@ -79,7 +79,7 @@ static constexpr bool unused = validateSPIConfig(px4_spi_buses);
  * Public Functions
  ************************************************************************************/
 
-__EXPORT void board_spi_reset(int ms, int bus_mask)
+__EXPORT void board_spi_disable()
 {
 	/* Goal not to back feed the chips on the bus via IO lines */
 
@@ -175,7 +175,7 @@ __EXPORT void board_spi_reset(int ms, int bus_mask)
 
 void fmuk66_spidev_initialize(void)
 {
-	board_spi_reset(10, 0xffff);
+	board_spi_disable();
 
 	for (int bus = 0; bus < SPI_BUS_MAX_BUS_ITEMS; ++bus) {
 		for (int i = 0; i < SPI_BUS_MAX_DEVICES; ++i) {

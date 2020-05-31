@@ -102,30 +102,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	VDD_5V_PERIPH_EN(false);
-	VDD_5V_HIPOWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_5V_HIPOWER_EN(true);
-	VDD_5V_PERIPH_EN(true);
-
-}
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -146,8 +122,10 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(6);
 	}
-}
 
+	VDD_5V_PERIPH_EN(false);
+	VDD_5V_HIPOWER_EN(false);
+}
 
 /****************************************************************************
  * Name: imxrt_ocram_initialize
@@ -197,19 +175,18 @@ __EXPORT void imxrt_ocram_initialize(void)
 
 __EXPORT void imxrt_boardinitialize(void)
 {
-
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
 
 	/* configure SPI interfaces */
+	board_spi_disable();
 
 	imxrt_spidev_initialize();
 
@@ -217,7 +194,6 @@ __EXPORT void imxrt_boardinitialize(void)
 
 	fmurt1062_timer_initialize();
 }
-
 
 /****************************************************************************
  * Name: board_app_initialize
@@ -246,17 +222,12 @@ __EXPORT void imxrt_boardinitialize(void)
 
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
-
 	/* Power on Interfaces */
-
-
 	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
 	VDD_3V3_SENSORS_EN(true);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
-
-	board_spi_reset(10, 0xffff);
 
 	if (OK == board_determine_hw_info()) {
 		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),

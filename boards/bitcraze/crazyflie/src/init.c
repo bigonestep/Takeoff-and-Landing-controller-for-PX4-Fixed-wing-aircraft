@@ -113,7 +113,7 @@ stm32_boardinitialize(void)
 
 	/* configure SPI interfaces */
 
-	stm32_spiinitialize();
+	board_spi_initialize();
 
 	stm32_usbinitialize();
 }

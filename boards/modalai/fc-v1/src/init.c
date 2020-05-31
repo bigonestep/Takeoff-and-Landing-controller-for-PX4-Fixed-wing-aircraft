@@ -93,36 +93,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	// NA, rails not controlled in ModalAI FC-v1
-
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
-
-	// NA, rails not controlled in ModalAI FC-v1
-
-}
-
 /************************************************************************************
  * Name: board_on_reset
  *
@@ -143,6 +113,11 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(6);
 	}
+
+	board_spi_disable();
+
+	/* Keep Spektum on to discharge rail*/
+	VDD_3V3_SPEKTRUM_POWER_EN(false);
 }
 
 /****************************************************************************
@@ -196,7 +171,7 @@ stm32_boardinitialize(void)
 
 	/* configure SPI interfaces */
 
-	stm32_spiinitialize();
+	board_spi_initialize();
 
 	/* configure USB interfaces */
 

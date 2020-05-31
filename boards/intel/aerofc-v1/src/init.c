@@ -135,7 +135,7 @@ __EXPORT void stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_VDD_5V_SENSORS_EN);
 
 	/* configure SPI interfaces */
-	stm32_spiinitialize();
+	board_spi_initialize();
 
 }
 

@@ -983,40 +983,23 @@ __EXPORT bool board_has_bus(enum board_bus_types type, uint32_t bus);
 #  define board_has_bus(t, b) true
 #endif /* BOARD_HAS_BUS_MANIFEST */
 
-
 /************************************************************************************
- * Name: board_spi_reset
+ * Name: board_spi_initialize
  *
  * Description:
- *   Reset SPI buses and devices
+ *   Initialize all SPI buses and devices.
  *
- * Input Parameters:
- *  ms                   - delay in msbetween powering off the devices and re-enabling power.
- *
- *  bus_mask             - bitmask to select buses - use 0xffff to select all.
  */
-__EXPORT void board_spi_reset(int ms, int bus_mask);
+__EXPORT void board_spi_initialize(void);
 
 /************************************************************************************
- * Name: board_control_spi_sensors_power_configgpio
+ * Name: board_spi_disable
  *
  * Description:
- *   Initialize GPIO pins for all SPI bus power enable pins
+ *   Disable all SPI buses and devices
+ *
  */
-__EXPORT void board_control_spi_sensors_power_configgpio(void);
-
-/************************************************************************************
- * Name: board_control_spi_sensors_power
- *
- * Description:
- *   Control the power of SPI buses
- *
- * Input Parameters:
- *  enable_power         - true to enable power, false to disable
- *
- *  bus_mask             - bitmask to select buses - use 0xffff to select all.
- */
-__EXPORT void board_control_spi_sensors_power(bool enable_power, int bus_mask);
+__EXPORT void board_spi_disable(void);
 
 /************************************************************************************
  * Name: board_hardfault_init

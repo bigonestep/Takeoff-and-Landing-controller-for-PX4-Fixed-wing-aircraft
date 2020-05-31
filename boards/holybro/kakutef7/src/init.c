@@ -96,17 +96,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	UNUSED(ms);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -125,6 +114,7 @@ __EXPORT void board_on_reset(int status)
 
 	if (status >= 0) {
 		up_mdelay(6);
+		board_spi_disable();
 	}
 }
 
@@ -141,25 +131,18 @@ __EXPORT void board_on_reset(int status)
 __EXPORT void
 stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
 
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
 	/* configure USB interfaces */
-
 	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -187,14 +170,11 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
-
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
@@ -227,23 +207,28 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_RED);
 	}
 
-	/* Get the SPI port for the microSD slot */
-	struct spi_dev_s *spi_dev = stm32_spibus_initialize(CONFIG_NSH_MMCSDSPIPORTNO);
+	/* configure SPI interfaces */
+	board_spi_initialize();
 
-	if (!spi_dev) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", CONFIG_NSH_MMCSDSPIPORTNO);
-		led_on(LED_BLUE);
+#ifdef CONFIG_MMCSD
+	/* Get the SPI port for the microSD slot */
+	struct spidev *spi_expansion = stm32_spibus_initialize(1);
+
+	if (!spi_expansion) {
+		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 1);
 		return -ENODEV;
 	}
 
 	/* Now bind the SPI interface to the MMCSD driver */
-	int result = mmcsd_spislotinitialize(CONFIG_NSH_MMCSDMINOR, CONFIG_NSH_MMCSDSLOTNO, spi_dev);
+	int result = mmcsd_spislotinitialize(CONFIG_NSH_MMCSDMINOR, CONFIG_NSH_MMCSDSLOTNO, spi_expansion);
 
 	if (result != OK) {
 		led_on(LED_BLUE);
 		syslog(LOG_ERR, "[boot] FAILED to bind SPI port 1 to the MMCSD driver\n");
 		return -ENODEV;
 	}
+
+#endif
 
 	up_udelay(20);
 

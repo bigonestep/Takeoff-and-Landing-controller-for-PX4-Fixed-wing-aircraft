@@ -93,39 +93,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	VDD_5V_PERIPH_EN(false);
-	board_control_spi_sensors_power(false, 0xffff);
-	VDD_3V3_SENSORS4_EN(false);
-
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
-	board_control_spi_sensors_power(true, 0xffff);
-	VDD_3V3_SENSORS4_EN(true);
-	VDD_5V_PERIPH_EN(true);
-
-}
-
 /************************************************************************************
  * Name: board_on_reset
  *
@@ -146,6 +113,13 @@ __EXPORT void board_on_reset(int status)
 	if (status >= 0) {
 		up_mdelay(6);
 	}
+
+	board_spi_disable();
+
+	/* set the peripheral rails off */
+	VDD_5V_PERIPH_EN(false);
+	VDD_3V3_SENSORS4_EN(false);
+	VDD_3V3_SPEKTRUM_POWER_EN(false);
 }
 
 /************************************************************************************
@@ -158,32 +132,26 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
-
-	/* configure LEDs */
-
-	board_autoled_initialize();
-
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
+
+	/* Reset PWM first thing */
+	board_on_reset(-1);
+
+	/* configure LEDs */
+	board_autoled_initialize();
 
 	/* configure SPI interfaces (we can do this here as long as we only have a single SPI hw config version -
 	 * otherwise we need to move this after board_determine_hw_info()) */
 	_Static_assert(BOARD_NUM_SPI_CFG_HW_VERSIONS == 1, "Need to move the SPI initialization for multi-version support");
 
-	stm32_spiinitialize();
-
 	/* configure USB interfaces */
-
 	stm32_usbinitialize();
 
 	VDD_3V3_ETH_POWER_EN(true);
-
 }
 
 /****************************************************************************
@@ -211,21 +179,17 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
 	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
-	board_spi_reset(10, 0xffff);
 	VDD_3V3_SENSORS4_EN(true);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
 	/* Need hrt running before using the ADC */
-
 	px4_platform_init();
-
 
 	if (OK == board_determine_hw_info()) {
 		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),
@@ -235,9 +199,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		syslog(LOG_ERR, "[boot] Failed to read HW revision and version\n");
 	}
 
-
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
@@ -269,6 +231,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();

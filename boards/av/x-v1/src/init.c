@@ -121,7 +121,7 @@ stm32_boardinitialize(void)
 	px4_gpio_init(gpio, arraySize(gpio));
 
 	/* configure SPI interfaces */
-	stm32_spiinitialize();
+	board_spi_initialize();
 }
 
 /****************************************************************************

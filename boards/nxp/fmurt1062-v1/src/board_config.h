@@ -490,8 +490,6 @@ extern int imxrt_usb_initialize(void);
 
 extern void imxrt_usbinitialize(void);
 
-extern void board_peripheral_reset(int ms);
-
 extern void fmurt1062_timer_initialize(void);
 /****************************************************************************
  * Name: nsh_archinitialize

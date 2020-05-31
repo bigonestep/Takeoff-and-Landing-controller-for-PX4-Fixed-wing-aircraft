@@ -448,16 +448,8 @@ void fmuk66_spidev_initialize(void);
  *
  ************************************************************************************/
 
-int  fmuk66_spi_bus_initialize(void);
+int fmuk66_spi_bus_initialize(void);
 
-/****************************************************************************************************
- * Name: board_spi_reset board_peripheral_reset
- *
- * Description:
- *   Called to reset SPI and the perferal bus
- *
- ****************************************************************************************************/
-void board_peripheral_reset(int ms);
 
 /************************************************************************************
  * Name: fmuk66_bringup

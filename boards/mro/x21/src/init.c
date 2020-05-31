@@ -76,10 +76,6 @@
 #include <px4_platform_common/init.h>
 #include <px4_platform/board_dma_alloc.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -93,12 +89,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 /************************************************************************************
  * Name: board_on_reset
  *
@@ -120,32 +110,15 @@ __EXPORT void board_on_reset(int status)
 	 * On resets invoked from system (not boot) insure we establish a low
 	 * output state (discharge the pins) on PWM pins before they become inputs.
 	 */
-
 	if (status >= 0) {
 		up_mdelay(400);
 	}
-}
 
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
 	/* set the peripheral rails off */
 	stm32_configgpio(GPIO_VDD_5V_PERIPH_EN);
 	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 1);
 
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 0);
+	board_spi_disable();
 }
 
 /************************************************************************************
@@ -157,20 +130,15 @@ __EXPORT void board_peripheral_reset(int ms)
  *   and mapped but before any devices have been initialized.
  *
  ************************************************************************************/
-
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	// Reset all PWM to Low outputs.
-
 	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure ADC pins */
-
 	px4_arch_configgpio(GPIO_ADC1_IN2);	/* BATT_VOLTAGE_SENS */
 	px4_arch_configgpio(GPIO_ADC1_IN3);	/* BATT_CURRENT_SENS */
 	px4_arch_configgpio(GPIO_ADC1_IN4);	/* VDD_5V_SENS */
@@ -185,18 +153,13 @@ stm32_boardinitialize(void)
 	px4_arch_configgpio(GPIO_VDD_5V_PERIPH_OC);
 
 	/* configure CAN interface */
-
 	stm32_configgpio(GPIO_CAN1_RX);
 	stm32_configgpio(GPIO_CAN1_TX);
 
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
 	/* configure USB interface */
-
 	stm32_usbinitialize();
 
+	board_spi_disable();
 }
 
 /****************************************************************************
@@ -224,18 +187,14 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-
-static struct spi_dev_s *spi1;
-static struct spi_dev_s *spi2;
-static struct sdio_dev_s *sdio;
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
+	/* switch the peripheral rail back on */
+	stm32_gpiowrite(GPIO_VDD_5V_PERIPH_EN, 0);
 
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "DMA alloc FAILED\n");
 	}
@@ -265,41 +224,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_AMBER);
 	}
 
-	/* Configure SPI-based devices */
-
-	spi1 = px4_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 1\n");
-		led_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI1 to 1MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
-
-	/* Get the SPI port for the FRAM */
-
-	spi2 = px4_spibus_initialize(2);
-
-	if (!spi2) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 2\n");
-		led_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI2 to 37.5 MHz (40 MHz rounded to nearest valid divider, F4 max)
-	 * and de-assert the known chip selects. */
-
-	// XXX start with 10.4 MHz in FRAM usage and go up to 37.5 once validated
-	SPI_SETFREQUENCY(spi2, 12 * 1000 * 1000);
-	SPI_SETBITS(spi2, 8);
-	SPI_SETMODE(spi2, SPIDEV_MODE3);
-	SPI_SELECT(spi2, SPIDEV_FLASH(0), false);
-
+	/* configure SPI interfaces */
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	/* First, get an instance of the SDIO interface */

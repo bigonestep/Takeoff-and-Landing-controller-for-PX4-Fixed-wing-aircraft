@@ -118,12 +118,10 @@ __EXPORT void board_on_reset(int status)
 
 	if (status >= 0) {
 		up_mdelay(400);
+		board_disable_spi();
 	}
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 /************************************************************************************
  * Name: stm32_boardinitialize
  *
@@ -134,19 +132,15 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	// Reset all PWM to Low outputs.
-
 	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure ADC pins */
-
 	stm32_configgpio(GPIO_ADC1_IN4);	/* VDD_5V_SENS */
 	stm32_configgpio(GPIO_ADC1_IN10);	/* BATT_CURRENT_SENS */
 	stm32_configgpio(GPIO_ADC1_IN12);	/* BATT_VOLTAGE_SENS */
@@ -156,25 +150,18 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_ADC1_IN15);	/* PRESSURE_SENS */
 
 	/* configure power supply control/sense pins */
-
 	stm32_configgpio(GPIO_SBUS_INV);
 	stm32_configgpio(GPIO_FRSKY_INV);
 
 	/* configure CAN interface */
-
 	stm32_configgpio(GPIO_CAN1_RX);
 	stm32_configgpio(GPIO_CAN1_TX);
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
 
 	stm32_configgpio(GPIO_I2C2_SCL);
 	stm32_configgpio(GPIO_I2C2_SDA);
 
 	stm32_configgpio(GPIO_I2C1_SCL);
 	stm32_configgpio(GPIO_I2C1_SDA);
-
 }
 
 /****************************************************************************
@@ -201,11 +188,6 @@ stm32_boardinitialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-static struct spi_dev_s *spi1;
-static struct spi_dev_s *spi2;
-static struct spi_dev_s *spi4;
-static struct sdio_dev_s *sdio;
 
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
@@ -242,46 +224,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_AMBER);
 	}
 
-	/* Configure SPI-based devices */
-
-	spi4 = px4_spibus_initialize(4);
-
-	if (!spi4) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 4\n");
-		board_autoled_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI4 to 10MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi4, 10000000);
-	SPI_SETBITS(spi4, 8);
-	SPI_SETMODE(spi4, SPIDEV_MODE3);
-	up_udelay(20);
-
-	/* Get the SPI port for the FRAM */
-
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 1\n");
-		board_autoled_on(LED_AMBER);
-		return -ENODEV;
-	}
-
-	/* Default SPI1 to 37.5 MHz (40 MHz rounded to nearest valid divider, F4 max)
-	 * and de-assert the known chip selects. */
-
-	// XXX start with 10.4 MHz in FRAM usage and go up to 37.5 once validated
-	SPI_SETFREQUENCY(spi1, 24 * 1000 * 1000);
-	SPI_SETBITS(spi1, 8);
-
-
-	spi2 = px4_spibus_initialize(2);
-
-	/* Default SPI2 to 10MHz and de-assert the known chip selects. */
-	SPI_SETFREQUENCY(spi2, 10000000);
-	SPI_SETBITS(spi2, 8);
-
+	/* configure SPI interfaces */
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 	/* First, get an instance of the SDIO interface */

@@ -302,14 +302,14 @@ __EXPORT uint8_t imxrt_lpspi4status(FAR struct spi_dev_s *dev, uint32_t devid)
 #endif
 
 /************************************************************************************
- * Name: board_spi_reset
+ * Name: board_spi_disable
  *
  * Description:
  *
  *
  ************************************************************************************/
 
-__EXPORT void board_spi_reset(int ms, int bus_mask)
+__EXPORT void board_spi_disable()
 {
 #ifdef CONFIG_IMXRT_LPSPI1
 

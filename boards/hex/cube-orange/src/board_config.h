@@ -176,10 +176,6 @@
 
 __BEGIN_DECLS
 #ifndef __ASSEMBLY__
-
-extern void stm32_spiinitialize(void);
-extern void board_peripheral_reset(int ms);
-
 #include <px4_platform_common/board_common.h>
 #endif /* __ASSEMBLY__ */
 __END_DECLS
