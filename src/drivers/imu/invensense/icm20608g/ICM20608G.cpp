@@ -48,6 +48,10 @@ ICM20608G::ICM20608G(I2CSPIBusOption bus_option, int bus, uint32_t device, enum 
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
+	if (drdy_gpio != 0) {
+		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval");
+	}
+
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 }
 
@@ -77,6 +81,7 @@ int ICM20608G::init()
 bool ICM20608G::Reset()
 {
 	_state = STATE::RESET;
+	DataReadyInterruptDisable();
 	ScheduleClear();
 	ScheduleNow();
 	return true;
@@ -91,8 +96,7 @@ void ICM20608G::exit_and_cleanup()
 void ICM20608G::print_status()
 {
 	I2CSPIDriverBase::print_status();
-	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us,
-		 static_cast<double>(1000000 / _fifo_empty_interval_us));
+	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us, 1e6 / _fifo_empty_interval_us);
 
 	perf_print_counter(_transfer_perf);
 	perf_print_counter(_bad_register_perf);
@@ -125,8 +129,10 @@ void ICM20608G::RunImpl()
 		// PWR_MGMT_1: Device Reset
 		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::DEVICE_RESET);
 		_reset_timestamp = hrt_absolute_time();
+		_consecutive_failures = 0;
+		_total_failures = 0;
 		_state = STATE::WAIT_FOR_RESET;
-		ScheduleDelayed(1_ms);
+		ScheduleDelayed(100_ms); // max 100 ms start-up time
 		break;
 
 	case STATE::WAIT_FOR_RESET:
@@ -136,9 +142,13 @@ void ICM20608G::RunImpl()
 		if ((RegisterRead(Register::WHO_AM_I) == WHOAMI)
 		    && (RegisterRead(Register::PWR_MGMT_1) == 0x40)) {
 
+			// Reset digital signal path
+			RegisterWrite(Register::SIGNAL_PATH_RESET, SIGNAL_PATH_RESET_BIT::ACCEL_RST | SIGNAL_PATH_RESET_BIT::TEMP_RST);
+			RegisterWrite(Register::USER_CTRL, USER_CTRL_BIT::SIG_COND_RST);
+
 			// if reset succeeded then configure
 			_state = STATE::CONFIGURE;
-			ScheduleNow();
+			ScheduleDelayed(10_ms);
 
 		} else {
 			// RESET not complete
@@ -182,38 +192,32 @@ void ICM20608G::RunImpl()
 		break;
 
 	case STATE::FIFO_READ: {
-			hrt_abstime timestamp_sample = 0;
-			uint8_t samples = 0;
+			hrt_abstime timestamp_sample = hrt_absolute_time();
 
 			if (_data_ready_interrupt_enabled) {
-				// re-schedule as watchdog timeout
-				ScheduleDelayed(10_ms);
+				// use timestamp set in interrupt iff _drdy_fifo_read_samples was set and timestamp isn't too old
+				if (_drdy_fifo_read_samples.fetch_and(0) == _fifo_gyro_samples) {
+					// sanity check watermark timestamp
+					const hrt_abstime drdy_timestamp_sample = _drdy_interrupt_timestamp;
 
-				// timestamp set in data ready interrupt
-				if (!_force_fifo_count_check) {
-					samples = _fifo_read_samples.load();
-
-				} else {
-					const uint16_t fifo_count = FIFOReadCount();
-					samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
+					if (hrt_elapsed_time(&drdy_timestamp_sample) < (_fifo_empty_interval_us / 2)) {
+						timestamp_sample = drdy_timestamp_sample;
+						perf_count_interval(_drdy_interval_perf, timestamp_sample);
+					}
 				}
 
-				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+				// push backup schedule back
+				ScheduleDelayed(_fifo_empty_interval_us * 2);
 			}
+
+			// always check current FIFO count
+			const uint16_t fifo_count = FIFOReadCount();
+			uint8_t samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) *
+					  SAMPLES_PER_TRANSFER; // round down to nearest
 
 			bool failure = false;
 
-			// manually check FIFO count if no samples from DRDY or timestamp looks bogus
-			if (!_data_ready_interrupt_enabled || (samples == 0)
-			    || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
-
-				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
-				timestamp_sample = hrt_absolute_time();
-				const uint16_t fifo_count = FIFOReadCount();
-				samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
-			}
-
-			if (samples > FIFO_MAX_SAMPLES) {
+			if ((samples > FIFO_MAX_SAMPLES) || (fifo_count >= FIFO::SIZE)) {
 				// not technically an overflow, but more samples than we expected or can publish
 				perf_count(_fifo_overflow_perf);
 				failure = true;
@@ -227,9 +231,23 @@ void ICM20608G::RunImpl()
 					_px4_gyro.increase_error_count();
 				}
 
-			} else if (samples == 0) {
+			} else if ((samples == 0) || (fifo_count == 0)) {
 				failure = true;
 				perf_count(_fifo_empty_perf);
+			}
+
+			if (failure) {
+				_total_failures++;
+				_consecutive_failures++;
+
+				// full reset if things are failing consecutively
+				if (_consecutive_failures > 100 || _total_failures > 1000) {
+					Reset();
+					return;
+				}
+
+			} else {
+				_consecutive_failures = 0;
 			}
 
 			if (failure || hrt_elapsed_time(&_last_config_check_timestamp) > 10_ms) {
@@ -239,10 +257,9 @@ void ICM20608G::RunImpl()
 					_checked_register = (_checked_register + 1) % size_register_cfg;
 
 				} else {
-					// register check failed, force reconfigure
-					PX4_DEBUG("Health check failed, reconfiguring");
-					_state = STATE::CONFIGURE;
-					ScheduleNow();
+					// register check failed, force reset
+					PX4_DEBUG("Health check failed, resetting");
+					Reset();
 				}
 
 			} else {
@@ -322,12 +339,12 @@ void ICM20608G::ConfigureSampleRate(int sample_rate)
 	const float min_interval = SAMPLES_PER_TRANSFER * FIFO_SAMPLE_DT;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);
 
-	_fifo_gyro_samples = math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_gyro_samples = roundf(math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES));
 
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_gyro_samples * (1e6f / GYRO_RATE);
 
-	_fifo_accel_samples = math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES);
+	_fifo_accel_samples = roundf(math::min(_fifo_empty_interval_us / (1e6f / ACCEL_RATE), (float)FIFO_MAX_SAMPLES));
 }
 
 bool ICM20608G::Configure()
@@ -354,12 +371,14 @@ int ICM20608G::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20608G::DataReady()
 {
-	perf_count(_drdy_interval_perf);
+	const uint8_t count = _drdy_count.fetch_add(1) + 1;
 
-	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
-		_data_ready_count.store(0);
-		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
-		_fifo_read_samples.store(_fifo_gyro_samples);
+	uint8_t expected = 0;
+
+	// at least the required number of samples in the FIFO
+	if ((count >= _fifo_gyro_samples) && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
+		_drdy_interrupt_timestamp = hrt_absolute_time();
+		_drdy_count.store(0);
 		ScheduleNow();
 	}
 }
@@ -486,29 +505,13 @@ bool ICM20608G::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
 
 	const uint16_t valid_samples = math::min(samples, fifo_count_samples);
 
-	if (fifo_count_samples < samples) {
-		// force check if there is somehow fewer samples actually in the FIFO (potentially a serious error)
-		_force_fifo_count_check = true;
-
-	} else if (fifo_count_samples >= samples + 2) {
-		// if we're more than a couple samples behind force FIFO_COUNT check
-		_force_fifo_count_check = true;
-
-	} else {
-		// skip earlier FIFO_COUNT and trust DRDY count if we're in sync
-		_force_fifo_count_check = false;
-	}
-
 	if (valid_samples > 0) {
-		ProcessGyro(timestamp_sample, buffer, valid_samples);
+		ProcessGyro(timestamp_sample, buffer.f, valid_samples);
 
-		if (ProcessAccel(timestamp_sample, buffer, valid_samples)) {
+		if (ProcessAccel(timestamp_sample, buffer.f, valid_samples)) {
 			return true;
 		}
 	}
-
-	// force FIFO count check if there was any other error
-	_force_fifo_count_check = true;
 
 	return false;
 }
@@ -524,9 +527,9 @@ void ICM20608G::FIFOReset()
 	RegisterSetAndClearBits(Register::USER_CTRL, USER_CTRL_BIT::FIFO_RST, USER_CTRL_BIT::FIFO_EN);
 
 	// reset while FIFO is disabled
-	_data_ready_count.store(0);
-	_fifo_watermark_interrupt_timestamp = 0;
-	_fifo_read_samples.store(0);
+	_drdy_count.store(0);
+	_drdy_interrupt_timestamp = 0;
+	_drdy_fifo_read_samples.store(0);
 
 	// FIFO_EN: enable both gyro and accel
 	// USER_CTRL: re-enable FIFO
@@ -542,8 +545,7 @@ static bool fifo_accel_equal(const FIFO::DATA &f0, const FIFO::DATA &f1)
 	return (memcmp(&f0.ACCEL_XOUT_H, &f1.ACCEL_XOUT_H, 6) == 0);
 }
 
-bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer,
-			     const uint8_t samples)
+bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples)
 {
 	PX4Accelerometer::FIFOSample accel;
 	accel.timestamp_sample = timestamp_sample;
@@ -555,12 +557,12 @@ bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTran
 	int accel_first_sample = 1;
 
 	if (samples >= 4) {
-		if (fifo_accel_equal(buffer.f[0], buffer.f[1]) && fifo_accel_equal(buffer.f[2], buffer.f[3])) {
+		if (fifo_accel_equal(fifo[0], fifo[1]) && fifo_accel_equal(fifo[2], fifo[3])) {
 			// [A0, A1, A2, A3]
 			//  A0==A1, A2==A3
 			accel_first_sample = 1;
 
-		} else if (fifo_accel_equal(buffer.f[1], buffer.f[2])) {
+		} else if (fifo_accel_equal(fifo[1], fifo[2])) {
 			// [A0, A1, A2, A3]
 			//  A0, A1==A2, A3
 			accel_first_sample = 0;
@@ -574,10 +576,9 @@ bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTran
 	int accel_samples = 0;
 
 	for (int i = accel_first_sample; i < samples; i = i + 2) {
-		const FIFO::DATA &fifo_sample = buffer.f[i];
-		int16_t accel_x = combine(fifo_sample.ACCEL_XOUT_H, fifo_sample.ACCEL_XOUT_L);
-		int16_t accel_y = combine(fifo_sample.ACCEL_YOUT_H, fifo_sample.ACCEL_YOUT_L);
-		int16_t accel_z = combine(fifo_sample.ACCEL_ZOUT_H, fifo_sample.ACCEL_ZOUT_L);
+		int16_t accel_x = combine(fifo[i].ACCEL_XOUT_H, fifo[i].ACCEL_XOUT_L);
+		int16_t accel_y = combine(fifo[i].ACCEL_YOUT_H, fifo[i].ACCEL_YOUT_L);
+		int16_t accel_z = combine(fifo[i].ACCEL_ZOUT_H, fifo[i].ACCEL_ZOUT_L);
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
@@ -594,8 +595,7 @@ bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTran
 	return !bad_data;
 }
 
-void ICM20608G::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer,
-			    const uint8_t samples)
+void ICM20608G::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples)
 {
 	PX4Gyroscope::FIFOSample gyro;
 	gyro.timestamp_sample = timestamp_sample;
@@ -603,11 +603,9 @@ void ICM20608G::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFOTrans
 	gyro.dt = _fifo_empty_interval_us / _fifo_gyro_samples;
 
 	for (int i = 0; i < samples; i++) {
-		const FIFO::DATA &fifo_sample = buffer.f[i];
-
-		const int16_t gyro_x = combine(fifo_sample.GYRO_XOUT_H, fifo_sample.GYRO_XOUT_L);
-		const int16_t gyro_y = combine(fifo_sample.GYRO_YOUT_H, fifo_sample.GYRO_YOUT_L);
-		const int16_t gyro_z = combine(fifo_sample.GYRO_ZOUT_H, fifo_sample.GYRO_ZOUT_L);
+		const int16_t gyro_x = combine(fifo[i].GYRO_XOUT_H, fifo[i].GYRO_XOUT_L);
+		const int16_t gyro_y = combine(fifo[i].GYRO_YOUT_H, fifo[i].GYRO_YOUT_L);
+		const int16_t gyro_z = combine(fifo[i].GYRO_ZOUT_H, fifo[i].GYRO_ZOUT_L);
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
