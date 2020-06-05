@@ -41,10 +41,6 @@
  * subsystems and perform board-specific initialisation.
  */
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
-
 #include "board_config.h"
 
 #include <stdbool.h>
@@ -74,12 +70,7 @@
 #include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/board_dma_alloc.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
 #define _GPIO_PULL_DOWN_INPUT(def) (((def) & (GPIO_PORT_MASK | GPIO_PIN_MASK)) | (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_2MHz))
-
-/* Configuration ************************************************************/
 
 /*
  * Ideally we'd be able to get these from up_internal.h,
@@ -93,37 +84,6 @@ extern void led_init(void);
 extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
-
-
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	VDD_5V_PERIPH_EN(false);
-	board_control_spi_sensors_power(false, 0xffff);
-
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
-	board_control_spi_sensors_power(true, 0xffff);
-	VDD_5V_PERIPH_EN(true);
-
-}
 
 /************************************************************************************
  * Name: board_on_reset
@@ -157,25 +117,19 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
-	/* configure pins */
+	board_spi_initialize();
 
+	/* configure pins */
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-	board_control_spi_sensors_power_configgpio();
-
-	/* configure USB interfaces */
-
-	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -203,39 +157,30 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
 	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
-	board_control_spi_sensors_power(true, 0xffff);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 	VDD_5V_RC_EN(true);
 	VDD_5V_WIFI_EN(true);
 
 	/* Need hrt running before using the ADC */
-
 	px4_platform_init();
 
-
 	if (OK == board_determine_hw_info()) {
-		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),
-		       board_get_hw_type_name());
+		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n",
+		       board_get_hw_revision(), board_get_hw_version(), board_get_hw_type_name());
 
 	} else {
 		syslog(LOG_ERR, "[boot] Failed to read HW revision and version\n");
 	}
 
-	/* configure SPI interfaces (after we determined the HW version) */
-
-	stm32_spiinitialize();
-
 	/* Does this board have CAN 2 or CAN 3 if not decouple the RX
 	 * from IP block Leave TX connected
 	 */
-
 	if (!PX4_MFT_HW_SUPPORTED(PX4_MFT_CAN2)) {
 		px4_arch_configgpio(_GPIO_PULL_DOWN_INPUT(GPIO_CAN2_RX));
 	}
@@ -245,29 +190,16 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
-
-#if defined(SERIAL_HAVE_RXDMA)
-	/* set up the serial DMA polling */
-	static struct hrt_call serial_dma_call;
 
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
-	struct timespec ts;
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
-#endif
+	static struct hrt_call serial_dma_call;
+	hrt_call_every(&serial_dma_call, 1000, 1000, (hrt_callout)stm32_serial_dma_poll, NULL);
 
 	/* initial LED state */
 	drv_led_start();
@@ -278,6 +210,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	board_spi_start();
 
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();

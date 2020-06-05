@@ -79,10 +79,6 @@
 #include <drivers/drv_pwm_output.h>
 #include <px4_arch/io_timer.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
 /**
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -95,40 +91,6 @@ extern void led_init(void);
 extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
-
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	// Set the peripheral rails off.
-	stm32_configgpio(GPIO_PERIPH_3V3_EN);
-
-	stm32_gpiowrite(GPIO_PERIPH_3V3_EN, 0);
-
-	bool last = stm32_gpioread(GPIO_SPEKTRUM_PWR_EN);
-	// Keep Spektum on to discharge rail.
-	stm32_gpiowrite(GPIO_SPEKTRUM_PWR_EN, 1);
-
-	// Wait for the peripheral rail to reach GND.
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	// Re-enable power.
-	// Switch the peripheral rail back on.
-	stm32_gpiowrite(GPIO_SPEKTRUM_PWR_EN, last);
-	stm32_gpiowrite(GPIO_PERIPH_3V3_EN, 1);
-
-}
 
 /************************************************************************************
  * Name: board_on_reset
@@ -152,7 +114,6 @@ __EXPORT void board_on_reset(int status)
 	 * On resets invoked from system (not boot) insure we establish a low
 	 * output state (discharge the pins) on PWM pins before they become inputs.
 	 */
-
 	if (status >= 0) {
 		up_mdelay(400);
 	}
@@ -168,8 +129,7 @@ __EXPORT void board_on_reset(int status)
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	// Reset all PWM to Low outputs.
 	board_on_reset(-1);
@@ -177,6 +137,7 @@ stm32_boardinitialize(void)
 	// Configure LEDs.
 	board_autoled_initialize();
 
+	board_spi_initialize();
 
 	// Configure ADC pins.
 	stm32_configgpio(GPIO_ADC1_IN2);	/* BATT_VOLTAGE_SENS */
@@ -217,9 +178,6 @@ stm32_boardinitialize(void)
 
 #endif /* CONFIG_STM32_SPI4 */
 
-	// Configure SPI all interfaces GPIO & enable power.
-	stm32_spiinitialize();
-
 	// Configure heater GPIO.
 	stm32_configgpio(GPIO_HEATER_INPUT);
 	stm32_configgpio(GPIO_HEATER_OUTPUT);
@@ -250,13 +208,6 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-static struct spi_dev_s *spi1;
-static struct spi_dev_s *spi2;
-static struct sdio_dev_s *sdio;
-#if defined(CONFIG_STM32_SPI4)
-static struct spi_dev_s *spi4;
-#endif
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	px4_platform_init();
@@ -267,21 +218,15 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 	// Set up the serial DMA polling.
-	static struct hrt_call serial_dma_call;
+
 	struct timespec ts;
 
 	/**
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
+	static struct hrt_call serial_dma_call;
+	hrt_call_every(&serial_dma_call, 1000, 1000, stm32_serial_dma_poll, NULL);
 
 	// Initial LED state.
 	drv_led_start();
@@ -296,67 +241,20 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	// Power down the heater.
 	stm32_gpiowrite(GPIO_HEATER_OUTPUT, 0);
 
-	// Configure SPI-based devices.
-	spi1 = stm32_spibus_initialize(1);
-
-	if (!spi1) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 1\n");
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-
-	// Default SPI1 to 1MHz and de-assert the known chip selects.
-	SPI_SETFREQUENCY(spi1, 10000000);
-	SPI_SETBITS(spi1, 8);
-	SPI_SETMODE(spi1, SPIDEV_MODE3);
-	up_udelay(20);
-
-	// Get the SPI port for the FRAM.
-	spi2 = stm32_spibus_initialize(2);
-
-	if (!spi2) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 2\n");
-		led_on(LED_RED);
-		return -ENODEV;
-	}
-
-	/**
-	 * Default SPI2 to 12MHz and de-assert the known chip selects.
-	 * MS5611 has max SPI clock speed of 20MHz.
-	 */
-
-	// XXX start with 10.4 MHz and go up to 20 once validated.
-	SPI_SETFREQUENCY(spi2, 20 * 1000 * 1000);
-	SPI_SETBITS(spi2, 8);
-	SPI_SETMODE(spi2, SPIDEV_MODE3);
-
 #if defined(CONFIG_STM32_SPI4)
 
 	if (stm32_gpioread(GPIO_PB4) == 0) {
 		syslog(LOG_INFO, "[boot] GPIO_PB4 - Low Initialize SPI port 4 \n");
-
-		// Configure SPI-based devices.
-		spi4 = stm32_spibus_initialize(4);
-
-		if (!spi4) {
-			syslog(LOG_ERR, "[boot] FAILED to initialize SPI port 4\n");
-
-		} else {
-			// Default SPI4 to 20 MHz and de-assert the known chip selects.
-			SPI_SETFREQUENCY(spi4, 20 * 1000 * 1000);
-			SPI_SETBITS(spi4, 8);
-			SPI_SETMODE(spi4, SPIDEV_MODE3);
-		}
 	}
 
 #endif /* defined(CONFIG_STM32_SPI4) */
 
+	board_spi_initialize();
 
 #ifdef CONFIG_MMCSD
 
 	// First, get an instance of the SDIO interface.
-	sdio = sdio_initialize(CONFIG_NSH_MMCSDSLOTNO);
+	struct sdioblah *sdio = sdio_initialize(CONFIG_NSH_MMCSDSLOTNO);
 
 	if (!sdio) {
 		led_on(LED_RED);

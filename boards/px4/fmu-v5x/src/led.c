@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4fmu2_led.c
+ * @file led.c
  *
  * PX4FMU LED backend.
  */
@@ -62,21 +62,6 @@ extern void led_off(int led);
 extern void led_toggle(int led);
 __END_DECLS
 
-#ifdef CONFIG_ARCH_LEDS
-static bool nuttx_owns_leds = true;
-//                                B  R  S  G
-//                                0  1  2  3
-static const uint8_t xlatpx4[] = {1, 2, 4, 0};
-#  define xlat(p) xlatpx4[(p)]
-static uint32_t g_ledmap[] = {
-	GPIO_nLED_GREEN,   // Indexed by BOARD_LED_GREEN
-	GPIO_nLED_BLUE,    // Indexed by BOARD_LED_BLUE
-	GPIO_nLED_RED,     // Indexed by BOARD_LED_RED
-	GPIO_nSAFETY_SWITCH_LED_OUT,  // Indexed by LED_SAFETY by xlatpx4
-};
-
-#else
-
 #  define xlat(p) (p)
 static uint32_t g_ledmap[] = {
 	GPIO_nLED_BLUE,                     // Indexed by LED_BLUE
@@ -84,8 +69,6 @@ static uint32_t g_ledmap[] = {
 	GPIO_nSAFETY_SWITCH_LED_OUT_INIT,   // Indexed by LED_SAFETY (defaulted to an input)
 	GPIO_nLED_GREEN,                    // Indexed by LED_GREEN
 };
-
-#endif
 
 __EXPORT void led_init(void)
 {
@@ -126,107 +109,3 @@ __EXPORT void led_toggle(int led)
 {
 	phy_set_led(xlat(led), !phy_get_led(xlat(led)));
 }
-
-#ifdef CONFIG_ARCH_LEDS
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Name: board_autoled_initialize
- ****************************************************************************/
-
-void board_autoled_initialize(void)
-{
-	led_init();
-}
-
-/****************************************************************************
- * Name: board_autoled_on
- ****************************************************************************/
-
-void board_autoled_on(int led)
-{
-	if (!nuttx_owns_leds) {
-		return;
-	}
-
-	switch (led) {
-	default:
-		break;
-
-	case LED_HEAPALLOCATE:
-		phy_set_led(BOARD_LED_BLUE, true);
-		break;
-
-	case LED_IRQSENABLED:
-		phy_set_led(BOARD_LED_BLUE, false);
-		phy_set_led(BOARD_LED_GREEN, true);
-		break;
-
-	case LED_STACKCREATED:
-		phy_set_led(BOARD_LED_GREEN, true);
-		phy_set_led(BOARD_LED_BLUE, true);
-		break;
-
-	case LED_INIRQ:
-		phy_set_led(BOARD_LED_BLUE, true);
-		break;
-
-	case LED_SIGNAL:
-		phy_set_led(BOARD_LED_GREEN, true);
-		break;
-
-	case LED_ASSERTION:
-		phy_set_led(BOARD_LED_RED, true);
-		phy_set_led(BOARD_LED_BLUE, true);
-		break;
-
-	case LED_PANIC:
-		phy_set_led(BOARD_LED_RED, true);
-		break;
-
-	case LED_IDLE : /* IDLE */
-		phy_set_led(BOARD_LED_RED, true);
-		break;
-	}
-}
-
-/****************************************************************************
- * Name: board_autoled_off
- ****************************************************************************/
-
-void board_autoled_off(int led)
-{
-	if (!nuttx_owns_leds) {
-		return;
-	}
-
-	switch (led) {
-	default:
-		break;
-
-	case LED_SIGNAL:
-		phy_set_led(BOARD_LED_GREEN, false);
-		break;
-
-	case LED_INIRQ:
-		phy_set_led(BOARD_LED_BLUE, false);
-		break;
-
-	case LED_ASSERTION:
-		phy_set_led(BOARD_LED_RED, false);
-		phy_set_led(BOARD_LED_BLUE, false);
-		break;
-
-	case LED_PANIC:
-		phy_set_led(BOARD_LED_RED, false);
-		break;
-
-	case LED_IDLE : /* IDLE */
-		phy_set_led(BOARD_LED_RED, false);
-		break;
-	}
-}
-
-#endif /* CONFIG_ARCH_LEDS */

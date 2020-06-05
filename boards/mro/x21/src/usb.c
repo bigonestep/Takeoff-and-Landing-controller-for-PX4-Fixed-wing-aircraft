@@ -57,41 +57,6 @@
 #include "board_config.h"
 
 /************************************************************************************
- * Definitions
- ************************************************************************************/
-
-/************************************************************************************
- * Private Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Public Functions
- ************************************************************************************/
-
-/************************************************************************************
- * Name: stm32_usbinitialize
- *
- * Description:
- *   Called to setup USB-related GPIO pins for the PX4FMU board.
- *
- ************************************************************************************/
-
-__EXPORT void stm32_usbinitialize(void)
-{
-	/* The OTG FS has an internal soft pull-up */
-
-	/* Configure the OTG FS VBUS sensing GPIO, Power On, and Overcurrent GPIOs */
-
-#ifdef CONFIG_STM32_OTGFS
-	px4_arch_configgpio(GPIO_OTGFS_VBUS);
-	/* XXX We only support device mode
-	px4_arch_configgpio(GPIO_OTGFS_PWRON);
-	px4_arch_configgpio(GPIO_OTGFS_OVER);
-	*/
-#endif
-}
-
-/************************************************************************************
  * Name:  stm32_usbsuspend
  *
  * Description:

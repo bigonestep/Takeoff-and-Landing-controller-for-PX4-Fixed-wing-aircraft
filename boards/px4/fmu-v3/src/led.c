@@ -31,12 +31,6 @@
  *
  ****************************************************************************/
 
-/**
- * @file px4fmu2_led.c
- *
- * PX4FMU LED backend.
- */
-
 #include <px4_platform_common/px4_config.h>
 
 #include <stdbool.h>

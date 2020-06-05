@@ -252,10 +252,7 @@
 #define HRT_TIMER               8  /* use timer8 for the HRT */
 #define HRT_TIMER_CHANNEL       3  /* use capture/compare channel 3 */
 
-/* RC Serial port */
-
 /* Input Capture Channels. */
-
 #define INPUT_CAP1_TIMER                  2
 #define INPUT_CAP1_CHANNEL     /* T2C4 */ 4
 #define GPIO_INPUT_CAP1        /* PB11 */ GPIO_TIM2_CH4_IN
@@ -281,17 +278,14 @@
 #define GPIO_INPUT_CAP6        /* PD14 */ GPIO_TIM4_CH3_IN
 
 /* PWM input driver. Use FMU AUX5 pins attached to timer4 channel 2 */
-
 #define PWMIN_TIMER                       4
 #define PWMIN_TIMER_CHANNEL    /* T4C2 */ 2
 #define GPIO_PWM_IN            /* PD13 */ GPIO_TIM4_CH2IN
 
 /* RSSI_IN is grounded via a 10K */
-
 #define GPIO_RSSI_IN                       /* PB0  */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTB|GPIO_PIN0)
 
 /* Safety Switch is only on PX4IO */
-
 #define GPIO_nSAFETY_SWITCH_LED_OUT   /* PE12 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTE|GPIO_PIN12)
 #define GPIO_SAFETY_SWITCH_IN         /* PE10 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTE|GPIO_PIN10)
 
@@ -367,6 +361,7 @@
 		SDMMC_PIN_OFF(GPIO_SDMMC1_CMD),   \
 		GPIO_VDD_3V3_SD_CARD_EN,          \
 		GPIO_TONE_ALARM_IDLE,             \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_RSSI_IN,                     \
 		GPIO_nSAFETY_SWITCH_LED_OUT,      \
 		GPIO_SAFETY_SWITCH_IN,            \
@@ -375,20 +370,7 @@
 #define BOARD_ENABLE_CONSOLE_BUFFER
 
 __BEGIN_DECLS
-
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -400,43 +382,7 @@ __BEGIN_DECLS
 
 int stm32_sdio_initialize(void);
 
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the Holybro Durandal V1
- *   board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
-
-
-/****************************************************************************
- * Name: nsh_archinitialize
- *
- * Description:
- *   Perform architecture specific initialization for NSH.
- *
- *   CONFIG_NSH_ARCHINIT=y :
- *     Called from the NSH library
- *
- *   CONFIG_BOARD_INITIALIZE=y, CONFIG_NSH_LIBRARY=y, &&
- *   CONFIG_NSH_ARCHINIT=n :
- *     Called from board_initialize().
- *
- ****************************************************************************/
-
-#ifdef CONFIG_NSH_LIBRARY
-int nsh_archinitialize(void);
-#endif
-
 #include <px4_platform_common/board_common.h>
-
 #endif /* __ASSEMBLY__ */
 
 __END_DECLS

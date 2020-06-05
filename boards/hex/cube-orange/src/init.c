@@ -65,25 +65,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* Power off Interfaces */
-	stm32_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, true);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-	stm32_gpiowrite(GPIO_nVDD_5V_PERIPH_EN, false);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -119,12 +100,14 @@ __EXPORT void stm32_boardinitialize(void)
 	/* Reset PWM first thing */
 	board_on_reset(-1);
 
+	/* configure LEDs */
+	board_autoled_initialize();
+
+	board_spi_initialize();
+
 	/* configure pins */
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	/* configure LEDs */
-	board_autoled_initialize();
 }
 
 /****************************************************************************
@@ -153,8 +136,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	px4_platform_init();
 
-	stm32_spiinitialize();
-
 	/* configure the DMA allocator */
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
@@ -169,6 +150,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	board_spi_start();
 
 #ifdef CONFIG_MMCSD
 	/* Mount the SDIO-based MMC/SD block driver */

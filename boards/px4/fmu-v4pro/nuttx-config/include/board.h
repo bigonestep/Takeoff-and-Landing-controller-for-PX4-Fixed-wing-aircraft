@@ -39,9 +39,6 @@
 #ifndef __ARCH_BOARD_BOARD_H
 #define __ARCH_BOARD_BOARD_H
 
-/************************************************************************************
- * Included Files
- ************************************************************************************/
 #include "board_dma_map.h"
 
 #include <nuttx/config.h>
@@ -50,10 +47,6 @@
 #endif
 
 #include <stm32.h>
-
-/************************************************************************************
- * Definitions
- ************************************************************************************/
 
 /* Clocking *************************************************************************/
 /* The PX4FMUV4-PRO uses a 24MHz crystal connected to the HSE.
@@ -110,14 +103,12 @@
 #define STM32_PLLCFG_PLLR       RCC_PLLCFG_PLLR(2)
 
 /* Configure factors for  PLLSAI clock */
-
 #define STM32_RCC_PLLSAICFGR_PLLSAIN    RCC_PLLSAICFGR_PLLSAIN(96)
 #define STM32_RCC_PLLSAICFGR_PLLSAIP    RCC_PLLSAICFGR_PLLSAIP(4)
 #define STM32_RCC_PLLSAICFGR_PLLSAIQ    RCC_PLLSAICFGR_PLLSAIQ(2)
 #define STM32_RCC_PLLSAICFGR_PLLSAIR    RCC_PLLSAICFGR_PLLSAIR(2)
 
 /* Configure Dedicated Clock Configuration Register */
-
 #define STM32_RCC_DCKCFGR_PLLI2SDIVQ    RCC_DCKCFGR_PLLI2SDIVQ(1)
 #define STM32_RCC_DCKCFGR_PLLSAIDIVQ    RCC_DCKCFGR_PLLSAIDIVQ(1)
 #define STM32_RCC_DCKCFGR_PLLSAIDIVR    RCC_DCKCFGR_PLLSAIDIVR_DIV2
@@ -129,7 +120,6 @@
 #define STM32_RCC_DCKCFGR_DSISEL        RCC_DCKCFGR_DSISEL_DSIPHY
 
 /* Configure factors for  PLLI2S clock */
-
 #define STM32_RCC_PLLI2SCFGR_PLLI2SN   RCC_PLLI2SCFGR_PLLI2SN(96)
 #define STM32_RCC_PLLI2SCFGR_PLLI2SQ   RCC_PLLI2SCFGR_PLLI2SQ(4)
 #define STM32_RCC_PLLI2SCFGR_PLLI2SR   RCC_PLLI2SCFGR_PLLI2SR(2)
@@ -138,18 +128,15 @@
 #define STM32_SYSCLK_FREQUENCY  180000000ul
 
 /* AHB clock (HCLK) is SYSCLK (180MHz) */
-
 #define STM32_RCC_CFGR_HPRE     RCC_CFGR_HPRE_SYSCLK  /* HCLK  = SYSCLK / 1 */
 #define STM32_HCLK_FREQUENCY    STM32_SYSCLK_FREQUENCY
 #define STM32_BOARD_HCLK        STM32_HCLK_FREQUENCY  /* same as above, to satisfy compiler */
 
 /* APB1 clock (PCLK1) is HCLK/4 (45MHz) */
-
 #define STM32_RCC_CFGR_PPRE1    RCC_CFGR_PPRE1_HCLKd4     /* PCLK1 = HCLK / 4 */
 #define STM32_PCLK1_FREQUENCY   (STM32_HCLK_FREQUENCY/4)
 
 /* Timers driven from APB1 will be twice PCLK1 */
-
 #define STM32_APB1_TIM2_CLKIN   (2*STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM3_CLKIN   (2*STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM4_CLKIN   (2*STM32_PCLK1_FREQUENCY)
@@ -161,12 +148,10 @@
 #define STM32_APB1_TIM14_CLKIN  (2*STM32_PCLK1_FREQUENCY)
 
 /* APB2 clock (PCLK2) is HCLK/2 (90MHz) */
-
 #define STM32_RCC_CFGR_PPRE2    RCC_CFGR_PPRE2_HCLKd2     /* PCLK2 = HCLK / 2 */
 #define STM32_PCLK2_FREQUENCY   (STM32_HCLK_FREQUENCY/2)
 
 /* Timers driven from APB2 will be twice PCLK2 */
-
 #define STM32_APB2_TIM1_CLKIN   (2*STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM8_CLKIN   (2*STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM9_CLKIN   (2*STM32_PCLK2_FREQUENCY)
@@ -177,7 +162,6 @@
  * otherwise frequency is 2xAPBx.
  * Note: TIM1,8-11 are on APB2, others on APB1
  */
-
 #define BOARD_TIM1_FREQUENCY    STM32_APB2_TIM1_CLKIN
 #define BOARD_TIM2_FREQUENCY    STM32_APB1_TIM2_CLKIN
 #define BOARD_TIM3_FREQUENCY    STM32_APB1_TIM3_CLKIN
@@ -204,7 +188,6 @@
 /* Use the Falling edge of the SDIO_CLK clock to change the edge the
  * data and commands are change on
  */
-
 #define SDIO_CLKCR_EDGE SDIO_CLKCR_NEGEDGE
 
 #define SDIO_INIT_CLKDIV        (118 << SDIO_CLKCR_CLKDIV_SHIFT)
@@ -212,7 +195,6 @@
 /* DMA ON:  SDIOCLK=48MHz, SDMMC_CK=SDIOCLK/(1+2)=16 MHz
  * DMA OFF: SDIOCLK=48MHz, SDMMC_CK=SDIOCLK/(2+2)=12 MHz
  */
-
 #ifdef CONFIG_STM32_SDIO_DMA
 #  define SDIO_MMCXFR_CLKDIV    (1 << SDIO_CLKCR_CLKDIV_SHIFT)
 #else
@@ -286,29 +268,16 @@
 #define GPIO_CAN2_RX	GPIO_CAN2_RX_1
 #define GPIO_CAN2_TX	GPIO_CAN2_TX_1
 
-/*
- * I2C
- *
- * The optional _GPIO configurations allow the I2C driver to manually
- * reset the bus to clear stuck slaves.  They match the pin configuration,
- * but are normally-high GPIOs.
- */
+
+// I2C
 #define GPIO_I2C1_SCL		GPIO_I2C1_SCL_2
 #define GPIO_I2C1_SDA		GPIO_I2C1_SDA_2
-#define GPIO_I2C1_SCL_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN8)
-#define GPIO_I2C1_SDA_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN9)
 
 #define GPIO_I2C2_SCL		GPIO_I2C2_SCL_2
 #define GPIO_I2C2_SDA		GPIO_I2C2_SDA_2
-#define GPIO_I2C2_SCL_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTF|GPIO_PIN1)
-#define GPIO_I2C2_SDA_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTF|GPIO_PIN0)
 
 
-/*
- * SPI
- *
- * There are sensors on SPI1, and SPI2 is connected to the FRAM.
- */
+// SPI
 #define GPIO_SPI1_MISO  GPIO_SPI1_MISO_1
 #define GPIO_SPI1_MOSI  GPIO_SPI1_MOSI_1
 #define GPIO_SPI1_SCK   GPIO_SPI1_SCK_1
@@ -321,6 +290,7 @@
 #define GPIO_SPI5_MOSI  GPIO_SPI5_MOSI_1
 #define GPIO_SPI5_SCK   GPIO_SPI5_SCK_1
 #define GPIO_SPI5_NSS   GPIO_SPI5_NSS_1
+
 
 /* Board provides GPIO or other Hardware for signaling to timing analyzer */
 
@@ -351,39 +321,4 @@
 # define PROBE_MARK(n)
 #endif
 
-/************************************************************************************
- * Public Data
- ************************************************************************************/
-
-#ifndef __ASSEMBLY__
-
-#undef EXTERN
-#if defined(__cplusplus)
-#define EXTERN extern "C"
-extern "C" {
-#else
-#define EXTERN extern
-#endif
-
-/************************************************************************************
- * Public Function Prototypes
- ************************************************************************************/
-/************************************************************************************
- * Name: stm32_boardinitialize
- *
- * Description:
- *   All STM32 architectures must provide the following entry point.  This entry point
- *   is called early in the initialization -- after all memory has been configured
- *   and mapped but before any devices have been initialized.
- *
- ************************************************************************************/
-
-EXTERN void stm32_boardinitialize(void);
-
-#undef EXTERN
-#if defined(__cplusplus)
-}
-#endif
-
-#endif /* __ASSEMBLY__ */
 #endif  /* __ARCH_BOARD_BOARD_H */

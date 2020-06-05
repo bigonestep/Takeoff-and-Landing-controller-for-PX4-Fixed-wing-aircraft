@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 /**
- * @file aerofc-v1_init.c
+ * @file init.c
  *
  * aerofc-specific early startup code.  This file implements the
  * board_app_initialize() function that is called early by nsh during startup.
@@ -41,10 +41,6 @@
  * Code here is run before the rcS script is invoked; it should start required
  * subsystems and perform board-specific initialization.
  */
-
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/tasks.h>
@@ -75,10 +71,6 @@
 #  include <parameters/flashparams/flashfs.h>
 #endif
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -92,10 +84,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
-
 static int _bootloader_force_pin_callback(int irq, void *context, void *args)
 {
 	if (stm32_gpioread(GPIO_FORCE_BOOTLOADER)) {
@@ -104,14 +92,6 @@ static int _bootloader_force_pin_callback(int irq, void *context, void *args)
 
 	return 0;
 }
-
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 /************************************************************************************
  * Name: stm32_boardinitialize
@@ -131,12 +111,10 @@ __EXPORT void stm32_boardinitialize(void)
 	/* configure LEDs */
 	board_autoled_initialize();
 
+	board_spi_initialize();
+
 	/* turn sensors on */
 	stm32_configgpio(GPIO_VDD_5V_SENSORS_EN);
-
-	/* configure SPI interfaces */
-	stm32_spiinitialize();
-
 }
 
 /****************************************************************************
@@ -156,28 +134,19 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	px4_platform_init();
 
-	/* set up the serial DMA polling */
-	static struct hrt_call serial_dma_call;
-	struct timespec ts;
-
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
-
+	static struct hrt_call serial_dma_call;
+	hrt_call_every(&serial_dma_call, 1000, 1000, (hrt_callout)stm32_serial_dma_poll, NULL);
 
 	/* initial LED state */
 	drv_led_start();
 	led_off(LED_AMBER);
 	led_off(LED_BLUE);
+
+	board_spi_start();
 
 	/*
 	 * Bootloader(sector 0):

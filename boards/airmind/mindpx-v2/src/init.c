@@ -142,11 +142,11 @@ stm32_boardinitialize(void)
 	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
-	/* configure ADC pins */
+	board_spi_initialize();
 
+	/* configure ADC pins */
 	stm32_configgpio(GPIO_ADC1_IN4);	/* VDD_5V_SENS */
 	stm32_configgpio(GPIO_ADC1_IN10);	/* BATT_CURRENT_SENS */
 	stm32_configgpio(GPIO_ADC1_IN12);	/* BATT_VOLTAGE_SENS */
@@ -156,25 +156,18 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_ADC1_IN15);	/* PRESSURE_SENS */
 
 	/* configure power supply control/sense pins */
-
 	stm32_configgpio(GPIO_SBUS_INV);
 	stm32_configgpio(GPIO_FRSKY_INV);
 
 	/* configure CAN interface */
-
 	stm32_configgpio(GPIO_CAN1_RX);
 	stm32_configgpio(GPIO_CAN1_TX);
-
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
 
 	stm32_configgpio(GPIO_I2C2_SCL);
 	stm32_configgpio(GPIO_I2C2_SDA);
 
 	stm32_configgpio(GPIO_I2C1_SCL);
 	stm32_configgpio(GPIO_I2C1_SDA);
-
 }
 
 /****************************************************************************

@@ -46,7 +46,6 @@ constexpr px4_i2c_bus_t px4_i2c_buses[I2C_BUS_MAX_BUS_ITEMS] = {
 	initI2CBusInternal(2),
 };
 
-
 bool px4_i2c_bus_external(const px4_i2c_bus_t &bus)
 {
 	if (HW_VER_FMUV3 == board_get_hw_version()) {

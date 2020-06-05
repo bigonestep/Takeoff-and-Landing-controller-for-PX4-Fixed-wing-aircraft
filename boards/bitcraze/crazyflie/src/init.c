@@ -69,10 +69,6 @@
 #include <systemlib/px4_macros.h>
 #include <px4_platform_common/init.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -86,14 +82,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-/****************************************************************************
- * Protected Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
 /************************************************************************************
  * Name: stm32_boardinitialize
  *
@@ -104,18 +92,12 @@ __END_DECLS
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
-
-	stm32_usbinitialize();
+	board_spi_initialize();
 }
 
 /****************************************************************************
@@ -130,23 +112,12 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	px4_platform_init();
 
-	/* set up the serial DMA polling */
-	static struct hrt_call serial_dma_call;
-	struct timespec ts;
-
 	/*
 	 * Poll at 1ms intervals for received bytes that have not triggered
 	 * a DMA event.
 	 */
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
-
+	static struct hrt_call serial_dma_call;
+	hrt_call_every(&serial_dma_call, 1000, 1000, (hrt_callout)stm32_serial_dma_poll, NULL);
 
 	/* initial LED state */
 	drv_led_start();
@@ -159,6 +130,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	board_spi_start();
 
 #ifdef CONFIG_SPI
 	int ret = stm32_spi_bus_initialize();

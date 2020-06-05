@@ -342,6 +342,7 @@
  *      GPIO_UART8_TX                          PE1
  */
 
+
 /* CAN
  *
  * CAN1 is routed to transceiver.
@@ -352,16 +353,8 @@
 #define GPIO_CAN2_RX     GPIO_CAN2_RX_1     /* PB12 */
 #define GPIO_CAN2_TX     GPIO_CAN2_TX_2     /* PB6  */
 
-/* SPI
- * SPI1 is IMU 20648 (Rev A)
- * SPI2 is none (Rev A)
- * SPI3 is none (Rev A)
- * SPI4 is none (Rev A)
- * SPI5 is FRAM
- * SPI6 is none (Rev A)
- *
- */
 
+// SPI
 #define GPIO_SPI1_MISO   GPIO_SPI1_MISO_2   /* PB4  */
 #define GPIO_SPI1_MOSI   GPIO_SPI1_MOSI_2   /* PB5  */
 #define GPIO_SPI1_SCK    GPIO_SPI1_SCK_1    /* PA5  */
@@ -386,37 +379,19 @@
 #define GPIO_SPI6_MOSI   GPIO_SPI6_MOSI_1   /* PG14 */
 #define GPIO_SPI6_SCK    GPIO_SPI6_SCK_3    /* PB3  */
 
-/* I2C
- *
- *   The optional _GPIO configurations allow the I2C driver to manually
- *   reset the bus to clear stuck slaves.  They match the pin configuration,
- *   but are normally-high GPIOs.
- *
- */
 
+// I2C
 #define GPIO_I2C1_SCL GPIO_I2C1_SCL_2       /* PB8  */
 #define GPIO_I2C1_SDA GPIO_I2C1_SDA_1       /* PB7  */
-
-#define GPIO_I2C1_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN8)
-#define GPIO_I2C1_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN7)
 
 #define GPIO_I2C2_SCL GPIO_I2C2_SCL_2       /* PF1 */
 #define GPIO_I2C2_SDA GPIO_I2C2_SDA_2       /* PF0 */
 
-#define GPIO_I2C2_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN1)
-#define GPIO_I2C2_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN0)
-
 #define GPIO_I2C3_SCL GPIO_I2C3_SCL_2       /* PH7 */
 #define GPIO_I2C3_SDA GPIO_I2C3_SDA_2       /* PH8 */
 
-#define GPIO_I2C3_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTH | GPIO_PIN7)
-#define GPIO_I2C3_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTH | GPIO_PIN8)
-
 #define GPIO_I2C4_SCL GPIO_I2C4_SCL_2       /* PF14 */
 #define GPIO_I2C4_SDA GPIO_I2C4_SDA_2       /* PF15 */
-
-#define GPIO_I2C4_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN14)
-#define GPIO_I2C4_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN15)
 
 /* SDMMC2
  *
@@ -479,40 +454,4 @@
 # define PROBE_MARK(n)
 #endif
 
-/************************************************************************************
- * Public Data
- ************************************************************************************/
-#ifndef __ASSEMBLY__
-
-#undef EXTERN
-#if defined(__cplusplus)
-#define EXTERN extern "C"
-extern "C"
-{
-#else
-#define EXTERN extern
-#endif
-
-/************************************************************************************
- * Public Function Prototypes
- ************************************************************************************/
-
-/************************************************************************************
- * Name: stm32_boardinitialize
- *
- * Description:
- *   All STM32 architectures must provide the following entry point.  This entry point
- *   is called early in the initialization -- after all memory has been configured
- *   and mapped but before any devices have been initialized.
- *
- ************************************************************************************/
-
-void stm32_boardinitialize(void);
-
-#undef EXTERN
-#if defined(__cplusplus)
-}
-#endif
-
-#endif /* __ASSEMBLY__ */
 #endif  /*__NUTTX_CONFIG_MODALAI_FCV1_INCLUDE_BOARD_H  */

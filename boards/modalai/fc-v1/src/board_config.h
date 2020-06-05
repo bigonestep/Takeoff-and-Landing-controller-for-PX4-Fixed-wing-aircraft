@@ -146,9 +146,7 @@
 #define HW_INFO_INIT_VER       2 /* Offset in above string of the VER */
 #define HW_INFO_INIT_REV       3 /* Offset in above string of the REV */
 
-/* PWM
- */
-
+// PWM
 #define DIRECT_PWM_OUTPUT_CHANNELS  8
 #define DIRECT_INPUT_TIMER_CHANNELS  8
 
@@ -254,6 +252,7 @@
 		GPIO_A71CH_nRST,                  \
 		GPIO_VOXL_STATUS_OUT,             \
 		GPIO_VOXL_STATUS_IN,              \
+		GPIO_OTGFS_VBUS,                  \
 		GPIO_SAFETY_SWITCH_IN,            \
 		GPIO_FYSNC_INT_ICM42688,          \
 		GPIO_FYSNC_INT_ICM20602           \
@@ -266,20 +265,7 @@
 #define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7};
 
 __BEGIN_DECLS
-
-/****************************************************************************************************
- * Public Types
- ****************************************************************************************************/
-
-/****************************************************************************************************
- * Public data
- ****************************************************************************************************/
-
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************
  * Name: stm32_sdio_initialize
@@ -291,22 +277,7 @@ __BEGIN_DECLS
 
 int stm32_sdio_initialize(void);
 
-/****************************************************************************************************
- * Name: stm32_spiinitialize
- *
- * Description:
- *   Called to configure SPI chip select GPIO pins for the PX4FMU board.
- *
- ****************************************************************************************************/
-
-extern void stm32_spiinitialize(void);
-
-extern void stm32_usbinitialize(void);
-
-extern void board_peripheral_reset(int ms);
-
 #include <px4_platform_common/board_common.h>
-
 #endif /* __ASSEMBLY__ */
 
 __END_DECLS

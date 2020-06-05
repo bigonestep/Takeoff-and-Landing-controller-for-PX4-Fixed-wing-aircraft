@@ -65,34 +65,6 @@ extern void led_off(int led);
 __END_DECLS
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-	VDD_5V_PERIPH_EN(false);
-	board_control_spi_sensors_power(false, 0xffff);
-
-	bool last = READ_SPEKTRUM_POWER();
-	/* Keep Spektum on to discharge rail*/
-	SPEKTRUM_POWER(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	SPEKTRUM_POWER(last);
-	board_control_spi_sensors_power(true, 0xffff);
-	VDD_5V_PERIPH_EN(true);
-}
-
-/************************************************************************************
  * Name: board_on_reset
  *
  * Description:
@@ -131,11 +103,11 @@ __EXPORT void stm32_boardinitialize(void)
 	/* configure LEDs */
 	board_autoled_initialize();
 
+	board_spi_initialize();
+
 	/* configure pins */
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	board_control_spi_sensors_power_configgpio();
 }
 
 /****************************************************************************
@@ -161,14 +133,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* Power on Interfaces */
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
-	board_control_spi_sensors_power(true, 0xffff);
 	SPEKTRUM_POWER(true);
 
 	/* Need hrt running before using the ADC */
 	px4_platform_init();
-
-	/* configure SPI interfaces (after we determined the HW version) */
-	stm32_spiinitialize();
 
 	/* configure the DMA allocator */
 	if (board_dma_alloc_init() < 0) {
@@ -184,6 +152,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
+
+	board_spi_start();
 
 #ifdef CONFIG_MMCSD
 	// Ensure Power is off for > 10 mS

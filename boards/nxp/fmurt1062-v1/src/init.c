@@ -82,12 +82,6 @@
 #include <px4_platform/board_determine_hw_info.h>
 #include <px4_platform/board_dma_alloc.h>
 
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
-
-/* Configuration ************************************************************/
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -101,30 +95,6 @@ extern void led_on(int led);
 extern void led_off(int led);
 __END_DECLS
 
-/************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	VDD_5V_PERIPH_EN(false);
-	VDD_5V_HIPOWER_EN(false);
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-	VDD_5V_HIPOWER_EN(true);
-	VDD_5V_PERIPH_EN(true);
-
-}
 /************************************************************************************
  * Name: board_on_reset
  *
@@ -147,7 +117,6 @@ __EXPORT void board_on_reset(int status)
 		up_mdelay(6);
 	}
 }
-
 
 /****************************************************************************
  * Name: imxrt_ocram_initialize
@@ -197,27 +166,22 @@ __EXPORT void imxrt_ocram_initialize(void)
 
 __EXPORT void imxrt_boardinitialize(void)
 {
-
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
-	/* configure pins */
+	board_spi_initialize();
 
+	/* configure pins */
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-
-	/* configure SPI interfaces */
-
-	imxrt_spidev_initialize();
 
 	imxrt_usb_initialize();
 
 	fmurt1062_timer_initialize();
 }
-
 
 /****************************************************************************
  * Name: board_app_initialize
@@ -246,21 +210,16 @@ __EXPORT void imxrt_boardinitialize(void)
 
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
-
 	/* Power on Interfaces */
-
-
 	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
 	VDD_3V3_SENSORS_EN(true);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
-	board_spi_reset(10, 0xffff);
-
 	if (OK == board_determine_hw_info()) {
-		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),
-		       board_get_hw_type_name());
+		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n",
+		       board_get_hw_revision(), board_get_hw_version(), board_get_hw_type_name());
 
 	} else {
 		syslog(LOG_ERR, "[boot] Failed to read HW revision and version\n");
@@ -270,29 +229,9 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	px4_platform_init();
 
 	/* configure the DMA allocator */
-
 	if (board_dma_alloc_init() < 0) {
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
-
-	/* set up the serial DMA polling */
-#ifdef SERIAL_HAVE_DMA
-	static struct hrt_call serial_dma_call;
-	struct timespec ts;
-
-	/*
-	 * Poll at 1ms intervals for received bytes that have not triggered
-	 * a DMA event.
-	 */
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)imxrt_serial_dma_poll,
-		       NULL);
-#endif
 
 	/* initial LED state */
 	drv_led_start();
@@ -300,6 +239,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	led_off(LED_RED);
 	led_off(LED_GREEN);
 	led_off(LED_BLUE);
+
+	board_spi_start();
 
 #if defined(CONFIG_IMXRT_USDHC)
 	int ret = fmurt1062_usdhc_initialize();
@@ -310,16 +251,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #endif
-
-	/* Configure SPI-based devices */
-
-	ret = imxrt1062_spi_bus_initialize();
-
-	if (ret != OK) {
-		led_on(LED_RED);
-		return ret;
-	}
-
 
 	return OK;
 }

@@ -146,25 +146,6 @@ int board_read_VBUS_state(void)
 }
 
 /************************************************************************************
- * Name: board_peripheral_reset
- *
- * Description:
- *
- ************************************************************************************/
-__EXPORT void board_peripheral_reset(int ms)
-{
-	/* set the peripheral rails off */
-
-	/* wait for the peripheral rail to reach GND */
-	usleep(ms * 1000);
-	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
-
-	/* re-enable power */
-
-	/* switch the peripheral rail back on */
-}
-
-/************************************************************************************
  * Name: kinetis_boardinitialize
  *
  * Description:
@@ -174,10 +155,10 @@ __EXPORT void board_peripheral_reset(int ms)
  *
  ************************************************************************************/
 
-__EXPORT void
-kinetis_boardinitialize(void)
+__EXPORT void kinetis_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
 	board_autoled_initialize();
@@ -188,7 +169,6 @@ kinetis_boardinitialize(void)
 	fmuk66_timer_initialize();
 
 	/* Power on Spektrum */
-
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 }
 

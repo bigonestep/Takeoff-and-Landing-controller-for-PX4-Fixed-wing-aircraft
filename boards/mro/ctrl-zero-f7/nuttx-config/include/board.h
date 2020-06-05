@@ -35,9 +35,6 @@
 
 #pragma once
 
-/************************************************************************************
- * Included Files
- ************************************************************************************/
 #include "board_dma_map.h"
 
 #include <nuttx/config.h>
@@ -48,10 +45,6 @@
 
 #include "stm32_rcc.h"
 #include "stm32_sdmmc.h"
-
-/************************************************************************************
- * Pre-processor Definitions
- ************************************************************************************/
 
 /* Clocking *************************************************************************/
 /* The mRo Control Zero F7  board provides the following clock sources:
@@ -328,36 +321,3 @@
  *      SDMMC1_D2                           PC10
  *      SDMMC1_D3                           PC11
  */
-
-/************************************************************************************
- * Public Data
- ************************************************************************************/
-#ifndef __ASSEMBLY__
-
-#undef EXTERN
-#if defined(__cplusplus)
-#define EXTERN extern "C"
-extern "C"
-{
-#else
-#define EXTERN extern
-#endif
-
-/************************************************************************************
- * Name: stm32_boardinitialize
- *
- * Description:
- *   All STM32 architectures must provide the following entry point.  This entry point
- *   is called early in the initialization -- after all memory has been configured
- *   and mapped but before any devices have been initialized.
- *
- ************************************************************************************/
-
-void stm32_boardinitialize(void);
-
-#undef EXTERN
-#if defined(__cplusplus)
-}
-#endif
-
-#endif /* __ASSEMBLY__ */
