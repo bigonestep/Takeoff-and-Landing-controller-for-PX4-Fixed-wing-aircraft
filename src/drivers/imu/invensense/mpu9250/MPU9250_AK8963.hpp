@@ -61,7 +61,6 @@ public:
 	~MPU9250_AK8963() override;
 
 	bool Init();
-	void Stop();
 	bool Reset();
 	void PrintInfo();
 
@@ -70,7 +69,7 @@ public:
 private:
 
 	struct TransferBuffer {
-		//uint8_t ST1;
+		uint8_t ST1;
 		uint8_t HXL;
 		uint8_t HXH;
 		uint8_t HYL;
@@ -106,6 +105,7 @@ private:
 	perf_counter_t _bad_register_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak8963: bad register")};
 	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak8963: bad transfer")};
 	perf_counter_t _duplicate_data_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak8963: duplicate data")};
+	perf_counter_t _data_not_ready{perf_alloc(PC_COUNT, MODULE_NAME"_ak8963: data not ready")};
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
@@ -120,11 +120,7 @@ private:
 		WAIT_FOR_RESET,
 		CONFIGURE,
 		READ,
-		REQUEST_STOP,
-		STOPPED,
-	};
-
-	px4::atomic<STATE> _state{STATE::RESET};
+	} _state{STATE::RESET};;
 
 	static constexpr uint8_t size_register_cfg{1};
 	register_config_t _register_cfg[size_register_cfg] {

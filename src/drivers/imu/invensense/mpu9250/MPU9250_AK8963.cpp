@@ -56,12 +56,13 @@ MPU9250_AK8963::MPU9250_AK8963(MPU9250 &mpu9250, enum Rotation rotation) :
 
 MPU9250_AK8963::~MPU9250_AK8963()
 {
-	Stop();
+	ScheduleClear();
 
 	perf_free(_transfer_perf);
 	perf_free(_bad_register_perf);
 	perf_free(_bad_transfer_perf);
 	perf_free(_duplicate_data_perf);
+	perf_free(_data_not_ready);
 }
 
 bool MPU9250_AK8963::Init()
@@ -69,19 +70,9 @@ bool MPU9250_AK8963::Init()
 	return Reset();
 }
 
-void MPU9250_AK8963::Stop()
-{
-	// wait until stopped
-	while (_state.load() != STATE::STOPPED) {
-		_state.store(STATE::REQUEST_STOP);
-		ScheduleNow();
-		px4_usleep(10);
-	}
-}
-
 bool MPU9250_AK8963::Reset()
 {
-	_state.store(STATE::RESET);
+	_state = STATE::RESET;
 	ScheduleClear();
 	ScheduleNow();
 	return true;
@@ -93,24 +84,25 @@ void MPU9250_AK8963::PrintInfo()
 	perf_print_counter(_bad_register_perf);
 	perf_print_counter(_bad_transfer_perf);
 	perf_print_counter(_duplicate_data_perf);
+	perf_print_counter(_data_not_ready);
 
 	_px4_mag.print_status();
 }
 
 void MPU9250_AK8963::Run()
 {
-	switch (_state.load()) {
+	switch (_state) {
 	case STATE::RESET:
 		// CNTL2 SRST: Soft reset
 		RegisterWrite(Register::CNTL2, CNTL2_BIT::SRST);
 		_reset_timestamp = hrt_absolute_time();
-		_state.store(STATE::READ_WHO_AM_I);
+		_state = STATE::READ_WHO_AM_I;
 		ScheduleDelayed(100_ms);
 		break;
 
 	case STATE::READ_WHO_AM_I:
 		_mpu9250.I2CSlaveRegisterStartRead(I2C_ADDRESS_DEFAULT, (uint8_t)Register::WIA);
-		_state.store(STATE::WAIT_FOR_RESET);
+		_state = STATE::WAIT_FOR_RESET;
 		ScheduleDelayed(10_ms);
 		break;
 
@@ -121,14 +113,15 @@ void MPU9250_AK8963::Run()
 
 			if (WIA == WHOAMI) {
 				// if reset succeeded then configure
-				_state.store(STATE::CONFIGURE);
+				PX4_DEBUG("AK09916 reset successful, configuring");
+				_state = STATE::CONFIGURE;
 				ScheduleDelayed(10_ms);
 
 			} else {
 				// RESET not complete
 				if (hrt_elapsed_time(&_reset_timestamp) > 100_ms) {
 					PX4_DEBUG("Reset failed, retrying");
-					_state.store(STATE::RESET);
+					_state = STATE::RESET;
 					ScheduleDelayed(100_ms);
 
 				} else {
@@ -145,8 +138,9 @@ void MPU9250_AK8963::Run()
 	case STATE::CONFIGURE:
 		if (Configure()) {
 			// if configure succeeded then start reading
-			_mpu9250.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::HXL, sizeof(TransferBuffer));
-			_state.store(STATE::READ);
+			PX4_DEBUG("AK8963 configure successful, reading");
+			_mpu9250.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::ST1, sizeof(TransferBuffer));
+			_state = STATE::READ;
 			ScheduleOnInterval(10_ms, 10_ms); // 100 Hz
 
 		} else {
@@ -166,7 +160,7 @@ void MPU9250_AK8963::Run()
 
 			perf_end(_transfer_perf);
 
-			if (success && !(buffer.ST2 & ST2_BIT::HOFL)) {
+			if (success && !(buffer.ST2 & ST2_BIT::HOFL) && (buffer.ST1 & ST1_BIT::DRDY)) {
 				// sensor's frame is +y forward (x), -x right, +z down
 				int16_t x = combine(buffer.HYH, buffer.HYL); // +Y
 				int16_t y = combine(buffer.HXH, buffer.HXL); // +X
@@ -190,6 +184,9 @@ void MPU9250_AK8963::Run()
 				} else {
 					success = false;
 				}
+
+			} else {
+				perf_count(_data_not_ready);
 			}
 
 			if (!success) {
@@ -197,15 +194,6 @@ void MPU9250_AK8963::Run()
 			}
 		}
 
-		break;
-
-	case STATE::REQUEST_STOP:
-		ScheduleClear();
-		_state.store(STATE::STOPPED);
-		break;
-
-	case STATE::STOPPED:
-		// DO NOTHING
 		break;
 	}
 }
