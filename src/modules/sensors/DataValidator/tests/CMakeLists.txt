@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -12,7 +12,7 @@
 #    notice, this list of conditions and the following disclaimer in
 #    the documentation and/or other materials provided with the
 #    distribution.
-# 3. Neither the name PX4 nor the names of its contributors may be
+# 3. Neither the name PX nor the names of its contributors may be
 #    used to endorse or promote products derived from this software
 #    without specific prior written permission.
 #
@@ -31,30 +31,7 @@
 #
 ############################################################################
 
-add_subdirectory(DataValidator)
-add_subdirectory(sensor_corrections) # used by vehicle_{acceleration, angular_velocity, imu}
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory(vehicle_acceleration)
-add_subdirectory(vehicle_angular_velocity)
-add_subdirectory(vehicle_air_data)
-add_subdirectory(vehicle_imu)
+include_directories(..)
 
-px4_add_module(
-	MODULE modules__sensors
-	MAIN sensors
-	SRCS
-		voted_sensors_update.cpp
-		sensors.cpp
-		parameters.cpp
-	DEPENDS
-		airspeed
-		conversion
-		data_validator
-		drivers__device
-		mathlib
-		vehicle_acceleration
-		vehicle_angular_velocity
-		vehicle_air_data
-		vehicle_imu
-		mag_compensation
-	)
+px4_add_unit_gtest(SRC test_data_validator.cpp LINKLIBS data_validator)
+px4_add_unit_gtest(SRC test_data_validator_group.cpp LINKLIBS data_validator)
