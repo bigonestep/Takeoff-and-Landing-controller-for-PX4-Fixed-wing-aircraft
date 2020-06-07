@@ -36,7 +36,6 @@
 #include <RateControl.hpp>
 
 #include <lib/matrix/matrix/math.hpp>
-#include <lib/perf/perf_counter.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
@@ -64,7 +63,7 @@ class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public
 {
 public:
 	MulticopterRateControl(bool vtol = false);
-	~MulticopterRateControl() override;
+	~MulticopterRateControl() override = default;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -121,8 +120,6 @@ private:
 	bool _maybe_landed{true};
 
 	float _battery_status_scale{0.0f};
-
-	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
 	matrix::Vector3f _rates_sp;			/**< angular rates setpoint */
 

@@ -44,7 +44,6 @@
 #include <lib/mathlib/mathlib.h>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <lib/parameters/param.h>
-#include <lib/perf/perf_counter.h>
 #include <px4_arch/dshot.h>
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/px4_config.h>
@@ -220,8 +219,6 @@ private:
 	uint32_t	_output_mask{0};
 	bool		_outputs_initialized{false};
 
-	perf_counter_t	_cycle_perf;
-
 	void		capture_callback(uint32_t chan_index,
 					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
 	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
@@ -246,8 +243,7 @@ px4::atomic_bool DShotOutput::_request_telemetry_init{false};
 
 DShotOutput::DShotOutput() :
 	CDev("/dev/dshot"),
-	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default),
-	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
+	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default)
 {
 	_mixing_output.setAllDisarmedValues(DISARMED_VALUE);
 	_mixing_output.setAllMinValues(DISARMED_VALUE + 1);
@@ -263,7 +259,6 @@ DShotOutput::~DShotOutput()
 	/* clean up the alternate device node */
 	unregister_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH, _class_instance);
 
-	perf_free(_cycle_perf);
 	delete _telemetry;
 }
 
@@ -754,8 +749,6 @@ DShotOutput::Run()
 		return;
 	}
 
-	perf_begin(_cycle_perf);
-
 	_mixing_output.update();
 
 	/* update output status if armed or if mixer is loaded */
@@ -802,8 +795,6 @@ DShotOutput::Run()
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
 	_mixing_output.updateSubscriptions(true);
-
-	perf_end(_cycle_perf);
 }
 
 void DShotOutput::update_params()
@@ -1586,7 +1577,7 @@ int DShotOutput::print_status()
 
 	PX4_INFO("Outputs initialized: %s", _outputs_initialized ? "yes" : "no");
 	PX4_INFO("Outputs on: %s", _outputs_on ? "yes" : "no");
-	perf_print_counter(_cycle_perf);
+
 	_mixing_output.printStatus();
 
 	if (_telemetry) {

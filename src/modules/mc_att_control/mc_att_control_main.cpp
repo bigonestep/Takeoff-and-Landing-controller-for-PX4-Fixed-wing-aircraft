@@ -54,8 +54,7 @@ using namespace matrix;
 MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::attitude_ctrl),
-	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
-	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
+	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint))
 {
 	if (vtol) {
 		int32_t vt_type = -1;
@@ -71,11 +70,6 @@ MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
 	_v_att.q[0] = 1.f;
 
 	parameters_updated();
-}
-
-MulticopterAttitudeControl::~MulticopterAttitudeControl()
-{
-	perf_free(_loop_perf);
 }
 
 bool
@@ -259,8 +253,6 @@ MulticopterAttitudeControl::Run()
 		return;
 	}
 
-	perf_begin(_loop_perf);
-
 	// Check if parameters have changed
 	if (_params_sub.updated()) {
 		// clear update
@@ -357,8 +349,6 @@ MulticopterAttitudeControl::Run()
 				(_vehicle_status.is_vtol && _vehicle_status.in_transition_mode);
 
 	}
-
-	perf_end(_loop_perf);
 }
 
 int MulticopterAttitudeControl::task_spawn(int argc, char *argv[])

@@ -35,7 +35,6 @@
 
 #include <lib/mixer/Mixer/Mixer.hpp> // Airmode
 #include <matrix/matrix/math.hpp>
-#include <perf/perf_counter.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
@@ -68,7 +67,7 @@ class MulticopterAttitudeControl : public ModuleBase<MulticopterAttitudeControl>
 {
 public:
 	MulticopterAttitudeControl(bool vtol = false);
-	~MulticopterAttitudeControl() override;
+	~MulticopterAttitudeControl() override = default;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -124,8 +123,6 @@ private:
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 	struct vehicle_land_detected_s		_vehicle_land_detected {};
-
-	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
 	matrix::Vector3f _thrust_setpoint_body; ///< body frame 3D thrust vector
 	matrix::Vector3f _rates_sp; ///< angular rates setpoint

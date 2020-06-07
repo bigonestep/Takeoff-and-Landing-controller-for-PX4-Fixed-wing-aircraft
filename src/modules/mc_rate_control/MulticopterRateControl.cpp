@@ -45,17 +45,11 @@ using math::radians;
 MulticopterRateControl::MulticopterRateControl(bool vtol) :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
-	_actuators_0_pub(vtol ? ORB_ID(actuator_controls_virtual_mc) : ORB_ID(actuator_controls_0)),
-	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
+	_actuators_0_pub(vtol ? ORB_ID(actuator_controls_virtual_mc) : ORB_ID(actuator_controls_0))
 {
 	_vehicle_status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
 
 	parameters_updated();
-}
-
-MulticopterRateControl::~MulticopterRateControl()
-{
-	perf_free(_loop_perf);
 }
 
 bool
@@ -128,8 +122,6 @@ MulticopterRateControl::Run()
 		exit_and_cleanup();
 		return;
 	}
-
-	perf_begin(_loop_perf);
 
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated()) {
@@ -311,8 +303,6 @@ MulticopterRateControl::Run()
 			}
 		}
 	}
-
-	perf_end(_loop_perf);
 }
 
 int MulticopterRateControl::task_spawn(int argc, char *argv[])

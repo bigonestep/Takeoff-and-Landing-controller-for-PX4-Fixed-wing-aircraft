@@ -35,9 +35,7 @@
 
 PWMOut::PWMOut() :
 	CDev(PX4FMU_DEVICE_PATH),
-	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default),
-	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")),
-	_interval_perf(perf_alloc(PC_INTERVAL, MODULE_NAME": interval"))
+	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default)
 {
 	_mixing_output.setAllMinValues(PWM_DEFAULT_MIN);
 	_mixing_output.setAllMaxValues(PWM_DEFAULT_MAX);
@@ -51,9 +49,6 @@ PWMOut::~PWMOut()
 
 	/* clean up the alternate device node */
 	unregister_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH, _class_instance);
-
-	perf_free(_cycle_perf);
-	perf_free(_interval_perf);
 }
 
 int PWMOut::init()
@@ -570,9 +565,6 @@ void PWMOut::Run()
 		return;
 	}
 
-	perf_begin(_cycle_perf);
-	perf_count(_interval_perf);
-
 	_mixing_output.update();
 
 	/* update PWM status if armed or if disarmed PWM values are set */
@@ -599,8 +591,6 @@ void PWMOut::Run()
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
 	_mixing_output.updateSubscriptions(true);
-
-	perf_end(_cycle_perf);
 }
 
 void PWMOut::update_params()
@@ -1999,8 +1989,6 @@ int PWMOut::print_status()
 		PX4_INFO("PWM Mode: %s", mode_str);
 	}
 
-	perf_print_counter(_cycle_perf);
-	perf_print_counter(_interval_perf);
 	_mixing_output.printStatus();
 
 	return 0;

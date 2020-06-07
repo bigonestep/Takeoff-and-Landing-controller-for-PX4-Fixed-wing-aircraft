@@ -47,7 +47,6 @@
 #include <lib/mathlib/mathlib.h>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <lib/parameters/param.h>
-#include <lib/perf/perf_counter.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/log.h>
@@ -179,9 +178,6 @@ private:
 	bool		_test_mode{false};
 
 	unsigned	_num_disarmed_set{0};
-
-	perf_counter_t	_cycle_perf;
-	perf_counter_t	_interval_perf;
 
 	void		capture_callback(uint32_t chan_index,
 					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
