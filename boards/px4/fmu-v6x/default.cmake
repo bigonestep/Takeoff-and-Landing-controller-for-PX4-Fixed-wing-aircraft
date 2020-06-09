@@ -2,14 +2,15 @@
 px4_add_board(
 	PLATFORM nuttx
 	VENDOR px4
-	MODEL fmu-v5x
-	LABEL p2_base_phy_LAN8742Ai
+	MODEL fmu-v6x
+	LABEL default
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
+	BUILD_BOOTLOADER
 	IO px4_io-v2_default
 	TESTING
-	UAVCAN_INTERFACES 2
+#	UAVCAN_INTERFACES 2  - No H7 or FD can support in UAVCAN
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0
 		TEL1:/dev/ttyS6
@@ -26,13 +27,13 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		dshot
 		gps
-		#heater
+		heater
 		#imu # all available imu drivers
 		imu/adis16448
 		imu/adis16477
 		imu/adis16497
 		imu/bmi088
-		imu/invensense/icm20602
+		imu/invensense/icm20649
 		imu/st/ism330dlc
 		irlock
 		lights/blinkm
@@ -45,7 +46,8 @@ px4_add_board(
 		pca9685
 		power_monitor/ina226
 		#protocol_splitter
-		pwm_input
+#		pwm_input  - Need to create arch/stm32 arch/stm32h7 arch/kinetis and reloacate
+#					   all arch dependant code there
 		pwm_out_sim
 		pwm_out
 		px4io
@@ -57,7 +59,7 @@ px4_add_board(
 		telemetry # all available telemetry drivers
 		test_ppm
 		tone_alarm
-		uavcan
+#		uavcan - No H7 or FD can support in UAVCAN yet
 	MODULES
 		airspeed_selector
 		attitude_estimator_q
@@ -65,6 +67,7 @@ px4_add_board(
 		commander
 		dataman
 		ekf2
+		esc_battery
 		events
 		fw_att_control
 		fw_pos_control_l1
