@@ -821,6 +821,11 @@ void Ekf2::Run()
 
 		const hrt_abstime now = imu_sample_new.time_us;
 
+
+		static uint64_t counter = 0;
+
+		counter++;
+
 		// ekf2_timestamps (using 0.1 ms relative timestamps)
 		ekf2_timestamps_s ekf2_timestamps{};
 		ekf2_timestamps.timestamp = now;
@@ -831,6 +836,8 @@ void Ekf2::Run()
 		ekf2_timestamps.vehicle_air_data_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.vehicle_magnetometer_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.visual_odometry_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+
+		ekf2_timestamps.counter = counter;
 
 		// update all other topics if they have new data
 		if (_status_sub.update(&_vehicle_status)) {

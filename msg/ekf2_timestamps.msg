@@ -21,3 +21,6 @@ int16 vehicle_magnetometer_timestamp_rel
 int16 visual_odometry_timestamp_rel
 
 # Note: this is a high-rate logged topic, so it needs to be as small as possible
+
+
+uint64 counter
