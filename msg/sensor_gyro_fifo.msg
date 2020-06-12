@@ -13,3 +13,5 @@ int16[32] y               # angular velocity in the NED Y board axis in rad/s
 int16[32] z               # angular velocity in the NED Z board axis in rad/s
 
 uint8 rotation            # Direction the sensor faces (see Rotation enum)
+
+uint8 ORB_QUEUE_LENGTH = 3

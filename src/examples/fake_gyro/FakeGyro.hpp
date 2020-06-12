@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,53 +33,39 @@
 
 #pragma once
 
-#include <drivers/drv_hrt.h>
-#include <lib/conversion/rotation.h>
+#include <px4_platform_common/defines.h>
+#include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
+#include <px4_platform_common/posix.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/sensor_gyro_fifo.h>
 
-class PX4Gyroscope : public ModuleParams
+class FakeGyro : public ModuleBase<FakeGyro>, public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
-	PX4Gyroscope(uint32_t device_id, enum Rotation rotation = ROTATION_NONE);
-	~PX4Gyroscope() override;
+	FakeGyro();
+	~FakeGyro() override = default;
 
-	uint32_t get_device_id() const { return _device_id; }
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
 
-	float get_max_rate_hz() const { return _param_imu_gyro_rate_max.get(); }
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]);
 
-	void set_device_id(uint32_t device_id) { _device_id = device_id; }
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint32_t error_count) { _error_count = error_count; }
-	void increase_error_count() { _error_count++; }
-	void set_range(float range) { _range = range; }
-	void set_scale(float scale) { _scale = scale; }
-	void set_temperature(float temperature) { _temperature = temperature; }
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
 
-	void update(const hrt_abstime &timestamp_sample, float x, float y, float z);
-
-	void updateFIFO(sensor_gyro_fifo_s &sample);
+	bool init();
 
 private:
-	void Publish(const hrt_abstime &timestamp_sample, float x, float y, float z);
+	static constexpr uint32_t SENSOR_RATE = 1250;
+	static constexpr float GYRO_RATE = 8000;
 
-	uORB::PublicationQueuedMulti<sensor_gyro_s>      _sensor_pub;
-	uORB::PublicationQueuedMulti<sensor_gyro_fifo_s> _sensor_fifo_pub;
+	void Run() override;
 
-	uint32_t		_device_id{0};
-	const enum Rotation	_rotation;
+	uORB::PublicationQueuedMulti<sensor_gyro_fifo_s> _sensor_gyro_fifo_pub{ORB_ID(sensor_gyro_fifo)};
 
-	float			_range{math::radians(2000.f)};
-	float			_scale{1.f};
-	float			_temperature{NAN};
-
-	uint32_t		_error_count{0};
-
-	int16_t			_last_sample[3] {};
-
-	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_rate_max
-	)
+	float _time{0.f};
 };
