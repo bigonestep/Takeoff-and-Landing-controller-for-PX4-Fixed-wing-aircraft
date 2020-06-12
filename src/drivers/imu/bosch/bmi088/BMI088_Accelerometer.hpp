@@ -121,7 +121,7 @@ private:
 		// Register                        | Set bits, Clear bits
 		{ Register::ACC_PWR_CONF,          0, ACC_PWR_CONF_BIT::acc_pwr_save },
 		{ Register::ACC_PWR_CTRL,          ACC_PWR_CTRL_BIT::acc_enable, 0 },
-		{ Register::ACC_CONF,              ACC_CONF_BIT::acc_bwp_Normal | ACC_CONF_BIT::acc_odr_1600, Bit1 | Bit0 },
+		{ Register::ACC_CONF,              ACC_CONF_BIT::acc_bwp_Normal | ACC_CONF_BIT::acc_odr_1600, ACC_CONF_BIT::cont_filter | Bit6 | Bit4 | Bit1 | Bit0 },
 		{ Register::ACC_RANGE,             ACC_RANGE_BIT::acc_range_24g, 0 },
 		{ Register::FIFO_WTM_0,            0, 0 },
 		{ Register::FIFO_WTM_1,            0, 0 },

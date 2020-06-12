@@ -81,11 +81,18 @@ enum class Register : uint8_t {
 
 // ACC_CONF
 enum ACC_CONF_BIT : uint8_t {
-	// [7:4] acc_bwp
-	acc_bwp_Normal = Bit7 | Bit5,        // Filter setting normal
+	// Continuous filter function: set bit7 in ACC_CONF
+	cont_filter    = Bit7,
 
-	// [3:0] acc_odr
-	acc_odr_1600   = Bit3 | Bit2,        // ODR 1600 Hz
+	// [7:4] acc_bwp: bandwidth of the accelerometer low pass filter.
+	acc_bwp_OSR4   = 0,    // 0b1000 (0x08) - OSR4 (4-fold oversampling)
+	acc_bwp_OSR2   = Bit4, // 0b1001 (0x09) - OSR2 (2-fold oversampling)
+	acc_bwp_Normal = Bit5, // 0b1010 (0x0A) - Normal
+
+	// [3:0] acc_odr: output data rate ODR
+	acc_odr_400    = Bit3 | Bit1,        // 0b1010 (0x0A) - ODR 400 Hz
+	acc_odr_800    = Bit3 | Bit1 | Bit0, // 0b1011 (0x0B) - ODR 800 Hz
+	acc_odr_1600   = Bit3 | Bit2,        // 0b1100 (0x0C) - ODR 1600 Hz
 };
 
 // ACC_RANGE
