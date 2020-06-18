@@ -147,6 +147,10 @@ private:
 			delete _dist_pubs[i];
 		}
 
+		for (size_t i = 0; i < sizeof(_vehicle_gps_position_pubs) / sizeof(_vehicle_gps_position_pubs[0]); i++) {
+			delete _vehicle_gps_position_pubs[i];
+		}
+
 		_instance = nullptr;
 	}
 
