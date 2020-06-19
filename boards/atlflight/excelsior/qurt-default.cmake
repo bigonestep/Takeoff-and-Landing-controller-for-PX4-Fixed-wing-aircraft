@@ -5,11 +5,14 @@
 # the DSP side.
 
 # Get $QC_SOC_TARGET from environment if existing.
-if (DEFINED ENV{QC_SOC_TARGET})
-	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
-else()
-	set(QC_SOC_TARGET "APQ8074")
-endif()
+# if (DEFINED ENV{QC_SOC_TARGET})
+# 	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
+# 	message("QC_SOC_TARGET: $ENV{QC_SOC_TARGET}")
+# else()
+# 	set(QC_SOC_TARGET "APQ8074")
+# endif()
+
+set(QC_SOC_TARGET "APQ8096")
 
 include(px4_git)
 px4_add_git_submodule(TARGET git_cmake_hexagon PATH "${PX4_SOURCE_DIR}/boards/atlflight/cmake_hexagon")
@@ -74,7 +77,7 @@ px4_add_board(
 		mc_att_control
 		mc_pos_control
 		sensors
-		sih
+		# sih
 		vmount
 		vtol_att_control
 		wind_estimator
