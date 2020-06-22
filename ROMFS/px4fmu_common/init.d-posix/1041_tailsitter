@@ -5,7 +5,7 @@
 # @type VTOL Quad Tailsitter
 #
 
-sh /etc/init.d/rc.vtol_defaults
+. /etc/init.d/rc.vtol_defaults
 
 if [ $AUTOCNF = yes ]
 then
