@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - 'master'
+    - 'pr-github_actions'
   pull_request:
     branches:
     - '*'
@@ -23,7 +24,19 @@ jobs:
         make airframe_metadata
         cd build/px4_sitl_default/docs
         ls -ls *
-      # TODO: deploy to devguide gitbook and s3
+        echo ${{github.ref}}
+    - name: S3 Sync
+      if: contains(github.ref, 'refs/heads/pr-github_actions')
+      uses: jakejarvis/s3-sync-action@v0.5.1
+      with:
+        args: --acl public-read
+      env:
+        AWS_S3_BUCKET: px4-travis
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'
+        SOURCE_DIR: 'build/px4_sitl_default/docs/airframes.xml'
+        DEST_DIR: 'Firmware/master'
 
   module:
     runs-on: ubuntu-latest
