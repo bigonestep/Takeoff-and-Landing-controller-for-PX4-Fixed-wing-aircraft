@@ -43,7 +43,7 @@ px4_add_board(
 	MODEL excelsior
 	LABEL default
 	TESTING
-	TOOLCHAIN arm-oemllib32-linux-gnueabi
+	TOOLCHAIN arm-linux-gnueabi
 
 	DRIVERS
 		#barometer # all available barometer drivers

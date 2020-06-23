@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +32,51 @@
  ****************************************************************************/
 
 /**
- * @file board_config.h
+ * @file sitl_led.c
  *
- * EXCELSIOR internal definitions
+ * sitl LED backend.
  */
 
-#pragma once
+#include <px4_config.h>
+#include <px4_log.h>
+#include <stdbool.h>
+#include <systemlib/px4_macros.h>
 
-#define BOARD_OVERRIDE_UUID "EAGLEID000000000" // must be of length 16
-#define PX4_SOC_ARCH_ID     PX4_SOC_ARCH_ID_EAGLE
+__BEGIN_DECLS
+extern void led_init(void);
+extern void led_on(int led);
+extern void led_off(int led);
+extern void led_toggle(int led);
+__END_DECLS
 
-#define BOARD_BATTERY1_V_DIV   (10.177939394f)
-#define BOARD_BATTERY1_A_PER_V (15.391030303f)
+static bool _led_state[] = { false, false, false, false };
 
-#define BOARD_HAS_NO_RESET
+__EXPORT void led_init()
+{
+	PX4_DEBUG("LED_INIT");
+}
 
-#define BOARD_HAS_NO_BOOTLOADER
+__EXPORT void led_on(int led)
+{
+	if ((unsigned int)led < arraySize(_led_state)) {
+		PX4_DEBUG("LED%d_ON", led);
+		_led_state[led] = true;
+	}
+}
 
-#define BOARD_NUMBER_BRICKS     0
+__EXPORT void led_off(int led)
+{
+	if ((unsigned int)led < arraySize(_led_state)) {
+		PX4_DEBUG("LED%d_OFF", led);
+		_led_state[led] = false;
+	}
+}
 
-/*
- * I2C busses
- */
-#define PX4_I2C_BUS_ESC		1
-#define PX4_SIM_BUS_TEST	2
-#define PX4_I2C_BUS_EXPANSION	3
-#define PX4_I2C_BUS_LED		3
-#define PX4_NUMBER_I2C_BUSES 3
-#include <system_config.h>
-#include <drivers/boards/common/board_common.h>
+__EXPORT void led_toggle(int led)
+{
+	if ((unsigned int)led < arraySize(_led_state)) {
+		_led_state[led] = !_led_state[led];
+		PX4_DEBUG("LED%d_TOGGLE: %s", led, _led_state[led] ? "ON" : "OFF");
+
+	}
+}
