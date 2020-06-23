@@ -55,7 +55,7 @@ else()
 	add_custom_target(upload
 		COMMAND
 			${CMAKE_CURRENT_SOURCE_DIR}/scripts/adb_upload.sh
-				${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bin ${PX4_SOURCE_DIR}/posix-configs/excelsior/mainapp.config # source
+				${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bin/px4 ${PX4_SOURCE_DIR}/posix-configs/excelsior/mainapp.config # source
 				/home/root	# destination
 		DEPENDS px4
 		COMMENT "uploading px4"

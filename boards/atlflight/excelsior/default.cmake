@@ -9,11 +9,13 @@ list(APPEND CMAKE_MODULE_PATH
 	)
 
 # Get $QC_SOC_TARGET from environment if existing.
-if (DEFINED ENV{QC_SOC_TARGET})
-	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
-else()
-	set(QC_SOC_TARGET "APQ8074")
-endif()
+# if (DEFINED ENV{QC_SOC_TARGET})
+# 	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
+# else()
+# 	set(QC_SOC_TARGET "APQ8074")
+# endif()
+
+set(QC_SOC_TARGET "APQ8096")
 
 # Disable the creation of the parameters.xml file by scanning individual
 # source files, and scan all source files.  This will create a parameters.xml
