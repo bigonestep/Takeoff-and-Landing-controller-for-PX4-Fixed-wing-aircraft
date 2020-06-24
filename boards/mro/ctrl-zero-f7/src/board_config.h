@@ -118,12 +118,10 @@
 #define BOARD_NUMBER_BRICKS             1
 
 #define GPIO_VDD_3V3_SPEKTRUM_POWER_EN  /* PE4  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN4)
-#define GPIO_VDD_3V3_SENSORS_EN         /* PE3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN3)
-
 
 /* Define True logic Power Control in arch agnostic form */
-#define VDD_3V3_SPEKTRUM_POWER_EN(on_true) px4_arch_gpiowrite(GPIO_VDD_3V3_SPEKTRUM_POWER_EN, (on_true))
-#define READ_VDD_3V3_SPEKTRUM_POWER_EN()   px4_arch_gpioread(GPIO_VDD_3V3_SPEKTRUM_POWER_EN)
+#define VDD_3V3_SPEKTRUM_POWER_EN(on_true) px4_arch_gpiowrite(GPIO_VDD_3V3_SPEKTRUM_POWER_EN, (!on_true))
+#define READ_VDD_3V3_SPEKTRUM_POWER_EN()   (px4_arch_gpioread(GPIO_VDD_3V3_SPEKTRUM_POWER_EN) == 0)
 
 /* Tone alarm output */
 #define TONE_ALARM_TIMER        2  /* timer 2 */
@@ -144,7 +142,7 @@
 #define HRT_TIMER               3  /* use timer3 for the HRT */
 #define HRT_TIMER_CHANNEL       3  /* use capture/compare channel 3 */
 
-#define HRT_PPM_CHANNEL         /* T3C2 */  2  /* use capture/compare channel 1 */
+#define HRT_PPM_CHANNEL         /* T3C2 */  2  /* use capture/compare channel 2 */
 #define GPIO_PPM_IN             /* PC7 T3C2 */ GPIO_TIM3_CH2IN_3
 
 /* RC Serial port */
@@ -201,7 +199,6 @@
 		GPIO_CAN1_SILENT_S0,              \
 		GPIO_nPOWER_IN_A,                 \
 		GPIO_VDD_3V3_SPEKTRUM_POWER_EN,   \
-		GPIO_VDD_3V3_SENSORS_EN,          \
 		GPIO_TONE_ALARM_IDLE,             \
 		GPIO_SAFETY_SWITCH_IN,            \
 	}

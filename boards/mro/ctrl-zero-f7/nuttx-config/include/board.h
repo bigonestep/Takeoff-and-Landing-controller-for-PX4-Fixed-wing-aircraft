@@ -283,29 +283,23 @@
  *      GPIO_UART8_TX                          PE1
  */
 
-/* CAN
- *
- * CAN1 is routed to transceiver.
- */
+/* CAN */
 #define GPIO_CAN1_RX     GPIO_CAN1_RX_3     /* PD0  */
 #define GPIO_CAN1_TX     GPIO_CAN1_TX_3     /* PD1 */
 
-/* SPI
- * SPI1 sensors 1
- * SPI2 FRAM + baro
- * SPI5 sensors 2
- * SPI6 Reserved
- *
- */
-#define GPIO_SPI1_SCK    GPIO_SPI1_SCK_1    /* PA5 */
+
+/* SPI */
+#define ADJ_SLEW_RATE(p) (((p) & ~GPIO_SPEED_MASK) | (GPIO_SPEED_2MHz))
+
+#define GPIO_SPI1_SCK    ADJ_SLEW_RATE(GPIO_SPI1_SCK_1)    /* PA5 */
 #define GPIO_SPI1_MISO   GPIO_SPI1_MISO_1   /* PA6 */
 #define GPIO_SPI1_MOSI   GPIO_SPI1_MOSI_1   /* PA7 */
 
-#define GPIO_SPI2_SCK    GPIO_SPI2_SCK_2    /* PB10 */
+#define GPIO_SPI2_SCK    ADJ_SLEW_RATE(GPIO_SPI2_SCK_2)    /* PB10 */
 #define GPIO_SPI2_MISO   GPIO_SPI2_MISO_1   /* PB14 */
 #define GPIO_SPI2_MOSI   GPIO_SPI2_MOSI_1   /* PB15 */
 
-#define GPIO_SPI5_SCK    GPIO_SPI5_SCK_1    /* PF7 */
+#define GPIO_SPI5_SCK    ADJ_SLEW_RATE(GPIO_SPI5_SCK_1)    /* PF7 */
 #define GPIO_SPI5_MISO   GPIO_SPI5_MISO_1   /* PF8 */
 #define GPIO_SPI5_MOSI   GPIO_SPI5_MOSI_1   /* PF9 */
 
@@ -314,8 +308,6 @@
 #define GPIO_I2C1_SCL GPIO_I2C1_SCL_2       /* PB8  */
 #define GPIO_I2C1_SDA GPIO_I2C1_SDA_2       /* PB9  */
 
-#define GPIO_I2C1_SCL_GPIO                  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN8)
-#define GPIO_I2C1_SDA_GPIO                  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN9)
 
 /* SDMMC1
  *
