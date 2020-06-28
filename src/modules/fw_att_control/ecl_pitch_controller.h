@@ -51,7 +51,7 @@
 
 #include <mathlib/mathlib.h>
 
-#include "ecl_controller.h"
+#include <lib/controller/ECL_Controller.hpp>
 
 class ECL_PitchController :
 	public ECL_Controller

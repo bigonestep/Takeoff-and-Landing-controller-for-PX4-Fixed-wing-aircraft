@@ -49,7 +49,7 @@
 #ifndef ECL_HEADING_CONTROLLER_H
 #define ECL_HEADING_CONTROLLER_H
 
-#include "ecl_controller.h"
+#include <lib/controller/ECL_Controller.hpp>
 
 class ECL_WheelController :
 	public ECL_Controller

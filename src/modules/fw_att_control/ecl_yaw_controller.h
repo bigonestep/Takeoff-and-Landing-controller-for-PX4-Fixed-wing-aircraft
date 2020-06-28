@@ -48,7 +48,7 @@
 #ifndef ECL_YAW_CONTROLLER_H
 #define ECL_YAW_CONTROLLER_H
 
-#include "ecl_controller.h"
+#include <lib/controller/ECL_Controller.hpp>
 
 class ECL_YawController :
 	public ECL_Controller

@@ -49,7 +49,7 @@
 #ifndef ECL_ROLL_CONTROLLER_H
 #define ECL_ROLL_CONTROLLER_H
 
-#include "ecl_controller.h"
+#include <lib/controller/ECL_Controller.hpp>
 
 class ECL_RollController :
 	public ECL_Controller

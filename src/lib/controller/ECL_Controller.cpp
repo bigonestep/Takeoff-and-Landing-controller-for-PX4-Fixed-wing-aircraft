@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ecl_controller.h
+ * @file ecl_controller.cpp
  * Definition of base class for other controllers
  *
  * @author Lorenz Meier <lm@inf.ethz.ch>
@@ -46,72 +46,100 @@
  *   Jonathan Challinger, 2012.
  */
 
-#pragma once
+#include "ECL_Controller.hpp"
 
-#include <drivers/drv_hrt.h>
-#include <px4_log.h>
+#include <stdio.h>
+#include <mathlib/mathlib.h>
 
-struct ECL_ControlData {
-	float roll;
-	float pitch;
-	float yaw;
-	float body_x_rate;
-	float body_y_rate;
-	float body_z_rate;
-	float roll_setpoint;
-	float pitch_setpoint;
-	float yaw_setpoint;
-	float roll_rate_setpoint;
-	float pitch_rate_setpoint;
-	float yaw_rate_setpoint;
-	float airspeed_min;
-	float airspeed_max;
-	float airspeed;
-	float scaler;
-	float groundspeed;
-	float groundspeed_scaler;
-	bool lock_integrator;
-};
-
-class ECL_Controller
+ECL_Controller::ECL_Controller() :
+	_last_run(0),
+	_tc(0.1f),
+	_k_p(0.0f),
+	_k_i(0.0f),
+	_k_ff(0.0f),
+	_integrator_max(0.0f),
+	_max_rate(0.0f),
+	_last_output(0.0f),
+	_integrator(0.0f),
+	_rate_error(0.0f),
+	_rate_setpoint(0.0f),
+	_bodyrate_setpoint(0.0f)
 {
-public:
-	ECL_Controller();
-	virtual ~ECL_Controller() = default;
+}
 
-	virtual float control_attitude(const struct ECL_ControlData &ctl_data) = 0;
-	virtual float control_euler_rate(const struct ECL_ControlData &ctl_data) = 0;
-	virtual float control_bodyrate(const struct ECL_ControlData &ctl_data) = 0;
+void ECL_Controller::reset_integrator()
+{
+	_integrator = 0.0f;
+}
 
-	/* Setters */
-	void set_time_constant(float time_constant);
-	void set_k_p(float k_p);
-	void set_k_i(float k_i);
-	void set_k_ff(float k_ff);
-	void set_integrator_max(float max);
-	void set_max_rate(float max_rate);
-	void set_bodyrate_setpoint(float rate);
+void ECL_Controller::set_time_constant(float time_constant)
+{
+	if (time_constant > 0.1f && time_constant < 3.0f) {
+		_tc = time_constant;
+	}
+}
 
-	/* Getters */
-	float get_rate_error();
-	float get_desired_rate();
-	float get_desired_bodyrate();
-	float get_integrator();
+void ECL_Controller::set_k_p(float k_p)
+{
+	_k_p = k_p;
+}
 
-	void reset_integrator();
+void ECL_Controller::set_k_i(float k_i)
+{
+	_k_i = k_i;
+}
 
-protected:
-	uint64_t _last_run;
-	float _tc;
-	float _k_p;
-	float _k_i;
-	float _k_ff;
-	float _integrator_max;
-	float _max_rate;
-	float _last_output;
-	float _integrator;
-	float _rate_error;
-	float _rate_setpoint;
-	float _bodyrate_setpoint;
-	float constrain_airspeed(float airspeed, float minspeed, float maxspeed);
-};
+void ECL_Controller::set_k_ff(float k_ff)
+{
+	_k_ff = k_ff;
+}
+
+void ECL_Controller::set_integrator_max(float max)
+{
+	_integrator_max = max;
+}
+
+void ECL_Controller::set_max_rate(float max_rate)
+{
+	_max_rate = max_rate;
+}
+
+void ECL_Controller::set_bodyrate_setpoint(float rate)
+{
+	_bodyrate_setpoint = math::constrain(rate, -_max_rate, _max_rate);
+}
+
+float ECL_Controller::get_rate_error()
+{
+	return _rate_error;
+}
+
+float ECL_Controller::get_desired_rate()
+{
+	return _rate_setpoint;
+}
+
+float ECL_Controller::get_desired_bodyrate()
+{
+	return _bodyrate_setpoint;
+}
+
+float ECL_Controller::get_integrator()
+{
+	return _integrator;
+}
+
+float ECL_Controller::constrain_airspeed(float airspeed, float minspeed, float maxspeed)
+{
+	float airspeed_result = airspeed;
+
+	if (!PX4_ISFINITE(airspeed)) {
+		/* airspeed is NaN, +- INF or not available, pick center of band */
+		airspeed_result = 0.5f * (minspeed + maxspeed);
+
+	} else if (airspeed < minspeed) {
+		airspeed_result = minspeed;
+	}
+
+	return airspeed_result;
+}
