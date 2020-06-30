@@ -253,6 +253,7 @@ private:
 	};
 	int _imu_sub_index{-1};
 	bool _callback_registered{false};
+	int _lockstep_component{-1};
 
 	// because we can have several distance sensor instances with different orientations
 	static constexpr int MAX_RNG_SENSOR_COUNT = 4;
@@ -658,6 +659,7 @@ Ekf2::Ekf2(bool replay_mode):
 
 Ekf2::~Ekf2()
 {
+	px4_lockstep_unregister_component(_lockstep_component);
 	perf_free(_ekf_update_perf);
 }
 
@@ -772,9 +774,9 @@ void Ekf2::Run()
 		updated = _vehicle_imu_subs[_imu_sub_index].update(&imu);
 
 		imu_sample_new.time_us = imu.timestamp_sample;
-		imu_sample_new.delta_ang_dt = imu.dt * 1.e-6f;
+		imu_sample_new.delta_ang_dt = imu.delta_angle_dt * 1.e-6f;
 		imu_sample_new.delta_ang = Vector3f{imu.delta_angle};
-		imu_sample_new.delta_vel_dt = imu.dt * 1.e-6f;
+		imu_sample_new.delta_vel_dt = imu.delta_velocity_dt * 1.e-6f;
 		imu_sample_new.delta_vel = Vector3f{imu.delta_velocity};
 
 		if (imu.delta_velocity_clipping > 0) {
@@ -783,7 +785,7 @@ void Ekf2::Run()
 			imu_sample_new.delta_vel_clipping[2] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_Z;
 		}
 
-		imu_dt = imu.dt;
+		imu_dt = imu.delta_angle_dt;
 
 		bias.accel_device_id = imu.accel_device_id;
 		bias.gyro_device_id = imu.gyro_device_id;
@@ -853,12 +855,10 @@ void Ekf2::Run()
 
 					if (_imu_sub_index < 0) {
 						if (_sensor_selection.accel_device_id != sensor_selection_prev.accel_device_id) {
-							PX4_WARN("accel id changed, resetting IMU bias");
 							_imu_bias_reset_request = true;
 						}
 
 						if (_sensor_selection.gyro_device_id != sensor_selection_prev.gyro_device_id) {
-							PX4_WARN("gyro id changed, resetting IMU bias");
 							_imu_bias_reset_request = true;
 						}
 					}
@@ -1061,7 +1061,8 @@ void Ekf2::Run()
 				flow.time_us = optical_flow.timestamp;
 
 				if (PX4_ISFINITE(optical_flow.pixel_flow_y_integral) &&
-				    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
+				    PX4_ISFINITE(optical_flow.pixel_flow_x_integral) &&
+				    flow.dt < 1) {
 
 					_ekf.setOpticalFlowData(flow);
 				}
@@ -1735,6 +1736,12 @@ void Ekf2::Run()
 
 		// publish ekf2_timestamps
 		_ekf2_timestamps_pub.publish(ekf2_timestamps);
+
+		if (_lockstep_component == -1) {
+			_lockstep_component = px4_lockstep_register_component();
+		}
+
+		px4_lockstep_progress(_lockstep_component);
 	}
 }
 
