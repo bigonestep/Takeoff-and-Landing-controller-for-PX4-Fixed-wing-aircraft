@@ -31,75 +31,43 @@
  *
  ****************************************************************************/
 
-#pragma once
-
 #include <board_config.h>
+#include <systemlib/px4_macros.h>
+#include <px4_platform_common/i2c.h>
 
-#define I2C_BUS_MAX_BUS_ITEMS PX4_NUMBER_I2C_BUSES
+#include <stdint.h>
+#include <stdbool.h>
+#include <debug.h>
+#include <unistd.h>
 
-#if defined(CONFIG_SYSTEM_I2CTOOL)
-int px4_i2c_tool_init(void);
-#endif
+#include <nuttx/i2c/i2c_master.h>
 
-struct px4_i2c_bus_t {
-	int bus{-1}; ///< physical bus number (1, ...) (-1 means this is unused)
-	bool is_external; ///< static external configuration. Use px4_i2c_bus_external() to check if a bus is really external
-};
 
-__EXPORT extern const px4_i2c_bus_t px4_i2c_buses[I2C_BUS_MAX_BUS_ITEMS]; ///< board-specific I2C bus configuration
-
-/**
- * runtime-check if a board has a specific bus as external.
- * This can be overridden by a board to add run-time checks.
- */
-__EXPORT bool px4_i2c_bus_external(const px4_i2c_bus_t &bus);
-
-/**
- * runtime-check if a board has a specific bus as external.
- */
-static inline bool px4_i2c_bus_external(int bus)
+static void stm32_i2c_register(int bus)
 {
-	for (int i = 0; i < I2C_BUS_MAX_BUS_ITEMS; ++i) {
-		if (px4_i2c_buses[i].bus == bus) {
-			return px4_i2c_bus_external(px4_i2c_buses[i]);
+	FAR struct i2c_master_s *i2c;
+	int ret;
+
+	i2c = stm32_i2cbus_initialize(bus);
+
+	if (i2c == NULL) {
+		serr("ERROR: Failed to get I2C%d interface\n", bus);
+
+	} else {
+		ret = i2c_register(i2c, bus);
+
+		if (ret < 0) {
+			serr("ERROR: Failed to register I2C%d driver: %d\n", bus, ret);
+			stm32_i2cbus_uninitialize(i2c);
 		}
 	}
-
-	return true;
 }
 
-
-/**
- * @class I2CBusIterator
- * Iterate over configured I2C buses by the board
- */
-class I2CBusIterator
+int px4_i2c_tool_init(void)
 {
-public:
-	enum class FilterType {
-		All, ///< specific or all buses
-		InternalBus, ///< specific or all internal buses
-		ExternalBus, ///< specific or all external buses
-	};
+	for (int i = 0; i < I2C_BUS_MAX_BUS_ITEMS && px4_i2c_buses[i].bus != -1; i++) {
+		stm32_i2c_register(px4_i2c_buses[i].bus);
+	}
 
-	/**
-	 * @param bus specify bus: starts with 1, -1=all. Internal: arch-specific bus numbering is used,
-	 *             external: n-th external bus
-	 */
-	I2CBusIterator(FilterType filter, int bus = -1)
-		: _filter(filter), _bus(bus) {}
-
-	bool next();
-
-	const px4_i2c_bus_t &bus() const { return px4_i2c_buses[_index]; }
-
-	int externalBusIndex() const { return _external_bus_counter; }
-
-	bool external() const { return px4_i2c_bus_external(bus()); }
-
-private:
-	const FilterType _filter;
-	const int _bus;
-	int _index{-1};
-	int _external_bus_counter{0};
-};
+	return 0;
+}

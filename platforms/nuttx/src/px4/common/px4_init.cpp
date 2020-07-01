@@ -39,6 +39,7 @@
 #include <lib/parameters/param.h>
 #include <px4_platform_common/px4_work_queue/WorkQueueManager.hpp>
 #include <systemlib/cpuload.h>
+#include <px4_platform_common/i2c.h>
 
 #include <fcntl.h>
 
@@ -103,6 +104,9 @@ int px4_platform_init(void)
 	cpuload_initialize_once();
 #endif
 
+#if defined(CONFIG_SYSTEM_I2CTOOL)
+	px4_i2c_tool_init();
+#endif
 	px4::WorkQueueManagerStart();
 
 	return PX4_OK;

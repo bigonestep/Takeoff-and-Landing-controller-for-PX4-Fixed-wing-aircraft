@@ -47,6 +47,7 @@ if(NOT PX4_BOARD MATCHES "px4_io")
 	target_link_libraries(px4_layer
 		PRIVATE
 			arch_board_reset
+			arch_i2c
 			arch_board_critmon
 			arch_version
 			nuttx_apps
