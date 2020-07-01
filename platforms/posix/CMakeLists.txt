@@ -9,6 +9,14 @@ if (NOT CATKIN_DEVEL_PREFIX)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
+if ("${QC_SOC_TARGET}" STREQUAL "APQ8096")
+  # Set the location for 8x96 target
+  set(APPS_DEST "/home/root")
+else()
+  # 8x74 target is assumed by default.
+  set(APPS_DEST "/home/linaro")
+endif()
+
 set(PX4_SHELL_COMMAND_PREFIX "px4-")
 
 add_definitions("-DPX4_SHELL_COMMAND_PREFIX=\"${PX4_SHELL_COMMAND_PREFIX}\"")
@@ -32,7 +40,7 @@ if (("${PX4_BOARD}" MATCHES "atlflight_eagle") OR ("${PX4_BOARD}" MATCHES "atlfl
 	LINUX_APP(
 		APP_NAME px4
 		IDL_NAME px4muorb
-		APPS_DEST "/home/linaro"
+		APPS_DEST ${APPS_DEST}
 		SOURCES
 			px4muorb_stub.c
 			src/px4/common/main.cpp

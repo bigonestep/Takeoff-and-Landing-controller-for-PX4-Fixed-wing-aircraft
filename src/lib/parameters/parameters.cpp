@@ -42,7 +42,7 @@
  */
 
 #define PARAM_IMPLEMENTATION
-#include "param.h"
+#include <parameters/param.h>
 #include "param_translation.h"
 #include <parameters/px4_parameters.h>
 #include "tinybson/tinybson.h"

@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,32 +31,35 @@
 #
 ############################################################################
 
-list(APPEND CMAKE_MODULE_PATH "${PX4_SOURCE_DIR}/boards/atlflight/cmake_hexagon")
-include(hexagon_sdk)
 
-include_directories(${HEXAGON_SDK_INCLUDES})
 
-set(QURT_LAYER_SRCS
-	px4_qurt_impl.cpp
-	tasks.cpp
-	lib_crc32.c
-	drv_hrt.cpp
-	qurt_stubs.c
-	main.cpp
-	shmem_qurt.cpp
-	px4_init.cpp
+
+############################################################################
+# Upload
+############################################################################
+
+if("${PX4_PLATFORM}" MATCHES "qurt")
+
+	add_custom_target(upload
+		COMMAND
+			${CMAKE_CURRENT_SOURCE_DIR}/scripts/adb_upload.sh
+				${PX4_BINARY_DIR}/platforms/qurt/libpx4.so ${PX4_BINARY_DIR}/platforms/qurt/libpx4muorb_skel.so ${PX4_SOURCE_DIR}/posix-configs/excelsior/px4.config	# source
+				/usr/lib/rfsa/adsp	# destination
+		DEPENDS px4 px4muorb_skel
+		COMMENT "uploading px4"
+		USES_TERMINAL
 	)
 
-if ("${QURT_ENABLE_STUBS}" STREQUAL "1")
-	list(APPEND QURT_LAYER_SRCS
-		stubs/posix.c
-		stubs/qurt.c
-		)
-endif()
+else()
 
-add_library(px4_layer
-	${QURT_LAYER_SRCS}
-	${CONFIG_SRC}
-)
-target_link_libraries(px4_layer PRIVATE work_queue)
-add_dependencies(px4_layer uorb_msgs) # dataman requires mission
+	add_custom_target(upload
+		COMMAND
+			${CMAKE_CURRENT_SOURCE_DIR}/scripts/adb_upload.sh
+				${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bin/px4 ${PX4_SOURCE_DIR}/posix-configs/excelsior/mainapp.config # source
+				/home/root	# destination
+		DEPENDS px4
+		COMMENT "uploading px4"
+		USES_TERMINAL
+		)
+
+endif()

@@ -4,12 +4,7 @@
 # This cmake config builds for QURT which is the operating system running on
 # the DSP side.
 
-# Get $QC_SOC_TARGET from environment if existing.
-if (DEFINED ENV{QC_SOC_TARGET})
-	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
-else()
-	set(QC_SOC_TARGET "APQ8074")
-endif()
+set(QC_SOC_TARGET "APQ8096")
 
 include(px4_git)
 px4_add_git_submodule(TARGET git_cmake_hexagon PATH "${PX4_SOURCE_DIR}/boards/atlflight/cmake_hexagon")

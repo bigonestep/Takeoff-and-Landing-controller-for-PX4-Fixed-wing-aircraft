@@ -104,8 +104,10 @@ __BEGIN_DECLS
 extern long PX4_TICKS_PER_SEC;
 __END_DECLS
 
-#  if defined(__PX4_POSIX_EAGLE) || defined(__PX4_POSIX_EXCELSIOR)
+#  if defined(__PX4_POSIX_EAGLE)
 #    define PX4_ROOTFSDIR "/home/linaro"
+#  elif defined(__PX4_POSIX_EXCELSIOR)
+#    define PX4_ROOTFSDIR "/home/root"
 #  else
 #    define PX4_ROOTFSDIR "."
 #  endif

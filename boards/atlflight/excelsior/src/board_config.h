@@ -45,6 +45,16 @@
 /*
  * I2C busses
  */
+#define BOARD_NUMBER_BRICKS     0
+
+/*
+ * I2C busses
+ */
+#define PX4_I2C_BUS_ESC		1
+#define PX4_SIM_BUS_TEST	2
+#define PX4_I2C_BUS_EXPANSION	3
+#define PX4_I2C_BUS_LED		3
+
 #define PX4_NUMBER_I2C_BUSES    3
 
 #include <system_config.h>

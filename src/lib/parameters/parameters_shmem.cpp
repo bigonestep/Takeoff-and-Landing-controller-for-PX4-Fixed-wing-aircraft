@@ -41,7 +41,9 @@
  * and background parameter saving.
  */
 
-#include "param.h"
+#define PARAM_IMPLEMENTATION
+
+#include <parameters/param.h>
 #include <parameters/px4_parameters.h>
 #include "tinybson/tinybson.h"
 
@@ -73,7 +75,7 @@
 #ifdef __PX4_QURT
 static const char *param_default_file = "/dev/fs/params";
 #else
-static const char *param_default_file = "/usr/share/data/adsp/params";
+static const char *param_default_file = "/usr/share/data/adsp/params"; // TODO: JAKE: check this for excelsior
 #endif
 static char *param_user_file = nullptr;
 

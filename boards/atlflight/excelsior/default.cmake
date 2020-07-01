@@ -8,12 +8,7 @@ list(APPEND CMAKE_MODULE_PATH
 	"${PX4_SOURCE_DIR}/boards/atlflight/cmake_hexagon/toolchain"
 	)
 
-# Get $QC_SOC_TARGET from environment if existing.
-if (DEFINED ENV{QC_SOC_TARGET})
-	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
-else()
-	set(QC_SOC_TARGET "APQ8074")
-endif()
+set(QC_SOC_TARGET "APQ8096")
 
 # Disable the creation of the parameters.xml file by scanning individual
 # source files, and scan all source files.  This will create a parameters.xml
@@ -27,7 +22,7 @@ add_definitions(-DORB_COMMUNICATOR)
 
 # atlflight toolchain doesn't properly set the compiler, so these aren't set automatically
 add_compile_options($<$<COMPILE_LANGUAGE:C>:-std=gnu99>)
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++11>)
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++14>)
 
 add_definitions(
 	-D__PX4_POSIX_EXCELSIOR
@@ -39,8 +34,7 @@ px4_add_board(
 	VENDOR atlflight
 	MODEL excelsior
 	LABEL default
-	#TESTING
-	TOOLCHAIN arm-oemllib32-linux-gnueabi
+	TOOLCHAIN arm-linux-gnueabihf
 	DRIVERS
 		#barometer # all available barometer drivers
 		batt_smbus
