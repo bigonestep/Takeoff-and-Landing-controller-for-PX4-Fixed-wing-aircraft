@@ -389,7 +389,7 @@ RoverPositionControl::control_rates(const vehicle_angular_velocity_s &rates, con
 	// Set scaling factor with local velocity
 	control_input.groundspeed = current_speed;
 	// Lock integrator when local velocity is small
-	control_input.lock_integrator = (current_speed < _param_rate_i_minspeed.get()) ? true : false;
+	control_input.lock_integrator = (current_speed < _param_rate_i_minspeed.get());
 
 	control_input.body_z_rate = rates.xyz[2];
 	_att_control.set_bodyrate_setpoint(rates_sp.yaw);

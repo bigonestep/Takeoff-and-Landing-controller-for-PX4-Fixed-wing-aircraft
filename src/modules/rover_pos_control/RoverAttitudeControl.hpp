@@ -1,6 +1,7 @@
 /****************************************************************************
  *
  *   Copyright (c) 2013-2016 Estimation and Control Library (ECL). All rights reserved.
+ *   Copyright (c) 2017-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,19 +33,14 @@
  ****************************************************************************/
 
 /**
- * @file ecl_yaw_controller.h
- * Definition of a simple orthogonal coordinated turn yaw PID controller.
+ * Definition of a rover attitude controller.
  *
  * @author Lorenz Meier <lm@inf.ethz.ch>
  * @author Thomas Gubler <thomasgubler@gmail.com>
+ * @author Jaeyoung Lim <jaeyoung@auterion.com>
  *
- * Acknowledgements:
- *
- *   The control design is based on a design
- *   by Paul Riseborough and Andrew Tridgell, 2013,
- *   which in turn is based on initial work of
- *   Jonathan Challinger, 2012.
  */
+
 #ifndef ROVER_ATTITUDE_CONTROLLER_H
 #define ROVER_ATTITUDE_CONTROLLER_H
 

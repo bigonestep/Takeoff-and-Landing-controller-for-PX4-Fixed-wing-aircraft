@@ -1,6 +1,7 @@
 /****************************************************************************
  *
  *   Copyright (c) 2013-2016 Estimation and Control Library (ECL). All rights reserved.
+ *   Copyright (c) 2017-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,9 +33,10 @@
  ****************************************************************************/
 
 /**
- * @file RoverAttitudeControl.hpp
- * Rover Attitude Controller
+ * Rover attitude controller.
  *
+ * @author Lorenz Meier <lm@inf.ethz.ch>
+ * @author Thomas Gubler <thomasgubler@gmail.com>
  * @author Jaeyoung Lim <jaeyoung@auterion.com>
  *
  */
