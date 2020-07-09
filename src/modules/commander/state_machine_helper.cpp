@@ -49,6 +49,8 @@
 #include "state_machine_helper.h"
 #include "commander_helper.h"
 
+using namespace time_literals;
+
 static constexpr const char reason_no_rc[] = "no RC";
 static constexpr const char reason_no_offboard[] = "no offboard";
 static constexpr const char reason_no_rc_and_no_offboard[] = "no RC and no offboard";
@@ -377,6 +379,7 @@ main_state_transition(const vehicle_status_s &status, const main_state_t new_mai
 void enable_failsafe(vehicle_status_s *status, bool old_failsafe, orb_advert_t *mavlink_log_pub, const char *reason)
 {
 	if (!old_failsafe && status->arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
+		status->failsafe_timestamp = hrt_absolute_time();
 		mavlink_log_critical(mavlink_log_pub, "Failsafe enabled: %s", reason);
 	}
 
@@ -457,7 +460,12 @@ bool set_nav_state(vehicle_status_s *status, actuator_armed_s *armed, commander_
 			if (rc_lost && is_armed) {
 				enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_rc);
 
-				set_link_loss_nav_state(status, armed, status_flags, internal_state, rc_loss_act);
+				if (hrt_elapsed_time(&status->failsafe_timestamp) < 10_s) {
+					set_link_loss_nav_state(status, armed, status_flags, internal_state, link_loss_actions_t::AUTO_LOITER);
+
+				} else {
+					set_link_loss_nav_state(status, armed, status_flags, internal_state, rc_loss_act);
+				}
 
 				/* As long as there is RC, we can fallback to ALTCTL, or STAB. */
 				/* A local position estimate is enough for POSCTL for multirotors,
