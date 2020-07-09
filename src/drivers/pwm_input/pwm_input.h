@@ -73,7 +73,7 @@
 #define rCR2		REG(STM32_GTIM_CR2_OFFSET)
 #define rSMCR		REG(STM32_GTIM_SMCR_OFFSET)
 #define rDIER		REG(STM32_GTIM_DIER_OFFSET)
-#define rSR		REG(STM32_GTIM_SR_OFFSET)
+#define rSR			REG(STM32_GTIM_SR_OFFSET)
 #define rEGR		REG(STM32_GTIM_EGR_OFFSET)
 #define rCCMR1		REG(STM32_GTIM_CCMR1_OFFSET)
 #define rCCMR2		REG(STM32_GTIM_CCMR2_OFFSET)
@@ -124,6 +124,7 @@ class PWMIN : public ModuleBase<PWMIN>
 {
 public:
 	void start();
+
 	void publish(uint16_t status, uint32_t period, uint32_t pulse_width);
 	void print_info(void);
 
@@ -138,6 +139,8 @@ private:
 	void timer_init(void);
 
 	uint32_t _error_count {};
+	uint32_t _consecutive_errors {};
+
 	uint32_t _pulses_captured {};
 	uint32_t _last_period {};
 	uint32_t _last_width {};

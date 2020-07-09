@@ -33,6 +33,8 @@
 
 #include "pwm_input.h"
 
+static constexpr uint32_t MAXIMUM_CONSECUTIVE_ERRORS = 3;
+
 int
 PWMIN::task_spawn(int argc, char *argv[])
 {
@@ -60,7 +62,6 @@ PWMIN::start()
 	// Initialize the timer isr for measuring pulse widths. Publishing is done inside the isr.
 	timer_init();
 }
-
 
 void
 PWMIN::timer_init(void)
@@ -143,8 +144,17 @@ PWMIN::publish(uint16_t status, uint32_t period, uint32_t pulse_width)
 	// if we missed an edge, we have to give up
 	if (status & SR_OVF_PWMIN) {
 		_error_count++;
+		_consecutive_errors++;
+
+		// If we continuously overcapture, stop the driver
+		if (_consecutive_errors >= MAXIMUM_CONSECUTIVE_ERRORS) {
+			up_disable_irq(PWMIN_TIMER_VECTOR);
+		}
+
 		return;
 	}
+
+	_consecutive_errors = 0;
 
 	_pwm.timestamp = hrt_absolute_time();
 	_pwm.error_count = _error_count;
