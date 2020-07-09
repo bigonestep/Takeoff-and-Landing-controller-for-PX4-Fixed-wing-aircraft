@@ -51,7 +51,9 @@
 #include <lib/mixer/MultirotorMixer/MultirotorMixer.hpp>
 #include <lib/mixer/MixerGroup.hpp>
 #include <lib/mixer/mixer_load.h>
+
 #include <lib/parameters/param.h>
+
 #include <lib/perf/perf_counter.h>
 #include <lib/output_limit/output_limit.h>
 
@@ -169,7 +171,8 @@ void update_params(Mixer::Airmode &airmode)
 	param_t param_handle = param_find("MC_AIRMODE");
 
 	if (param_handle != PARAM_INVALID) {
-		param_get(param_handle, &airmode);
+		int32_t mode = (int32_t)airmode;
+		param_get(param_handle, &mode);
 	}
 }
 

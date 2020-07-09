@@ -39,6 +39,7 @@
 
 #pragma once
 
+#include <px4_platform_common/spi.h>
 #include "../CDev.hpp"
 
 #include "dev_fs_lib_spi.h"

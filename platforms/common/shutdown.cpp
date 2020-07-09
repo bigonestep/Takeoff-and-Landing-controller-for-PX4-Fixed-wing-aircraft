@@ -40,6 +40,7 @@
 #include <px4_platform_common/workqueue.h>
 #include <px4_platform_common/shutdown.h>
 #include <px4_platform_common/tasks.h>
+#include <px4_platform_common/defines.h>
 
 #include <drivers/drv_hrt.h>
 

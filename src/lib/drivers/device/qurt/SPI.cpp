@@ -75,6 +75,8 @@ SPI::~SPI()
 int
 SPI::init()
 {
+	(void)_mode; // TODO: JAKE: fix the constructor
+
 	// Open the actual SPI device
 	char dev_path[16];
 	snprintf(dev_path, sizeof(dev_path), DEV_FS_SPI_DEVICE_TYPE_STRING"%lu", PX4_SPI_DEV_ID(_device));

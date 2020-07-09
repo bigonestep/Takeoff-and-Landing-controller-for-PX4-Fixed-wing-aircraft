@@ -93,7 +93,7 @@ bool PreFlightCheck::powerCheck(orb_advert_t *mavlink_log_pub, const vehicle_sta
 		}
 
 		int power_module_count = countSetBits(system_power.brick_valid);
-		int required_power_module_count;
+		int32_t required_power_module_count;
 		param_get(param_find("COM_POWER_COUNT"), &required_power_module_count);
 
 		if (power_module_count < required_power_module_count) {

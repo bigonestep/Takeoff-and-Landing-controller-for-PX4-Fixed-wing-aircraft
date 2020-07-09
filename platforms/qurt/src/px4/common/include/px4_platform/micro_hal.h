@@ -32,5 +32,5 @@
  ****************************************************************************/
 #pragma once
 
-#include <px4_platform/micro_hal.h>
+#define px4_arch_gpiosetevent(pinset,r,f,e,fp,a) -1
 

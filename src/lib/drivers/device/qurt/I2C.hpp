@@ -40,6 +40,7 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
+#include <px4_platform_common/i2c.h>
 #include "../CDev.hpp"
 
 namespace device __EXPORT

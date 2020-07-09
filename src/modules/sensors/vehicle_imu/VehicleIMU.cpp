@@ -109,7 +109,8 @@ void VehicleIMU::ParametersUpdate(bool force)
 		_gyro_calibration.ParametersUpdate();
 
 		// constrain IMU integration time 1-20 milliseconds (50-1000 Hz)
-		int32_t imu_integration_rate_hz = constrain(_param_imu_integ_rate.get(), 50, 1000);
+		int imu_integ_rate = _param_imu_integ_rate.get();
+		int32_t imu_integration_rate_hz = constrain(imu_integ_rate, 50, 1000);
 
 		if (imu_integration_rate_hz != _param_imu_integ_rate.get()) {
 			_param_imu_integ_rate.set(imu_integration_rate_hz);

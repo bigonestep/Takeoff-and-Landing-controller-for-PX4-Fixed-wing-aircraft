@@ -318,7 +318,7 @@ VtolAttitudeControl::parameters_update()
 	param_get(_params_handles.vt_mc_on_fmu, &l);
 	_params.vt_mc_on_fmu = l;
 
-	param_get(_params_handles.vt_forward_thrust_enable_mode, &_params.vt_forward_thrust_enable_mode);
+	param_get(_params_handles.vt_forward_thrust_enable_mode, (int32_t*)&_params.vt_forward_thrust_enable_mode);
 	param_get(_params_handles.mpc_land_alt1, &_params.mpc_land_alt1);
 	param_get(_params_handles.mpc_land_alt2, &_params.mpc_land_alt2);
 
