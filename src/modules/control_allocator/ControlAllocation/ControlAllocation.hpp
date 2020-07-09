@@ -92,6 +92,8 @@ public:
 		THRUST_Z
 	};
 
+	float _tilt_trim = 0.0f;
+
 	/**
 	 * Allocate control setpoint to actuators
 	 *
@@ -203,6 +205,12 @@ public:
 	 */
 	matrix::Vector<float, NUM_ACTUATORS> normalizeActuatorSetpoint(const matrix::Vector<float, NUM_ACTUATORS> &actuator)
 	const;
+
+	/**
+	 * Tiltrotor: set desired tilt as trim value
+	 *
+	 */
+	void set_tilt_trim(float tilt) {_tilt_trim = tilt;}
 
 protected:
 	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness;  //< Effectiveness matrix

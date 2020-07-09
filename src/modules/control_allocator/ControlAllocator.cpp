@@ -229,6 +229,14 @@ ControlAllocator::update_effectiveness_source()
 		case EffectivenessSource::TILTROTOR_VTOL:
 			tmp = new ActuatorEffectivenessTiltrotorVTOL();
 			break;
+
+		case EffectivenessSource::PLANE:
+			tmp = new ActuatorEffectivenessPlane();
+			break;
+
+		case EffectivenessSource::TAILSITTER_VTOL:
+			tmp = new ActuatorEffectivenessTailsitterVTOL();
+			break;
 		}
 
 		// Replace previous source with new one
@@ -288,32 +296,48 @@ ControlAllocator::Run()
 		parameters_updated();
 	}
 
-	if (_vehicle_status_sub.updated()) {
-		vehicle_status_s vehicle_status = {};
-		_vehicle_status_sub.update(&vehicle_status);
+	// if (_vehicle_status_sub.updated()) {
+	// 	vehicle_status_s vehicle_status = {};
+	// 	_vehicle_status_sub.update(&vehicle_status);
 
-		ActuatorEffectiveness::FlightPhase flight_phase{ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT};
+	// 	ActuatorEffectiveness::FlightPhase flight_phase{ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT};
 
-		// Check if the current flight phase is HOVER or FIXED_WING
-		if (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-			flight_phase = ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT;
+	// 	// Check if the current flight phase is HOVER or FIXED_WING
+	// 	if (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
+	// 		flight_phase = ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT;
 
-		} else {
-			flight_phase = ActuatorEffectiveness::FlightPhase::FORWARD_FLIGHT;
+	// 	} else {
+	// 		flight_phase = ActuatorEffectiveness::FlightPhase::FORWARD_FLIGHT;
+	// 	}
+
+	// // Special cases for VTOL in transition
+	// if (vehicle_status.is_vtol && vehicle_status.in_transition_mode) {
+	// 	if (vehicle_status.in_transition_to_fw) {
+	// 		flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_HF_TO_FF;
+
+	// 	} else {
+	// 		flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_FF_TO_HF;
+	// 	}
+	// }
+
+	// Forward to effectiveness source
+	// _actuator_effectiveness->setFlightPhase(flight_phase);
+	// }
+
+	if (_airspeed_sub.updated()) {
+		airspeed_validated_s airspeed = {};
+
+		_airspeed_sub.update(&airspeed);
+
+		float div = _thrust_sp(0) / (-_thrust_sp(2) + 0.001f);
+		float tilt = math::constrain(atanf(div), 0.0f, 0.8f);
+		_control_allocation->set_tilt_trim(tilt);
+
+		if (PX4_ISFINITE(airspeed.equivalent_airspeed_m_s)) {
+			float used_airspeed = math::constrain(airspeed.equivalent_airspeed_m_s, _param_airspeed_min.get(),
+							      _param_airspeed_max.get());
+			_actuator_effectiveness->updateAirspeedTilt(used_airspeed, tilt);
 		}
-
-		// Special cases for VTOL in transition
-		if (vehicle_status.is_vtol && vehicle_status.in_transition_mode) {
-			if (vehicle_status.in_transition_to_fw) {
-				flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_HF_TO_FF;
-
-			} else {
-				flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_FF_TO_HF;
-			}
-		}
-
-		// Forward to effectiveness source
-		_actuator_effectiveness->setFlightPhase(flight_phase);
 	}
 
 	// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
@@ -600,6 +624,14 @@ int ControlAllocator::print_status()
 
 	case EffectivenessSource::TILTROTOR_VTOL:
 		PX4_INFO("EffectivenessSource: Tiltrotor VTOL");
+		break;
+
+	case EffectivenessSource::PLANE:
+		PX4_INFO("EffectivenessSource: Plane");
+		break;
+
+	case EffectivenessSource::TAILSITTER_VTOL:
+		PX4_INFO("EffectivenessSource: TAILSITTER_VTOL");
 		break;
 	}
 

@@ -461,8 +461,7 @@ float VtolType::pusher_assist()
 
 	// if the thrust scale param is zero or the drone is not in some position or altitude control mode,
 	// then the pusher-for-pitch strategy is disabled and we can return
-	if (_params->forward_thrust_scale < FLT_EPSILON || !(_v_control_mode->flag_control_position_enabled
-			|| _v_control_mode->flag_control_altitude_enabled)) {
+	if (_params->forward_thrust_scale < FLT_EPSILON) {
 		return 0.0f;
 	}
 

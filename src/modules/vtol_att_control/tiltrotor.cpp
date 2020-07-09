@@ -251,8 +251,9 @@ void Tiltrotor::update_mc_state()
 	} else {
 		// normal operation
 		_tilt_control = VtolType::pusher_assist();
+		_v_att_sp->thrust_body[0] = _tilt_control * 1.3f;
 		_mc_yaw_weight = 1.0f;
-		_v_att_sp->thrust_body[2] = Tiltrotor::thrust_compensation_for_tilt();
+		// _v_att_sp->thrust_body[2] = Tiltrotor::thrust_compensation_for_tilt();
 	}
 
 }

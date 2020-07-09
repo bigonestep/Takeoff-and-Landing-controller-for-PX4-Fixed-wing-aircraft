@@ -63,6 +63,13 @@ public:
 	 */
 	void setFlightPhase(const FlightPhase &flight_phase) override;
 
+	/**
+	* Set the current airspeed scaling
+	*
+	* @param Airspeed scaling
+	*/
+	void updateAirspeedTilt(const float airspeed, const float tilt) override;
+
 protected:
 	bool _updated{false};
 };
