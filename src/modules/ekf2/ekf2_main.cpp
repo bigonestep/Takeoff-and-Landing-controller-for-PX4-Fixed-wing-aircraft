@@ -63,7 +63,7 @@
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/landing_target_pose.h>
-#include <uORB/topics/optical_flow.h>
+#include <uORB/topics/vehicle_optical_flow.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_selection.h>
@@ -238,7 +238,7 @@ private:
 	uORB::Subscription _ev_odom_sub{ORB_ID(vehicle_visual_odometry)};
 	uORB::Subscription _landing_target_pose_sub{ORB_ID(landing_target_pose)};
 	uORB::Subscription _magnetometer_sub{ORB_ID(vehicle_magnetometer)};
-	uORB::Subscription _optical_flow_sub{ORB_ID(optical_flow)};
+	uORB::Subscription _optical_flow_sub{ORB_ID(vehicle_optical_flow)};
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
@@ -1045,7 +1045,7 @@ void Ekf2::Run()
 		}
 
 		if (_optical_flow_sub.updated()) {
-			optical_flow_s optical_flow;
+			vehicle_optical_flow_s optical_flow;
 
 			if (_optical_flow_sub.copy(&optical_flow)) {
 				flowSample flow {};

@@ -583,7 +583,7 @@ MavlinkReceiver::handle_message_optical_flow_rad(mavlink_message_t *msg)
 	mavlink_optical_flow_rad_t flow;
 	mavlink_msg_optical_flow_rad_decode(msg, &flow);
 
-	optical_flow_s f{};
+	sensor_optical_flow_s f{};
 
 	f.timestamp = hrt_absolute_time();
 	f.time_since_last_sonar_update = flow.time_delta_distance_us;
@@ -636,7 +636,7 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 	mavlink_hil_optical_flow_t flow;
 	mavlink_msg_hil_optical_flow_decode(msg, &flow);
 
-	optical_flow_s f{};
+	sensor_optical_flow_s f{};
 
 	f.timestamp = hrt_absolute_time(); // XXX we rely on the system time for now and not flow.time_usec;
 	f.integration_timespan = flow.integration_time_us;

@@ -19,7 +19,7 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
-#include <uORB/topics/optical_flow.h>
+#include <uORB/topics/vehicle_optical_flow.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/parameter_update.h>
@@ -266,7 +266,7 @@ private:
 	uORB::SubscriptionData<vehicle_land_detected_s> _sub_land{ORB_ID(vehicle_land_detected)};
 	uORB::SubscriptionData<vehicle_attitude_s> _sub_att{ORB_ID(vehicle_attitude)};
 	uORB::SubscriptionData<vehicle_angular_velocity_s> _sub_angular_velocity{ORB_ID(vehicle_angular_velocity)};
-	uORB::SubscriptionData<optical_flow_s> _sub_flow{ORB_ID(optical_flow)};
+	uORB::SubscriptionData<vehicle_optical_flow_s> _sub_flow{ORB_ID(vehicle_optical_flow)};
 	uORB::SubscriptionData<parameter_update_s> _sub_param_update{ORB_ID(parameter_update)};
 	uORB::SubscriptionData<vehicle_gps_position_s> _sub_gps{ORB_ID(vehicle_gps_position)};
 	uORB::SubscriptionData<vehicle_odometry_s> _sub_visual_odom{ORB_ID(vehicle_visual_odometry)};

@@ -78,6 +78,7 @@
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
 #include "vehicle_air_data/VehicleAirData.hpp"
 #include "vehicle_imu/VehicleIMU.hpp"
+#include "vehicle_optical_flow/VehicleOpticalFlow.hpp"
 
 using namespace sensors;
 using namespace time_literals;
@@ -169,6 +170,7 @@ private:
 	VehicleAcceleration	_vehicle_acceleration;
 	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          _vehicle_air_data;
+	VehicleOpticalFlow      _vehicle_optical_flow;
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
@@ -219,6 +221,7 @@ Sensors::Sensors(bool hil_enabled) :
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
 	_vehicle_air_data.Start();
+	_vehicle_optical_flow.Start();
 
 	InitializeVehicleIMU();
 }
@@ -233,6 +236,7 @@ Sensors::~Sensors()
 	_vehicle_acceleration.Stop();
 	_vehicle_angular_velocity.Stop();
 	_vehicle_air_data.Stop();
+	_vehicle_optical_flow.Stop();
 
 	for (auto &i : _vehicle_imu_list) {
 		if (i != nullptr) {
@@ -642,6 +646,8 @@ int Sensors::print_status()
 			i->PrintStatus();
 		}
 	}
+
+	_vehicle_optical_flow.PrintStatus();
 
 	return 0;
 }

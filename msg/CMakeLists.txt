@@ -87,7 +87,8 @@ set(msg_files
 	obstacle_distance.msg
 	offboard_control_mode.msg
 	onboard_computer_status.msg
-	optical_flow.msg
+	sensor_optical_flow.msg
+	vehicle_optical_flow.msg
 	orb_test.msg
 	orb_test_large.msg
 	orb_test_medium.msg

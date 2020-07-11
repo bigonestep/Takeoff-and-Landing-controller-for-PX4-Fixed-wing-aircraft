@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,57 +31,75 @@
  *
  ****************************************************************************/
 
-#include "flow.hpp"
+#include "VehicleOpticalFlow.hpp"
 
-#include <drivers/drv_hrt.h>
+#include <px4_platform_common/log.h>
+#include <lib/ecl/geo/geo.h>
 
-const char *const UavcanFlowBridge::NAME = "flow";
+namespace sensors
+{
 
-UavcanFlowBridge::UavcanFlowBridge(uavcan::INode &node) :
-	UavcanCDevSensorBridgeBase("uavcan_flow", "/dev/uavcan/flow", "/dev/flow", ORB_ID(sensor_optical_flow)),
-	_sub_flow(node)
+using namespace matrix;
+using namespace time_literals;
+
+static constexpr uint32_t SENSOR_TIMEOUT{300_ms};
+
+VehicleOpticalFlow::VehicleOpticalFlow() :
+	ModuleParams(nullptr),
+	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::navigation_and_controllers)
 {
 }
 
-int
-UavcanFlowBridge::init()
+VehicleOpticalFlow::~VehicleOpticalFlow()
 {
-	int res = device::CDev::init();
+	Stop();
+	perf_free(_cycle_perf);
+}
 
-	if (res < 0) {
-		return res;
+bool VehicleOpticalFlow::Start()
+{
+	ScheduleNow();
+	return true;
+}
+
+void VehicleOpticalFlow::Stop()
+{
+	Deinit();
+
+	// clear all registered callbacks
+	for (auto &sub : _sensor_sub) {
+		sub.unregisterCallback();
 	}
-
-	res = _sub_flow.start(FlowCbBinder(this, &UavcanFlowBridge::flow_sub_cb));
-
-	if (res < 0) {
-		DEVICE_LOG("failed to start uavcan sub: %d", res);
-		return res;
-	}
-
-	return 0;
 }
 
-void
-UavcanFlowBridge::flow_sub_cb(const uavcan::ReceivedDataStructure<com::hex::equipment::flow::Measurement> &msg)
+void VehicleOpticalFlow::ParametersUpdate()
 {
-	sensor_optical_flow_s flow{};
+	// Check if parameters have changed
+	if (_params_sub.updated()) {
+		// clear update
+		parameter_update_s param_update;
+		_params_sub.copy(&param_update);
 
-	// We're only given an 8 bit field for sensor ID; just use the UAVCAN node ID
-	flow.sensor_id = msg.getSrcNodeID().get();
-
-	flow.timestamp = hrt_absolute_time();
-	flow.integration_timespan = 1.e6f * msg.integration_interval; // s -> micros
-	flow.pixel_flow_x_integral = msg.flow_integral[0];
-	flow.pixel_flow_y_integral = msg.flow_integral[1];
-
-	flow.gyro_x_rate_integral = msg.rate_gyro_integral[0];
-	flow.gyro_y_rate_integral = msg.rate_gyro_integral[1];
-
-	flow.quality = msg.quality;
-	flow.max_flow_rate = 5.0f;       // Datasheet: 7.4 rad/s
-	flow.min_ground_distance = 0.1f; // Datasheet: 80mm
-	flow.max_ground_distance = 30.0f; // Datasheet: infinity
-
-	publish(msg.getSrcNodeID().get(), &flow);
+		updateParams();
+	}
 }
+
+void VehicleOpticalFlow::Run()
+{
+	perf_begin(_cycle_perf);
+
+	ParametersUpdate();
+
+
+	// reschedule timeout
+	ScheduleDelayed(100_ms);
+
+	perf_end(_cycle_perf);
+}
+
+void VehicleOpticalFlow::PrintStatus()
+{
+
+}
+
+}; // namespace sensors

@@ -636,7 +636,7 @@ PAW3902::RunImpl()
 		return;
 	}
 
-	optical_flow_s report{};
+	sensor_optical_flow_s report{};
 	report.timestamp = timestamp_sample;
 
 

@@ -85,7 +85,7 @@
 #include <uORB/topics/mavlink_log.h>
 #include <uORB/topics/mount_orientation.h>
 #include <uORB/topics/obstacle_distance.h>
-#include <uORB/topics/optical_flow.h>
+#include <uORB/topics/vehicle_optical_flow.h>
 #include <uORB/topics/orbit_status.h>
 #include <uORB/topics/position_controller_status.h>
 #include <uORB/topics/position_setpoint_triplet.h>
@@ -3964,7 +3964,7 @@ public:
 	}
 
 private:
-	uORB::Subscription _flow_sub{ORB_ID(optical_flow)};
+	uORB::Subscription _flow_sub{ORB_ID(vehicle_optical_flow)};
 
 	/* do not allow top copying this class */
 	MavlinkStreamOpticalFlowRad(MavlinkStreamOpticalFlowRad &) = delete;
@@ -3976,7 +3976,7 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		optical_flow_s flow;
+		vehicle_optical_flow_s flow;
 
 		if (_flow_sub.update(&flow)) {
 			mavlink_optical_flow_rad_t msg{};
