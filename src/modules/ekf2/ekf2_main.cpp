@@ -1305,7 +1305,7 @@ void Ekf2::Run()
 				// The rotation of the tangent plane vs. geographical north
 				const matrix::Quatf q = _ekf.getQuaternion();
 
-				lpos.yaw = matrix::Eulerf(q).psi();
+				lpos.yaw = 2.f * atan2f(q(3), q(0));
 
 				// Vehicle odometry quaternion
 				q.copyTo(odom.q);
