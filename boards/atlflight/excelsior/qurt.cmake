@@ -30,8 +30,14 @@ add_definitions(-DORB_COMMUNICATOR)
 # ARM and DSP processors.
 set(DISABLE_PARAMS_MODULE_SCOPING TRUE)
 
+# add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+
+
 # This definition allows to differentiate the specific board.
-add_definitions(-D__PX4_QURT_EXCELSIOR)
+add_definitions(
+	-D__PX4_QURT_EXCELSIOR
+	-DDEBUG_BUILD
+	)
 
 px4_add_board(
 	PLATFORM qurt

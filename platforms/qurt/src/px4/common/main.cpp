@@ -221,9 +221,13 @@ extern "C" {
 
 	int dspal_main(int argc, char *argv[])
 	{
+		PX4_INFO("dspal_main.......");
+
 		int ret = 0;
 
 		if (argc == 2 && strcmp(argv[1], "start") == 0) {
+			PX4_INFO("dspal_main.......start");
+
 			g_dspal_task = px4_task_spawn_cmd("dspal",
 							  SCHED_DEFAULT,
 							  SCHED_PRIORITY_MAX - 5,
@@ -233,9 +237,10 @@ extern "C" {
 
 		} else if (argc == 2 && strcmp(argv[1], "stop") == 0) {
 			if (g_dspal_task < 0) {
-				PX4_WARN("start up thread not running");
+				PX4_INFO("start up thread not running");
 
 			} else {
+				PX4_INFO("dspal_main.......task delete");
 				px4_task_delete(g_dspal_task);
 				g_dspal_task = -1;
 			}
@@ -244,6 +249,9 @@ extern "C" {
 			usage();
 			ret = -1;
 		}
+
+		PX4_INFO("dspal_main.......ret val is: %d", ret);
+
 
 		return ret;
 	}

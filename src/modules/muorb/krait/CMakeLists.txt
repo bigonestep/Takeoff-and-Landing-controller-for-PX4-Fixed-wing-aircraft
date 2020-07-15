@@ -37,6 +37,7 @@ px4_add_module(
 	MAIN muorb
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
+		-DDEBUG_BUILD
 	INCLUDES
 		${HEXAGON_SDK_INCLUDES}
 		${PX4_BINARY_DIR}/platforms/posix

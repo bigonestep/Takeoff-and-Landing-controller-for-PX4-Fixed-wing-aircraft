@@ -41,7 +41,7 @@ constexpr px4_spi_bus_t px4_spi_buses[SPI_BUS_MAX_BUS_ITEMS] = {
 		initSPIDevice(DRV_IMU_DEVTYPE_MPU9250, 0), // TODO: JAKE: second arg
 
 #elif defined(__PX4_QURT)
-		initSPIDevice(DRV_IMU_DEVTYPE_MPU9250), // TODO: JAKE: where did it go?
+		{initSPIDevice(DRV_IMU_DEVTYPE_MPU9250)}, // TODO: JAKE: where did it go?
 
 #endif
 	}),

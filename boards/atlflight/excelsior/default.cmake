@@ -24,6 +24,8 @@ add_definitions(-DORB_COMMUNICATOR)
 add_compile_options($<$<COMPILE_LANGUAGE:C>:-std=gnu99>)
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++14>)
 
+# add_compile_options(-march=armv7-a -mfloat-abi=softfp -mfpu=neon-vfpv4)
+
 add_definitions(
 	-D__PX4_POSIX_EXCELSIOR
 	-D__PX4_LINUX
