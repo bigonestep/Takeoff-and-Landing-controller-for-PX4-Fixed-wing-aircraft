@@ -34,9 +34,12 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(micrortps_agent)
 
-# Find requirements
+# Find requirementspr
 find_package(fastrtps REQUIRED)
 find_package(fastcdr REQUIRED)
+
+# Protocol splitter dependency
+find_package(Threads)
 
 # Set C++14
 include(CheckCXXCompilerFlag)
@@ -48,8 +51,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG OR
     else()
         message(FATAL_ERROR "Compiler doesn't support C++14")
     endif()
+
+    # Protocol splitter dependency
+    SET(CMAKE_CXX_FLAGS -pthread)
 endif()
 
 file(GLOB MICRORTPS_AGENT_SOURCES *.cpp *.h)
 add_executable(micrortps_agent ${MICRORTPS_AGENT_SOURCES})
 target_link_libraries(micrortps_agent fastrtps fastcdr)
+
+add_executable(protocol_splitter protocol_splitter/ProtocolSplitter.cpp)
