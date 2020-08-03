@@ -107,11 +107,12 @@ public:
 	 */
 	bool publish(const T &data)
 	{
-		if (!advertised()) {
-			advertise();
+		if (advertised()) {
+			return static_cast<DeviceNode *>(_handle)->write((uint8_t *)&data);
 		}
 
-		return (DeviceNode::publish(get_topic(), _handle, &data) == PX4_OK);
+		_handle = orb_advertise_queue(get_topic(), (uint8_t *)&data, ORB_QSIZE);
+		return advertised();
 	}
 };
 

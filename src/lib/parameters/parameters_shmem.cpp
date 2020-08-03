@@ -320,8 +320,7 @@ param_find_changed(param_t param)
 static void
 _param_notify_changes()
 {
-	parameter_update_s pup = {};
-	pup.timestamp = hrt_absolute_time();
+	parameter_update_s pup{};
 	pup.instance = param_instance++;
 
 	/*

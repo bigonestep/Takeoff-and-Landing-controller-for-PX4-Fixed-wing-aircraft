@@ -393,8 +393,6 @@ void task_main(int argc, char *argv[])
 				pwm_out->send_output_pwm(pwm, _outputs.noutputs);
 			}
 
-			_outputs.timestamp = hrt_absolute_time();
-
 			if (_outputs_pub != nullptr) {
 				orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_outputs);
 

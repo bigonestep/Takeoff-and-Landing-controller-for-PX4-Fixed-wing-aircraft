@@ -129,7 +129,6 @@ void LogWriterMavlink::set_need_reliable_transfer(bool need_reliable)
 
 int LogWriterMavlink::publish_message()
 {
-	_ulog_stream_data.timestamp = hrt_absolute_time();
 	_ulog_stream_data.flags = 0;
 
 	if (_need_reliable_transfer) {

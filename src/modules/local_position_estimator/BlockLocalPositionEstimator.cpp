@@ -500,9 +500,9 @@ void BlockLocalPositionEstimator::Run()
 		publishLocalPos();
 		publishOdom();
 		publishEstimatorStatus();
-		_pub_innov.get().timestamp = _timeStamp;
+		_pub_innov.get().timestamp_sample = _timeStamp;
 		_pub_innov.update();
-		_pub_innov_var.get().timestamp = _timeStamp;
+		_pub_innov_var.get().timestamp_sample = _timeStamp;
 		_pub_innov_var.update();
 
 		if ((_estimatorInitialized & EST_XY) && (_map_ref.init_done || _param_lpe_fake_origin.get())) {
@@ -578,7 +578,8 @@ void BlockLocalPositionEstimator::publishLocalPos()
 	if (PX4_ISFINITE(_x(X_x)) && PX4_ISFINITE(_x(X_y)) && PX4_ISFINITE(_x(X_z)) &&
 	    PX4_ISFINITE(_x(X_vx)) && PX4_ISFINITE(_x(X_vy))
 	    && PX4_ISFINITE(_x(X_vz))) {
-		_pub_lpos.get().timestamp = _timeStamp;
+
+		_pub_lpos.get().timestamp_sample = _timeStamp;
 
 		_pub_lpos.get().xy_valid = _estimatorInitialized & EST_XY;
 		_pub_lpos.get().z_valid = _estimatorInitialized & EST_Z;
@@ -640,7 +641,6 @@ void BlockLocalPositionEstimator::publishOdom()
 	if (PX4_ISFINITE(_x(X_x)) && PX4_ISFINITE(_x(X_y)) && PX4_ISFINITE(_x(X_z)) &&
 	    PX4_ISFINITE(_x(X_vx)) && PX4_ISFINITE(_x(X_vy))
 	    && PX4_ISFINITE(_x(X_vz))) {
-		_pub_odom.get().timestamp = hrt_absolute_time();
 		_pub_odom.get().timestamp_sample = _timeStamp;
 		_pub_odom.get().local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
@@ -789,7 +789,8 @@ void BlockLocalPositionEstimator::publishGlobalPos()
 	if (PX4_ISFINITE(lat) && PX4_ISFINITE(lon) && PX4_ISFINITE(alt) &&
 	    PX4_ISFINITE(xLP(X_vx)) && PX4_ISFINITE(xLP(X_vy)) &&
 	    PX4_ISFINITE(xLP(X_vz))) {
-		_pub_gpos.get().timestamp = _timeStamp;
+
+		_pub_gpos.get().timestamp_sample = _timeStamp;
 		_pub_gpos.get().lat = lat;
 		_pub_gpos.get().lon = lon;
 		_pub_gpos.get().alt = alt;

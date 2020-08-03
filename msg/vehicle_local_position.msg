@@ -1,6 +1,8 @@
 # Fused local position in NED.
 
-uint64 timestamp			# time since system start (microseconds)
+uint64 timestamp                # time since system start (microseconds)
+uint64 timestamp_sample
+
 
 bool xy_valid				# true if x and y are valid
 bool z_valid				# true if z is valid

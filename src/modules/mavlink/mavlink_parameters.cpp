@@ -83,7 +83,6 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 				req.message_type = msg->msgid;
 				req.node_id = req_list.target_component;
 				req.param_index = 0;
-				req.timestamp = hrt_absolute_time();
 				_uavcan_parameter_request_pub.publish(req);
 			}
 
@@ -157,7 +156,6 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 					req.int_value = val;
 				}
 
-				req.timestamp = hrt_absolute_time();
 				_uavcan_parameter_request_pub.publish(req);
 			}
 
@@ -219,7 +217,6 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 			    (req_read.target_component != mavlink_system.compid || req_read.target_component == MAV_COMP_ID_ALL)) {
 				// publish set request to UAVCAN driver via uORB.
 				uavcan_parameter_request_s req{};
-				req.timestamp = hrt_absolute_time();
 				req.message_type = msg->msgid;
 				req.node_id = req_read.target_component;
 				req.param_index = req_read.param_index;
@@ -262,7 +259,6 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 					_rc_param_map.valid[i] = true;
 				}
 
-				_rc_param_map.timestamp = hrt_absolute_time();
 				_rc_param_map_pub.publish(_rc_param_map);
 			}
 

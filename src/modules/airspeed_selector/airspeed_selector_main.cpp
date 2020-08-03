@@ -303,7 +303,7 @@ AirspeedModule::Run()
 		bool in_air = !_vehicle_land_detected.landed;
 
 		/* Prepare data for airspeed_validator */
-		struct airspeed_validator_update_data input_data = {};
+		airspeed_validator_update_data input_data{};
 		input_data.timestamp = _time_now_usec;
 		input_data.lpos_vx = _vehicle_local_position.vx;
 		input_data.lpos_vy = _vehicle_local_position.vy;

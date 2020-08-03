@@ -2588,8 +2588,6 @@ void Mavlink::publish_telemetry_status()
 
 	_tstatus.streams = _streams.size();
 
-	_tstatus.timestamp = hrt_absolute_time();
-
 	_telem_status_pub.publish(_tstatus);
 }
 

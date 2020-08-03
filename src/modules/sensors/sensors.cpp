@@ -286,7 +286,6 @@ void Sensors::diff_pres_poll()
 						(air_data.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);
 
 		airspeed_s airspeed{};
-		airspeed.timestamp = diff_pres.timestamp;
 
 		/* push data into validator */
 		float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
@@ -405,7 +404,6 @@ void Sensors::adc_poll()
 						if (voltage > 0.4f) {
 							const float diff_pres_pa_raw = voltage * _parameters.diff_pres_analog_scale - _parameters.diff_pres_offset_pa;
 
-							_diff_pres.timestamp = t;
 							_diff_pres.differential_pressure_raw_pa = diff_pres_pa_raw;
 							_diff_pres.differential_pressure_filtered_pa = (_diff_pres.differential_pressure_filtered_pa * 0.9f) +
 									(diff_pres_pa_raw * 0.1f);
@@ -568,7 +566,6 @@ void Sensors::Run()
 			_voted_sensors_update.calcAccelInconsistency(_sensor_preflight);
 			_voted_sensors_update.calcGyroInconsistency(_sensor_preflight);
 
-			_sensor_preflight.timestamp = hrt_absolute_time();
 			_sensor_preflight_pub.publish(_sensor_preflight);
 		}
 	}

@@ -189,7 +189,6 @@ RCInput::fill_rc_in(uint16_t raw_rc_count_local,
 		_raw_rc_values[i] = UINT16_MAX;
 	}
 
-	_rc_in.timestamp = now;
 	_rc_in.timestamp_last_signal = _rc_in.timestamp;
 	_rc_in.rc_ppm_frame_length = 0;
 

@@ -122,7 +122,6 @@ static int power_button_state_notification_cb(board_power_button_state_notificat
 	// Note: this can be called from IRQ handlers, so we publish a message that will be handled
 	// on the main thread of commander.
 	power_button_state_s button_state{};
-	button_state.timestamp = hrt_absolute_time();
 	const int ret = PWR_BUTTON_RESPONSE_SHUT_DOWN_PENDING;
 
 	switch (request) {
@@ -179,8 +178,6 @@ static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 
 	vcmd.target_system = vehicle_status_sub.get().system_id;
 	vcmd.source_component = vehicle_status_sub.get().component_id;
 	vcmd.target_component = vehicle_status_sub.get().component_id;
-
-	vcmd.timestamp = hrt_absolute_time();
 
 	uORB::PublicationQueued<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
 
@@ -813,7 +810,6 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 					if (local_pos.xy_global && local_pos.z_global) {
 						/* use specified position */
 						home_position_s home{};
-						home.timestamp = hrt_absolute_time();
 
 						home.lat = lat;
 						home.lon = lon;
@@ -1097,7 +1093,6 @@ Commander::handle_command_motor_test(const vehicle_command_s &cmd)
 	}
 
 	test_motor_s test_motor{};
-	test_motor.timestamp = hrt_absolute_time();
 	test_motor.motor_number = (int)(cmd.param1 + 0.5f) - 1;
 	int throttle_type = (int)(cmd.param2 + 0.5f);
 
@@ -1152,8 +1147,6 @@ Commander::set_home_position()
 			// Set home position
 			home_position_s home{};
 
-			home.timestamp = hrt_absolute_time();
-
 			home.lat = gpos.lat;
 			home.lon = gpos.lon;
 			home.valid_hpos = true;
@@ -1195,8 +1188,6 @@ Commander::set_home_position_alt_only()
 		home.alt = lpos.ref_alt;
 		home.valid_alt = true;
 
-		home.timestamp = hrt_absolute_time();
-
 		return _home_pub.update(home);
 	}
 
@@ -1220,7 +1211,6 @@ Commander::run()
 		// we need to do an initial publication to make sure uORB allocates the buffer, which cannot happen
 		// in IRQ context.
 		power_button_state_s button_state{};
-		button_state.timestamp = hrt_absolute_time();
 		button_state.event = 0xff;
 		power_button_state_pub = orb_advertise(ORB_ID(power_button_state), &button_state);
 
@@ -2318,7 +2308,6 @@ Commander::run()
 
 			update_control_mode();
 
-			status.timestamp = hrt_absolute_time();
 			_status_pub.publish(status);
 
 			switch ((PrearmedMode)_param_com_prearm_mode.get()) {
@@ -2352,15 +2341,10 @@ Commander::run()
 				break;
 			}
 
-			armed.timestamp = hrt_absolute_time();
 			_armed_pub.publish(armed);
 
 			/* publish internal state for logging purposes */
-			_internal_state.timestamp = hrt_absolute_time();
 			_commander_state_pub.publish(_internal_state);
-
-			/* publish vehicle_status_flags */
-			status_flags.timestamp = hrt_absolute_time();
 
 			// Evaluate current prearm status
 			if (!armed.armed && !status_flags.condition_calibration_enabled) {
@@ -3125,8 +3109,6 @@ Commander::update_control_mode()
 {
 	vehicle_control_mode_s control_mode{};
 
-	control_mode.timestamp = hrt_absolute_time();
-
 	/* set vehicle_control_mode according to set_navigation_state */
 	control_mode.flag_armed = armed.armed;
 	control_mode.flag_external_manual_override_ok = (status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING
@@ -3354,12 +3336,10 @@ void answer_command(const vehicle_command_s &cmd, unsigned result,
 	/* publish ACK */
 	vehicle_command_ack_s command_ack{};
 
-	command_ack.timestamp = hrt_absolute_time();
 	command_ack.command = cmd.command;
 	command_ack.result = (uint8_t)result;
 	command_ack.target_system = cmd.source_system;
 	command_ack.target_component = cmd.source_component;
-
 
 	command_ack_pub.publish(command_ack);
 }
@@ -3660,7 +3640,6 @@ void Commander::mission_init()
 			PX4_ERR("reading mission state failed");
 
 			/* initialize mission state in dataman */
-			mission.timestamp = hrt_absolute_time();
 			mission.dataman_id = DM_KEY_WAYPOINTS_OFFBOARD_0;
 			dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
 		}

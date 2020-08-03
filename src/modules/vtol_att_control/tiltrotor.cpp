@@ -401,7 +401,6 @@ void Tiltrotor::waiting_on_tecs()
 void Tiltrotor::fill_actuator_outputs()
 {
 	// Multirotor output
-	_actuators_out_0->timestamp = hrt_absolute_time();
 	_actuators_out_0->timestamp_sample = _actuators_mc_in->timestamp_sample;
 
 	_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
@@ -427,7 +426,6 @@ void Tiltrotor::fill_actuator_outputs()
 	}
 
 	// Fixed wing output
-	_actuators_out_1->timestamp = hrt_absolute_time();
 	_actuators_out_1->timestamp_sample = _actuators_fw_in->timestamp_sample;
 
 	_actuators_out_1->control[4] = _tilt_control;

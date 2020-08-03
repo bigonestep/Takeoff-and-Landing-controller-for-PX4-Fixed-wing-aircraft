@@ -434,7 +434,6 @@ MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_output
 		actuator_outputs.output[i] = _current_output_value[i];
 	}
 
-	actuator_outputs.timestamp = hrt_absolute_time();
 	_outputs_pub.publish(actuator_outputs);
 }
 
@@ -446,7 +445,6 @@ MixingOutput::publishMixerStatus(const actuator_outputs_s &actuator_outputs)
 
 	if (saturation_status.flags.valid) {
 		multirotor_motor_limits_s motor_limits;
-		motor_limits.timestamp = actuator_outputs.timestamp;
 		motor_limits.saturation_status = saturation_status.value;
 
 		_to_mixer_status.publish(motor_limits);

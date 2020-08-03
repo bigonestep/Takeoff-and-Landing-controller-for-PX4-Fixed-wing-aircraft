@@ -73,7 +73,6 @@ TEST_F(ObstacleAvoidanceTest, oa_enabled_healthy)
 	TestObstacleAvoidance oa;
 
 	vehicle_trajectory_waypoint_s message = empty_trajectory_waypoint;
-	message.timestamp = hrt_absolute_time();
 	message.type = vehicle_trajectory_waypoint_s::MAV_TRAJECTORY_REPRESENTATION_WAYPOINTS;
 	message.waypoints[vehicle_trajectory_waypoint_s::POINT_0].position[0] = 2.6f;
 	message.waypoints[vehicle_trajectory_waypoint_s::POINT_0].position[1] = 2.4f;
@@ -108,8 +107,7 @@ TEST_F(ObstacleAvoidanceTest, oa_enabled_healthy_bezier)
 	// from offboard
 	TestObstacleAvoidance oa;
 
-	vehicle_trajectory_bezier_s message {};
-	message.timestamp = hrt_absolute_time();
+	vehicle_trajectory_bezier_s message{};
 	message.bezier_order = 2;
 	message.control_points[vehicle_trajectory_bezier_s::POINT_0].position[0] = 2.6f;
 	message.control_points[vehicle_trajectory_bezier_s::POINT_0].position[1] = 2.4f;

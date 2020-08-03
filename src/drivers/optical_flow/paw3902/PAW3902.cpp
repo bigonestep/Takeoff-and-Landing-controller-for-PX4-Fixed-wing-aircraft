@@ -647,7 +647,7 @@ PAW3902::RunImpl()
 	}
 
 	optical_flow_s report{};
-	report.timestamp = timestamp_sample;
+	//report.timestamp_sample = timestamp_sample;
 
 	report.pixel_flow_x_integral = (float)_flow_sum_x / 500.0f;	// proportional factor + convert from pixels to radians
 	report.pixel_flow_y_integral = (float)_flow_sum_y / 500.0f;	// proportional factor + convert from pixels to radians

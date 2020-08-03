@@ -87,11 +87,13 @@ public:
 	 */
 	bool publish(const T &data)
 	{
-		if (!advertised()) {
-			advertise();
+		if (advertised()) {
+			return static_cast<DeviceNode *>(_handle)->write((uint8_t *)&data);
 		}
 
-		return (orb_publish(get_topic(), _handle, &data) == PX4_OK);
+		int instance = 0;
+		_handle = orb_advertise_multi_queue(get_topic(), (uint8_t *)&data, &instance, _priority, QSIZE);
+		return advertised();
 	}
 
 protected:

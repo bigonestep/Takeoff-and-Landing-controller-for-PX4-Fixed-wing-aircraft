@@ -114,7 +114,6 @@ void RcInput::_measure(void)
 	}
 
 	ts = hrt_absolute_time();
-	_data.timestamp = ts;
 	_data.timestamp_last_signal = ts;
 	_data.channel_count = _channels;
 	_data.rssi = 100;

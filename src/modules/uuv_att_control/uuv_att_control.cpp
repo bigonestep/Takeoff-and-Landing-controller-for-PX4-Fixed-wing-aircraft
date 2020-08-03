@@ -351,8 +351,6 @@ void UUVAttitudeControl::run()
 
 			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
 
-			_actuators.timestamp = hrt_absolute_time();
-
 			/* Only publish if any of the proper modes are enabled */
 			if (_vcontrol_mode.flag_control_manual_enabled ||
 			    _vcontrol_mode.flag_control_attitude_enabled) {

@@ -278,8 +278,6 @@ void UavcanGnssBridge::process_fixx(const uavcan::ReceivedDataStructure<FixType>
 	 * to use an independent time source (based on hardware TIM5) instead of HRT.
 	 * The proper solution is to be developed.
 	 */
-	report.timestamp = hrt_absolute_time();
-
 	report.lat           = msg.latitude_deg_1e8 / 10;
 	report.lon           = msg.longitude_deg_1e8 / 10;
 	report.alt           = msg.height_msl_mm;

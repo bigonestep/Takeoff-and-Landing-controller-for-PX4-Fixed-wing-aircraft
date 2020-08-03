@@ -184,7 +184,6 @@ void fill_input_rc(uint16_t raw_rc_count, uint16_t raw_rc_values[input_rc_s::RC_
 		}
 	}
 
-	input_rc.timestamp = now;
 	input_rc.timestamp_last_signal = input_rc.timestamp;
 	input_rc.rc_ppm_frame_length = 0;
 

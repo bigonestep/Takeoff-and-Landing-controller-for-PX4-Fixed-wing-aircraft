@@ -151,7 +151,6 @@ MavlinkMissionManager::update_active_mission(dm_item_t dataman_id, uint16_t coun
 {
 	// We want to make sure the whole struct is initialized including padding before getting written by dataman.
 	mission_s mission{};
-	mission.timestamp = hrt_absolute_time();
 	mission.dataman_id = dataman_id;
 	mission.count = count;
 	mission.current_seq = seq;

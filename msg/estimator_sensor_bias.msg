@@ -3,7 +3,9 @@
 # scale errors, in-run bias and thermal drift (if thermal compensation is enabled and available).
 #
 
-uint64 timestamp		# time since system start (microseconds)
+uint64 timestamp                # time since system start (microseconds)
+uint64 timestamp_sample
+
 
 # In-run bias estimates (subtract from uncorrected data)
 

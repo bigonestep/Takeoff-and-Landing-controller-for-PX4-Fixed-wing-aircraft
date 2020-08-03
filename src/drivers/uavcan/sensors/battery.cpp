@@ -71,7 +71,6 @@ UavcanBatteryBridge::battery_sub_cb(const uavcan::ReceivedDataStructure<uavcan::
 {
 	battery_status_s battery{};
 
-	battery.timestamp = hrt_absolute_time();
 	battery.voltage_v = msg.voltage;
 	battery.voltage_filtered_v = msg.voltage;
 	battery.current_a = msg.current;

@@ -177,7 +177,6 @@ VtolAttitudeControl::handle_command()
 
 		if (_vehicle_cmd.from_external) {
 			vehicle_command_ack_s command_ack{};
-			command_ack.timestamp = hrt_absolute_time();
 			command_ack.command = _vehicle_cmd.command;
 			command_ack.result = result;
 			command_ack.target_system = _vehicle_cmd.source_system;
@@ -486,7 +485,6 @@ VtolAttitudeControl::Run()
 		_actuators_1_pub.publish(_actuators_out_1);
 
 		// Advertise/Publish vtol vehicle status
-		_vtol_vehicle_status.timestamp = hrt_absolute_time();
 		_vtol_vehicle_status_pub.publish(_vtol_vehicle_status);
 	}
 

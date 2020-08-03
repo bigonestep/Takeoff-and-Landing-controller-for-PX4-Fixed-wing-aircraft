@@ -1,6 +1,7 @@
 # This is similar to the mavlink message ATTITUDE_QUATERNION, but for onboard use
 
-uint64 timestamp		# time since system start (microseconds)
+uint64 timestamp                # time since system start (microseconds)
+uint64 timestamp_sample
 
 float32[4] q			# Quaternion rotation from XYZ body frame to NED earth frame.
 float32[4] delta_q_reset 	# Amount by which quaternion has changed during last reset

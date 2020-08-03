@@ -435,7 +435,6 @@ RCUpdate::Run()
 		_rc.channel_count = rc_input.channel_count;
 		_rc.rssi = rc_input.rssi;
 		_rc.signal_lost = signal_lost;
-		_rc.timestamp = rc_input.timestamp_last_signal;
 		_rc.frame_drop_count = rc_input.rc_lost_frame_count;
 
 		/* publish rc_channels topic even if signal is invalid, for debug */

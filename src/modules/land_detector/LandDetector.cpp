@@ -131,7 +131,6 @@ void LandDetector::Run()
 		_land_detected.ground_contact = ground_contactDetected;
 		_land_detected.alt_max = alt_max;
 		_land_detected.in_ground_effect = in_ground_effect;
-		_land_detected.timestamp = hrt_absolute_time();
 		_vehicle_land_detected_pub.publish(_land_detected);
 	}
 

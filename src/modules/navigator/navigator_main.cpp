@@ -461,8 +461,6 @@ Navigator::run()
 					break;
 				}
 
-				_vroi.timestamp = hrt_absolute_time();
-
 				_vehicle_roi_pub.publish(_vroi);
 
 				publish_vehicle_command_ack(cmd, vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED);
@@ -482,7 +480,6 @@ Navigator::run()
 			last_geofence_check = hrt_absolute_time();
 			have_geofence_position_data = false;
 
-			_geofence_result.timestamp = hrt_absolute_time();
 			_geofence_result.geofence_action = _geofence.getGeofenceAction();
 			_geofence_result.home_required = _geofence.isHomeRequired();
 
@@ -773,7 +770,6 @@ Navigator::print_status()
 void
 Navigator::publish_position_setpoint_triplet()
 {
-	_pos_sp_triplet.timestamp = hrt_absolute_time();
 	_pos_sp_triplet_pub.publish(_pos_sp_triplet);
 	_pos_sp_triplet_updated = false;
 }
@@ -882,7 +878,6 @@ void
 Navigator::reset_position_setpoint(position_setpoint_s &sp)
 {
 	sp = position_setpoint_s{};
-	sp.timestamp = hrt_absolute_time();
 	sp.lat = static_cast<double>(NAN);
 	sp.lon = static_cast<double>(NAN);;
 	sp.loiter_radius = get_loiter_radius();
@@ -966,7 +961,6 @@ void Navigator::fake_traffic(const char *callsign, float distance, float directi
 	// float vel_d = get_global_position()->vel_d;
 
 	transponder_report_s tr{};
-	tr.timestamp = hrt_absolute_time();
 	tr.icao_address = 1234;
 	tr.lat = lat; // Latitude, expressed as degrees
 	tr.lon = lon; // Longitude, expressed as degrees
@@ -1227,8 +1221,6 @@ int navigator_main(int argc, char *argv[])
 void
 Navigator::publish_mission_result()
 {
-	_mission_result.timestamp = hrt_absolute_time();
-
 	/* lazily publish the mission result only once available */
 	_mission_result_pub.publish(_mission_result);
 
@@ -1253,7 +1245,6 @@ Navigator::set_mission_failure(const char *reason)
 void
 Navigator::publish_vehicle_cmd(vehicle_command_s *vcmd)
 {
-	vcmd->timestamp = hrt_absolute_time();
 	vcmd->source_system = _vstatus.system_id;
 	vcmd->source_component = _vstatus.component_id;
 	vcmd->target_system = _vstatus.system_id;
@@ -1281,9 +1272,8 @@ Navigator::publish_vehicle_cmd(vehicle_command_s *vcmd)
 void
 Navigator::publish_vehicle_command_ack(const vehicle_command_s &cmd, uint8_t result)
 {
-	vehicle_command_ack_s command_ack = {};
+	vehicle_command_ack_s command_ack{};
 
-	command_ack.timestamp = hrt_absolute_time();
 	command_ack.command = cmd.command;
 	command_ack.target_system = cmd.source_system;
 	command_ack.target_component = cmd.source_component;

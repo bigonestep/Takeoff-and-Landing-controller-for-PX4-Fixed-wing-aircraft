@@ -83,8 +83,7 @@ GpsFailure::on_active()
 	case GPSF_STATE_LOITER: {
 			/* Position controller does not run in this mode:
 			 * navigator has to publish an attitude setpoint */
-			vehicle_attitude_setpoint_s att_sp = {};
-			att_sp.timestamp = hrt_absolute_time();
+			vehicle_attitude_setpoint_s att_sp{};
 			att_sp.roll_body = math::radians(_param_nav_gpsf_r.get());
 			att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
 			att_sp.thrust_body[0] = _param_nav_gpsf_tr.get();

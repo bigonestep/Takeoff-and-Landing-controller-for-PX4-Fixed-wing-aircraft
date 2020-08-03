@@ -103,6 +103,8 @@ public:
 	 */
 	ssize_t write(cdev::file_t *filp, const char *buffer, size_t buflen) override;
 
+	bool write(uint8_t *buffer, bool set_timestamp = true);
+
 	/**
 	 * IOCTL control for the subscriber.
 	 */
@@ -111,7 +113,7 @@ public:
 	/**
 	 * Method to publish a data to this node.
 	 */
-	static ssize_t    publish(const orb_metadata *meta, orb_advert_t handle, const void *data);
+	static ssize_t    publish(const orb_metadata *meta, orb_advert_t handle, const void *data, bool set_timestamp = true);
 
 	static int        unadvertise(orb_advert_t handle);
 

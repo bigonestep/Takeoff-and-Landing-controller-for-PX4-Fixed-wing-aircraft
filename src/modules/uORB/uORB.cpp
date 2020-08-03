@@ -71,6 +71,11 @@ int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const voi
 	return uORB::Manager::get_instance()->orb_publish(meta, handle, data);
 }
 
+int  orb_publish_custom_timestamp(const struct orb_metadata *meta, orb_advert_t handle, const void *data)
+{
+	return uORB::Manager::get_instance()->orb_publish(meta, handle, data, false);
+}
+
 int  orb_subscribe(const struct orb_metadata *meta)
 {
 	return uORB::Manager::get_instance()->orb_subscribe(meta);

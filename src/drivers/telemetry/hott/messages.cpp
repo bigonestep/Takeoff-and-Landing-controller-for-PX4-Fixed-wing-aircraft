@@ -110,7 +110,6 @@ publish_gam_message(const uint8_t *buffer)
 	memset(&esc, 0, sizeof(esc));
 
 	// Publish it.
-	esc.timestamp = hrt_absolute_time();
 	esc.esc_count = 1;
 	esc.esc_connectiontype = esc_status_s::ESC_CONNECTION_TYPE_PPM;
 

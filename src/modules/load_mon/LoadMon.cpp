@@ -125,7 +125,6 @@ void LoadMon::cpuload()
 	cpuload_s cpuload{};
 	cpuload.load = 1.f - interval_idletime / interval;
 	cpuload.ram_usage = ram_usage;
-	cpuload.timestamp = hrt_absolute_time();
 
 	_cpuload_pub.publish(cpuload);
 
@@ -178,7 +177,6 @@ void LoadMon::stack_usage()
 
 	if (checked_task) {
 		task_stack_info.stack_free = stack_free;
-		task_stack_info.timestamp = hrt_absolute_time();
 
 		_task_stack_info_pub.publish(task_stack_info);
 

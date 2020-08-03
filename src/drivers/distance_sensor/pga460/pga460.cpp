@@ -761,8 +761,7 @@ int PGA460::task_spawn(int argc, char *argv[])
 
 void PGA460::uORB_publish_results(const float object_distance)
 {
-	struct distance_sensor_s report = {};
-	report.timestamp = hrt_absolute_time();
+	distance_sensor_s report{};
 	report.type = distance_sensor_s::MAV_DISTANCE_SENSOR_ULTRASOUND;
 	report.orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
 	report.current_distance = object_distance;

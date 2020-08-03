@@ -157,7 +157,6 @@ VOXLPM::measure()
 
 		case VOXLPM_CH_TYPE_P5VDC: {
 				memset(&_pm_status, 0x00, sizeof(_pm_status));
-				_pm_status.timestamp = tnow;
 				_pm_status.voltage_v = (float) _voltage;
 				_pm_status.current_a = (float) _amperage;
 

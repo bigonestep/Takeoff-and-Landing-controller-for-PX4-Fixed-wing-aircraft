@@ -172,15 +172,12 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
 					q.copyTo(_att_sp.q_d);
 
-					_att_sp.timestamp = hrt_absolute_time();
-
 					_attitude_sp_pub.publish(_att_sp);
 
 				} else if (_vcontrol_mode.flag_control_rates_enabled &&
 					   !_vcontrol_mode.flag_control_attitude_enabled) {
 
 					// RATE mode we need to generate the rate setpoint from manual user inputs
-					_rates_sp.timestamp = hrt_absolute_time();
 					_rates_sp.roll = _manual_control_setpoint.y * radians(_param_fw_acro_x_max.get());
 					_rates_sp.pitch = -_manual_control_setpoint.x * radians(_param_fw_acro_y_max.get());
 					_rates_sp.yaw = _manual_control_setpoint.r * radians(_param_fw_acro_z_max.get());
@@ -586,8 +583,6 @@ void FixedwingAttitudeControl::Run()
 				_rates_sp.pitch = _pitch_ctrl.get_desired_bodyrate();
 				_rates_sp.yaw = _yaw_ctrl.get_desired_bodyrate();
 
-				_rates_sp.timestamp = hrt_absolute_time();
-
 				_rate_sp_pub.publish(_rates_sp);
 
 			} else {
@@ -611,7 +606,6 @@ void FixedwingAttitudeControl::Run()
 			}
 
 			rate_ctrl_status_s rate_ctrl_status{};
-			rate_ctrl_status.timestamp = hrt_absolute_time();
 			rate_ctrl_status.rollspeed_integ = _roll_ctrl.get_integrator();
 			rate_ctrl_status.pitchspeed_integ = _pitch_ctrl.get_integrator();
 
@@ -637,7 +631,6 @@ void FixedwingAttitudeControl::Run()
 		_actuators.control[7] = _manual_control_setpoint.aux3;
 
 		/* lazily publish the setpoint only once available */
-		_actuators.timestamp = hrt_absolute_time();
 		_actuators.timestamp_sample = _att.timestamp;
 
 		/* Only publish if any of the proper modes are enabled */

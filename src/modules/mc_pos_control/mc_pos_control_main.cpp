@@ -681,7 +681,6 @@ MulticopterPositionControl::Run()
 			// will remain NAN. Given that the PositionController cannot generate a position-setpoint, this type of setpoint is always equal to the input to the
 			// PositionController.
 			vehicle_local_position_setpoint_s local_pos_sp{};
-			local_pos_sp.timestamp = time_stamp_now;
 			_control.getLocalPositionSetpoint(local_pos_sp);
 
 			// Publish local position setpoint
@@ -694,7 +693,6 @@ MulticopterPositionControl::Run()
 					Vector3f(local_pos_sp.acceleration));
 
 			vehicle_attitude_setpoint_s attitude_setpoint{};
-			attitude_setpoint.timestamp = time_stamp_now;
 			_control.getAttitudeSetpoint(attitude_setpoint);
 
 			// publish attitude setpoint
@@ -709,7 +707,6 @@ MulticopterPositionControl::Run()
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position
 			    && gear.landing_gear != landing_gear_s::GEAR_KEEP) {
-				_landing_gear.timestamp = time_stamp_now;
 				_landing_gear.landing_gear = gear.landing_gear;
 				_landing_gear_pub.publish(_landing_gear);
 			}
@@ -1015,7 +1012,6 @@ void MulticopterPositionControl::check_failure(bool task_failure, uint8_t nav_st
 void MulticopterPositionControl::send_vehicle_cmd_do(uint8_t nav_state)
 {
 	vehicle_command_s command{};
-	command.timestamp = hrt_absolute_time();
 	command.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
 	command.param1 = (float)1; // base mode
 	command.param3 = (float)0; // sub mode

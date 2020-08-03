@@ -498,7 +498,6 @@ bool VotedSensorsUpdate::checkFailover(SensorData &sensor, const char *sensor_na
 						if (type == subsystem_info_s::SUBSYSTEM_TYPE_MAG) { _info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_MAG2; }
 					}
 
-					_info.timestamp = hrt_absolute_time();
 					_info.present = true;
 					_info.enabled = true;
 					_info.ok = false;
@@ -573,7 +572,6 @@ void VotedSensorsUpdate::sensorsPoll(sensor_combined_s &raw, vehicle_magnetomete
 	if (_selection_changed) {
 		// don't publish until selected IDs are valid
 		if (_selection.accel_device_id > 0 && _selection.gyro_device_id > 0) {
-			_selection.timestamp = hrt_absolute_time();
 			_sensor_selection_pub.publish(_selection);
 			_selection_changed = false;
 		}

@@ -351,7 +351,7 @@ void Sih::send_IMU()
 
 void Sih::send_gps()
 {
-	_vehicle_gps_pos.timestamp = _now;
+	//_vehicle_gps_pos.timestamp_sample = _now;
 	_vehicle_gps_pos.lat = (int32_t)(_gps_lat * 1e7);       // Latitude in 1E-7 degrees
 	_vehicle_gps_pos.lon = (int32_t)(_gps_lon * 1e7); // Longitude in 1E-7 degrees
 	_vehicle_gps_pos.alt = (int32_t)(_gps_alt * 1000.0f); // Altitude in 1E-3 meters above MSL, (millimetres)
@@ -371,7 +371,6 @@ void Sih::send_gps()
 void Sih::publish_sih()
 {
 	// publish angular velocity groundtruth
-	_vehicle_angular_velocity_gt.timestamp = hrt_absolute_time();
 	_vehicle_angular_velocity_gt.xyz[0] = _w_B(0); // rollspeed;
 	_vehicle_angular_velocity_gt.xyz[1] = _w_B(1); // pitchspeed;
 	_vehicle_angular_velocity_gt.xyz[2] = _w_B(2); // yawspeed;
@@ -379,7 +378,6 @@ void Sih::publish_sih()
 	_vehicle_angular_velocity_gt_pub.publish(_vehicle_angular_velocity_gt);
 
 	// publish attitude groundtruth
-	_att_gt.timestamp = hrt_absolute_time();
 	_att_gt.q[0] = _q(0);
 	_att_gt.q[1] = _q(1);
 	_att_gt.q[2] = _q(2);
@@ -387,7 +385,6 @@ void Sih::publish_sih()
 
 	_att_gt_pub.publish(_att_gt);
 
-	_gpos_gt.timestamp = hrt_absolute_time();
 	_gpos_gt.lat = _gps_lat_noiseless;
 	_gpos_gt.lon = _gps_lon_noiseless;
 	_gpos_gt.alt = _gps_alt_noiseless;

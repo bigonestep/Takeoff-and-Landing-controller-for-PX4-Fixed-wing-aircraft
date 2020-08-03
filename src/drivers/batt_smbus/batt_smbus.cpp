@@ -83,17 +83,11 @@ BATT_SMBUS::~BATT_SMBUS()
 
 void BATT_SMBUS::RunImpl()
 {
-	// Get the current time.
-	uint64_t now = hrt_absolute_time();
-
 	// Read data from sensor.
-	battery_status_s new_report = {};
+	battery_status_s new_report{};
 
 	// TODO(hyonlim): this driver should support multiple SMBUS going forward.
 	new_report.id = 1;
-
-	// Set time of reading.
-	new_report.timestamp = now;
 
 	new_report.connected = true;
 

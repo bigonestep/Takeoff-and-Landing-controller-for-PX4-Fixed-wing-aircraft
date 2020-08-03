@@ -253,7 +253,6 @@ void VehicleAirData::Run()
 
 			out.rho = pressure_to_density * out.baro_pressure_pa;
 
-			out.timestamp = hrt_absolute_time();
 			_vehicle_air_data_pub.publish(out);
 
 			_last_publication_timestamp = out.timestamp;

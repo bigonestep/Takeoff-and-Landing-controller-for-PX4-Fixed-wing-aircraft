@@ -167,7 +167,6 @@ void ObstacleAvoidance::updateAvoidanceDesiredWaypoints(const Vector3f &curr_wp,
 		const float curr_yawspeed, const Vector3f &next_wp, const float next_yaw, const float next_yawspeed,
 		const bool ext_yaw_active, const int wp_type)
 {
-	_desired_waypoint.timestamp = hrt_absolute_time();
 	_desired_waypoint.type = vehicle_trajectory_waypoint_s::MAV_TRAJECTORY_REPRESENTATION_WAYPOINTS;
 	_curr_wp = curr_wp;
 	_ext_yaw_active = ext_yaw_active;
@@ -206,8 +205,7 @@ void ObstacleAvoidance::checkAvoidanceProgress(const Vector3f &pos, const Vector
 		float target_acceptance_radius, const Vector2f &closest_pt)
 {
 	_position = pos;
-	position_controller_status_s pos_control_status = {};
-	pos_control_status.timestamp = hrt_absolute_time();
+	position_controller_status_s pos_control_status{};
 
 	// vector from previous triplet to current target
 	Vector2f prev_to_target = Vector2f(_curr_wp - prev_wp);
@@ -246,7 +244,6 @@ void ObstacleAvoidance::checkAvoidanceProgress(const Vector3f &pos, const Vector
 void ObstacleAvoidance::_publishVehicleCmdDoLoiter()
 {
 	vehicle_command_s command{};
-	command.timestamp = hrt_absolute_time();
 	command.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
 	command.param1 = (float)1; // base mode
 	command.param3 = (float)0; // sub mode

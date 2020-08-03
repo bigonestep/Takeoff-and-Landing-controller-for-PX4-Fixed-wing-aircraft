@@ -500,7 +500,6 @@ void
 CameraTrigger::test()
 {
 	vehicle_command_s vcmd{};
-	vcmd.timestamp = hrt_absolute_time();
 	vcmd.param5 = 1.0;
 	vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_DIGICAM_CONTROL;
 
@@ -720,7 +719,6 @@ CameraTrigger::Run()
 	if (updated && need_ack) {
 		vehicle_command_ack_s command_ack{};
 
-		command_ack.timestamp = hrt_absolute_time();
 		command_ack.command = cmd.command;
 		command_ack.result = (uint8_t)cmd_result;
 		command_ack.target_system = cmd.source_system;
@@ -756,12 +754,9 @@ CameraTrigger::engage(void *arg)
 	// Send camera trigger message. This messages indicates that we sent
 	// the camera trigger request. Does not guarantee capture.
 
-	struct camera_trigger_s	trigger = {};
+	camera_trigger_s trigger{};
 
-	// Set timestamp the instant after the trigger goes off
-	trigger.timestamp = now;
-
-	timespec tv = {};
+	timespec tv{};
 	px4_clock_gettime(CLOCK_REALTIME, &tv);
 	trigger.timestamp_utc = (uint64_t) tv.tv_sec * 1000000 + tv.tv_nsec / 1000;
 

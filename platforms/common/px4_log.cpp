@@ -61,8 +61,7 @@ void px4_log_initialize(void)
 	assert(orb_log_message_pub == nullptr);
 
 	/* we need to advertise with a valid message */
-	struct log_message_s log_message;
-	log_message.timestamp = hrt_absolute_time();
+	log_message_s log_message;
 	log_message.severity = 6; //info
 	strcpy((char *)log_message.text, "initialized uORB logging");
 
@@ -111,9 +110,8 @@ __EXPORT void px4_log_modulename(int level, const char *moduleName, const char *
 	/* publish an orb log message */
 	if (level >= _PX4_LOG_LEVEL_INFO && orb_log_message_pub) { //publish all messages
 
-		struct log_message_s log_message;
+		log_message_s log_message;
 		const unsigned max_length_pub = sizeof(log_message.text);
-		log_message.timestamp = hrt_absolute_time();
 
 		const uint8_t log_level_table[] = {
 			7, /* _PX4_LOG_LEVEL_DEBUG */

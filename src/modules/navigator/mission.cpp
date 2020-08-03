@@ -1663,7 +1663,6 @@ Mission::save_mission_state()
 			/* navigator may modify only sequence, write modified state only if it changed */
 			if (mission_state.current_seq != _current_mission_index) {
 				mission_state.current_seq = _current_mission_index;
-				mission_state.timestamp = hrt_absolute_time();
 
 				if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
 					     sizeof(mission_s)) != sizeof(mission_s)) {
@@ -1675,7 +1674,6 @@ Mission::save_mission_state()
 
 	} else {
 		/* invalid data, this must not happen and indicates error in mission publisher */
-		mission_state.timestamp = hrt_absolute_time();
 		mission_state.dataman_id = _mission.dataman_id;
 		mission_state.count = _mission.count;
 		mission_state.current_seq = _current_mission_index;
@@ -1788,7 +1786,6 @@ Mission::reset_mission(struct mission_s &mission)
 			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Could not read mission.");
 
 			/* initialize mission state in dataman */
-			mission.timestamp = hrt_absolute_time();
 			mission.dataman_id = DM_KEY_WAYPOINTS_OFFBOARD_0;
 			mission.count = 0;
 			mission.current_seq = 0;

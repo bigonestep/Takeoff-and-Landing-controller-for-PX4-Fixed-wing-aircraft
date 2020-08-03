@@ -2254,7 +2254,6 @@ protected:
 				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
 
 				vehicle_command_s vcmd{};
-				vcmd.timestamp = hrt_absolute_time();
 				vcmd.param1 = 0.0f; // all cameras
 				vcmd.param2 = 0.0f; // duration 0 because only taking one picture
 				vcmd.param3 = 1.0f; // only take one

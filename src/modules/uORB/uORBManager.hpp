@@ -185,7 +185,7 @@ public:
 	 * @param data    A pointer to the data to be published.
 	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data);
+	int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data, bool set_timestamp = true);
 
 	/**
 	 * Subscribe to a topic.

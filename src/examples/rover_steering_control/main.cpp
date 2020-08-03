@@ -183,8 +183,6 @@ void control_attitude(const struct vehicle_attitude_setpoint_s *att_sp, const st
 
 	/* copy throttle */
 	actuators->control[3] = att_sp->thrust_body[0];
-
-	actuators->timestamp = hrt_absolute_time();
 }
 
 /* Main Thread */
@@ -371,8 +369,6 @@ int rover_steering_control_thread_main(int argc, char *argv[])
 	for (unsigned i = 0; i < (sizeof(actuators.control) / sizeof(actuators.control[0])); i++) {
 		actuators.control[i] = 0.0f;
 	}
-
-	actuators.timestamp = hrt_absolute_time();
 
 	orb_publish(ORB_ID_VEHICLE_ATTITUDE_CONTROLS, actuator_pub, &actuators);
 

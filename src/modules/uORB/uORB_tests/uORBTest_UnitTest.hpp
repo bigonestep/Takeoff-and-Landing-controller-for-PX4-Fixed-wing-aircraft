@@ -111,7 +111,6 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	test_note("---------------- LATENCY TEST ------------------");
 	S t{};
 	t.val = 308;
-	t.timestamp = hrt_absolute_time();
 
 	orb_advert_t pfd0 = orb_advertise(T, &t);
 
@@ -139,7 +138,6 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	/* give the test task some data */
 	while (!pubsubtest_passed) {
 		++t.val;
-		t.timestamp = hrt_absolute_time();
 
 		if (PX4_OK != orb_publish(T, pfd0, &t)) {
 			return test_fail("mult. pub0 timing fail");

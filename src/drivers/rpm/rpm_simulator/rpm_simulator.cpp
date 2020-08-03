@@ -62,11 +62,9 @@ int rpm_simulator_main(int argc, char *argv[])
 	rpm_s rpm{};
 
 	uORB::Publication<rpm_s> rpm_pub{ORB_ID(rpm)};
-	uint64_t timestamp_us = hrt_absolute_time();
 	float frequency = atof(argv[1]);
 
 	// prpepare RPM data message
-	rpm.timestamp = timestamp_us;
 	rpm.indicated_frequency_rpm = frequency;
 	rpm.estimated_accurancy_rpm = frequency / 100.0f;
 

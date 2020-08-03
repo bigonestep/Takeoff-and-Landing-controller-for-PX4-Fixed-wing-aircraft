@@ -57,7 +57,6 @@ OutputMavlink::OutputMavlink(const OutputConfig &output_config)
 int OutputMavlink::update(const ControlData *control_data)
 {
 	vehicle_command_s vehicle_command{};
-	vehicle_command.timestamp = hrt_absolute_time();
 	vehicle_command.target_system = (uint8_t)_config.mavlink_sys_id;
 	vehicle_command.target_component = (uint8_t)_config.mavlink_comp_id;
 
@@ -66,7 +65,6 @@ int OutputMavlink::update(const ControlData *control_data)
 		_set_angle_setpoints(control_data);
 
 		vehicle_command.command = vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONFIGURE;
-		vehicle_command.timestamp = hrt_absolute_time();
 
 		if (control_data->type == ControlData::Type::Neutral) {
 			vehicle_command.param1 = vehicle_command_s::VEHICLE_MOUNT_MODE_NEUTRAL;
@@ -92,10 +90,8 @@ int OutputMavlink::update(const ControlData *control_data)
 
 	_handle_position_update();
 
-	hrt_abstime t = hrt_absolute_time();
-	_calculate_output_angles(t);
+	_calculate_output_angles(hrt_absolute_time());
 
-	vehicle_command.timestamp = t;
 	vehicle_command.command = vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONTROL;
 
 	// vmount spec has roll, pitch on channels 0, 1, respectively; MAVLink spec has roll, pitch on channels 1, 0, respectively
@@ -107,7 +103,7 @@ int OutputMavlink::update(const ControlData *control_data)
 
 	_vehicle_command_pub.publish(vehicle_command);
 
-	_last_update = t;
+	_last_update = vehicle_command.timestamp;
 
 	return 0;
 }

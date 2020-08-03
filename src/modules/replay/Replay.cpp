@@ -927,13 +927,9 @@ Replay::publishTopic(Subscription &sub, void *data)
 		data = sub.compat->apply(data);
 	}
 
-	if (sub.orb_advert) {
-		orb_publish(sub.orb_meta, sub.orb_advert, data);
-		published = true;
-
-	} else {
+	if (!sub.orb_advert) {
 		if (sub.multi_id == 0) {
-			sub.orb_advert = orb_advertise(sub.orb_meta, data);
+			sub.orb_advert = orb_advertise(sub.orb_meta, nullptr);
 			published = true;
 
 		} else {
@@ -955,10 +951,16 @@ Replay::publishTopic(Subscription &sub, void *data)
 
 			if (advertised) {
 				int instance;
-				sub.orb_advert = orb_advertise_multi(sub.orb_meta, data, &instance, ORB_PRIO_DEFAULT);
+				sub.orb_advert = orb_advertise_multi(sub.orb_meta, nullptr, &instance, ORB_PRIO_DEFAULT);
 				published = true;
 			}
 		}
+	}
+
+	if (sub.orb_advert) {
+		orb_publish_custom_timestamp(sub.orb_meta, sub.orb_advert, data);
+		published = true;
+
 	}
 
 	if (published) {

@@ -41,6 +41,7 @@ if(NOT PX4_BOARD MATCHES "px4_io") # TODO: fix this hack (move uORB to platform 
 		MAIN uorb
 		COMPILE_FLAGS
 			${MAX_CUSTOM_OPT_LEVEL}
+			-Wno-cast-align
 		SRCS
 			ORBSet.hpp
 			Publication.hpp

@@ -100,14 +100,11 @@ void UavcanDifferentialPressureBridge::air_sub_cb(const
 	float diff_press_pa = msg.differential_pressure;
 	float temperature_c = msg.static_air_temperature + CONSTANTS_ABSOLUTE_NULL_CELSIUS;
 
-	differential_pressure_s report = {
-		.timestamp = hrt_absolute_time(),
-		.error_count = 0,
-		.differential_pressure_raw_pa = diff_press_pa - _diff_pres_offset,
-		.differential_pressure_filtered_pa = _filter.apply(diff_press_pa) - _diff_pres_offset, /// TODO: Create filter
-		.temperature = temperature_c,
-		.device_id = _device_id.devid
-	};
+	differential_pressure_s report{};
+	report.differential_pressure_raw_pa = diff_press_pa - _diff_pres_offset;
+	report.differential_pressure_filtered_pa = _filter.apply(diff_press_pa) - _diff_pres_offset; /// TODO: Create filter
+	report.temperature = temperature_c;
+	report.device_id = _device_id.devid;
 
 	publish(msg.getSrcNodeID().get(), &report);
 }

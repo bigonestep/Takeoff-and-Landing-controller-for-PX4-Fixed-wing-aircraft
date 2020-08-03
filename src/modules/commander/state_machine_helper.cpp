@@ -361,7 +361,6 @@ main_state_transition(const vehicle_status_s &status, const main_state_t new_mai
 	if (ret == TRANSITION_CHANGED) {
 		if (internal_state->main_state != new_main_state) {
 			internal_state->main_state = new_main_state;
-			internal_state->timestamp = hrt_absolute_time();
 
 		} else {
 			ret = TRANSITION_NOT_CHANGED;
@@ -1008,12 +1007,10 @@ void battery_failsafe(orb_advert_t *mavlink_log_pub, const vehicle_status_s &sta
 
 			if (status_flags.condition_global_position_valid && status_flags.condition_home_position_valid) {
 				internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_RTL;
-				internal_state->timestamp = hrt_absolute_time();
 				mavlink_log_critical(mavlink_log_pub, "%s, executing RTL", battery_critical);
 
 			} else {
 				internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_LAND;
-				internal_state->timestamp = hrt_absolute_time();
 				mavlink_log_emergency(mavlink_log_pub, "%s, can't execute RTL, landing instead", battery_critical);
 			}
 
@@ -1021,7 +1018,6 @@ void battery_failsafe(orb_advert_t *mavlink_log_pub, const vehicle_status_s &sta
 
 		case LOW_BAT_ACTION::LAND:
 			internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_LAND;
-			internal_state->timestamp = hrt_absolute_time();
 			mavlink_log_emergency(mavlink_log_pub, "%s, landing", battery_critical);
 
 			break;
@@ -1041,12 +1037,10 @@ void battery_failsafe(orb_advert_t *mavlink_log_pub, const vehicle_status_s &sta
 		case LOW_BAT_ACTION::RETURN:
 			if (status_flags.condition_global_position_valid && status_flags.condition_home_position_valid) {
 				internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_RTL;
-				internal_state->timestamp = hrt_absolute_time();
 				mavlink_log_critical(mavlink_log_pub, "%s, executing RTL", battery_dangerous);
 
 			} else {
 				internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_LAND;
-				internal_state->timestamp = hrt_absolute_time();
 				mavlink_log_emergency(mavlink_log_pub, "%s, can't execute RTL, landing instead", battery_dangerous);
 			}
 
@@ -1057,7 +1051,6 @@ void battery_failsafe(orb_advert_t *mavlink_log_pub, const vehicle_status_s &sta
 		// FALLTHROUGH
 		case LOW_BAT_ACTION::LAND:
 			internal_state->main_state = commander_state_s::MAIN_STATE_AUTO_LAND;
-			internal_state->timestamp = hrt_absolute_time();
 			mavlink_log_emergency(mavlink_log_pub, "%s, landing", battery_dangerous);
 
 			break;

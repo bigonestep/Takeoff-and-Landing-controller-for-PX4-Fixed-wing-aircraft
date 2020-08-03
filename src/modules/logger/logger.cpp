@@ -946,7 +946,6 @@ void Logger::publish_logger_status()
 				status.buffer_used_bytes = buffer_fill_count_file;
 				status.buffer_size_bytes = _writer.get_buffer_size_file(log_type);
 				status.num_messages = _num_subscriptions;
-				status.timestamp = hrt_absolute_time();
 				_logger_status_pub[i].publish(status);
 			}
 		}
@@ -1734,7 +1733,6 @@ void Logger::write_header(LogType type)
 	header.magic[5] = 0x12;
 	header.magic[6] = 0x35;
 	header.magic[7] = 0x01; //file version 1
-	header.timestamp = hrt_absolute_time();
 	_writer.lock();
 	write_message(type, &header, sizeof(header));
 
@@ -1967,8 +1965,7 @@ void Logger::write_changed_parameters(LogType type)
 
 void Logger::ack_vehicle_command(vehicle_command_s *cmd, uint32_t result)
 {
-	vehicle_command_ack_s vehicle_command_ack = {};
-	vehicle_command_ack.timestamp = hrt_absolute_time();
+	vehicle_command_ack_s vehicle_command_ack{};
 	vehicle_command_ack.command = cmd->command;
 	vehicle_command_ack.result = (uint8_t)result;
 	vehicle_command_ack.target_system = cmd->source_system;

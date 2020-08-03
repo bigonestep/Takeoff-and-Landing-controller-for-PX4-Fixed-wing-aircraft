@@ -65,8 +65,6 @@ extern "C" {
 
 static void publish_tune_control(tune_control_s &tune_control)
 {
-	tune_control.timestamp = hrt_absolute_time();
-
 	if (tune_control_pub == nullptr) {
 		// We have a minimum of 3 so that tune, stop, tune will fit
 		tune_control_pub = orb_advertise_queue(ORB_ID(tune_control), &tune_control, tune_control_s::ORB_QUEUE_LENGTH);

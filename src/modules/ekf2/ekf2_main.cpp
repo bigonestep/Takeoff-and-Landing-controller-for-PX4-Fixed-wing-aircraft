@@ -825,7 +825,6 @@ void Ekf2::Run()
 
 		// ekf2_timestamps (using 0.1 ms relative timestamps)
 		ekf2_timestamps_s ekf2_timestamps{};
-		ekf2_timestamps.timestamp = now;
 
 		ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
@@ -999,7 +998,7 @@ void Ekf2::Run()
 
 				// log blended solution as a third GPS instance
 				ekf_gps_position_s gps;
-				gps.timestamp = _gps_output[_gps_select_index].time_usec;
+				//gps.timestamp_sample = _gps_output[_gps_select_index].time_usec;
 				gps.lat = _gps_output[_gps_select_index].lat;
 				gps.lon = _gps_output[_gps_select_index].lon;
 				gps.alt = _gps_output[_gps_select_index].alt;
@@ -1240,9 +1239,8 @@ void Ekf2::Run()
 				// generate vehicle odometry data
 				vehicle_odometry_s odom{};
 
-				lpos.timestamp = now;
+				lpos.timestamp_sample = now;
 
-				odom.timestamp = hrt_absolute_time();
 				odom.timestamp_sample = now;
 
 				odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
@@ -1465,7 +1463,7 @@ void Ekf2::Run()
 					// generate and publish global position data
 					vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
 
-					global_pos.timestamp = now;
+					global_pos.timestamp_sample = now;
 
 					if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
 						map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
@@ -1499,9 +1497,6 @@ void Ekf2::Run()
 			}
 
 			{
-				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				bias.timestamp = now;
-
 				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
 				if (_imu_sub_index < 0) {
 					bias.gyro_device_id = _sensor_selection.gyro_device_id;
@@ -1523,7 +1518,7 @@ void Ekf2::Run()
 
 			// publish estimator status
 			estimator_status_s status;
-			status.timestamp = now;
+			status.timestamp_sample = now;
 			_ekf.getStateAtFusionHorizonAsVector().copyTo(status.states);
 			status.n_states = 24;
 			_ekf.covariances_diagonal().copyTo(status.covariances);
@@ -1560,7 +1555,7 @@ void Ekf2::Run()
 
 			if (_ekf.get_gps_drift_metrics(gps_drift, &blocked)) {
 				ekf_gps_drift_s drift_data;
-				drift_data.timestamp = now;
+				drift_data.timestamp_sample = now;
 				drift_data.hpos_drift_rate = gps_drift[0];
 				drift_data.vpos_drift_rate = gps_drift[1];
 				drift_data.hspd = gps_drift[2];
@@ -1654,7 +1649,7 @@ void Ekf2::Run()
 			{
 				// publish estimator innovation data
 				estimator_innovations_s innovations;
-				innovations.timestamp = now;
+				innovations.timestamp_sample = now;
 				_ekf.getGpsVelPosInnov(&innovations.gps_hvel[0], innovations.gps_vvel, &innovations.gps_hpos[0],
 						       innovations.gps_vpos);
 				_ekf.getEvVelPosInnov(&innovations.ev_hvel[0], innovations.ev_vvel, &innovations.ev_hpos[0], innovations.ev_vpos);
@@ -1675,7 +1670,7 @@ void Ekf2::Run()
 
 				// publish estimator innovation variance data
 				estimator_innovations_s innovation_var;
-				innovation_var.timestamp = now;
+				innovation_var.timestamp_sample = now;
 				_ekf.getGpsVelPosInnovVar(&innovation_var.gps_hvel[0], innovation_var.gps_vvel, &innovation_var.gps_hpos[0],
 							  innovation_var.gps_vpos);
 				_ekf.getEvVelPosInnovVar(&innovation_var.ev_hvel[0], innovation_var.ev_vvel, &innovation_var.ev_hpos[0],
@@ -1698,7 +1693,7 @@ void Ekf2::Run()
 
 				// publish estimator innovation test ratio data
 				estimator_innovations_s test_ratios;
-				test_ratios.timestamp = now;
+				test_ratios.timestamp_sample = now;
 				_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
 							    test_ratios.gps_vpos);
 				_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0],
@@ -1809,7 +1804,7 @@ void Ekf2::publish_attitude(const hrt_abstime &timestamp)
 	if (_ekf.attitude_valid()) {
 		// generate vehicle attitude quaternion data
 		vehicle_attitude_s att;
-		att.timestamp = timestamp;
+		att.timestamp_sample = timestamp;
 
 		const Quatf q{_ekf.calculate_quaternion()};
 		q.copyTo(att.q);
@@ -1822,6 +1817,7 @@ void Ekf2::publish_attitude(const hrt_abstime &timestamp)
 		// in replay mode we have to tell the replay module not to wait for an update
 		// we do this by publishing an attitude with zero timestamp
 		vehicle_attitude_s att{};
+		att.timestamp_sample = timestamp;
 		_att_pub.publish(att);
 	}
 }
@@ -1838,7 +1834,7 @@ void Ekf2::publish_yaw_estimator_status(const hrt_abstime &timestamp)
 			       &yaw_est_test_data.innov_vn[0], &yaw_est_test_data.innov_ve[0],
 			       &yaw_est_test_data.weight[0])) {
 
-		yaw_est_test_data.timestamp = timestamp;
+		yaw_est_test_data.timestamp_sample = timestamp;
 
 		_yaw_est_pub.publish(yaw_est_test_data);
 	}
@@ -1855,7 +1851,7 @@ void Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
 		_ekf.getAirspeedInnovVar(wind_estimate.tas_innov_var);
 		_ekf.getBetaInnov(wind_estimate.beta_innov);
 		_ekf.getBetaInnovVar(wind_estimate.beta_innov_var);
-		wind_estimate.timestamp = timestamp;
+		wind_estimate.timestamp_sample = timestamp;
 		wind_estimate.windspeed_north = wind_vel(0);
 		wind_estimate.windspeed_east = wind_vel(1);
 		wind_estimate.variance_north = wind_vel_var(0);

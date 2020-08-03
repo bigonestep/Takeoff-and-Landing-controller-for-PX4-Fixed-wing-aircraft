@@ -230,7 +230,6 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 	// differential pressure
 	if ((sensors.fields_updated & SensorSource::DIFF_PRESS) == SensorSource::DIFF_PRESS && !_param_sim_dpres_block.get()) {
 		differential_pressure_s report{};
-		report.timestamp = time;
 		report.temperature = temperature;
 		report.differential_pressure_filtered_pa = sensors.diff_pressure * 100.0f; // convert from millibar to bar;
 		report.differential_pressure_raw_pa = sensors.diff_pressure * 100.0f; // convert from millibar to bar;
@@ -295,7 +294,6 @@ void Simulator::handle_message_hil_gps(const mavlink_message_t *msg)
 	if (!_param_sim_gps_block.get()) {
 		vehicle_gps_position_s gps{};
 
-		gps.timestamp = hrt_absolute_time();
 		gps.time_utc_usec = hil_gps.time_usec;
 		gps.fix_type = hil_gps.fix_type;
 		gps.lat = hil_gps.lat;
@@ -369,13 +367,9 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 	mavlink_hil_state_quaternion_t hil_state;
 	mavlink_msg_hil_state_quaternion_decode(msg, &hil_state);
 
-	uint64_t timestamp = hrt_absolute_time();
-
 	/* angular velocity */
 	vehicle_angular_velocity_s hil_angular_velocity{};
 	{
-		hil_angular_velocity.timestamp = timestamp;
-
 		hil_angular_velocity.xyz[0] = hil_state.rollspeed;
 		hil_angular_velocity.xyz[1] = hil_state.pitchspeed;
 		hil_angular_velocity.xyz[2] = hil_state.yawspeed;
@@ -387,8 +381,6 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 	/* attitude */
 	vehicle_attitude_s hil_attitude{};
 	{
-		hil_attitude.timestamp = timestamp;
-
 		matrix::Quatf q(hil_state.attitude_quaternion);
 		q.copyTo(hil_attitude.q);
 
@@ -399,8 +391,6 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 	/* global position */
 	vehicle_global_position_s hil_gpos{};
 	{
-		hil_gpos.timestamp = timestamp;
-
 		hil_gpos.lat = hil_state.lat / 1E7;//1E7
 		hil_gpos.lon = hil_state.lon / 1E7;//1E7
 		hil_gpos.alt = hil_state.alt / 1E3;//1E3
@@ -410,17 +400,15 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 	}
 
 	/* local position */
-	struct vehicle_local_position_s hil_lpos = {};
+	vehicle_local_position_s hil_lpos{};
 	{
-		hil_lpos.timestamp = timestamp;
-
 		double lat = hil_state.lat * 1e-7;
 		double lon = hil_state.lon * 1e-7;
 
 		if (!_hil_local_proj_inited) {
 			_hil_local_proj_inited = true;
 			map_projection_init(&_hil_local_proj_ref, lat, lon);
-			_hil_ref_timestamp = timestamp;
+			_hil_ref_timestamp = hrt_absolute_time();
 			_hil_ref_lat = lat;
 			_hil_ref_lon = lon;
 			_hil_ref_alt = hil_state.alt / 1000.0f;
@@ -429,7 +417,6 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 		float x;
 		float y;
 		map_projection_project(&_hil_local_proj_ref, lat, lon, &x, &y);
-		hil_lpos.timestamp = timestamp;
 		hil_lpos.xy_valid = true;
 		hil_lpos.z_valid = true;
 		hil_lpos.v_xy_valid = true;
@@ -464,7 +451,6 @@ void Simulator::handle_message_landing_target(const mavlink_message_t *msg)
 	mavlink_msg_landing_target_decode(msg, &landing_target_mavlink);
 
 	irlock_report_s report{};
-	report.timestamp = hrt_absolute_time();
 	report.signature = landing_target_mavlink.target_num;
 	report.pos_x = landing_target_mavlink.angle_x;
 	report.pos_y = landing_target_mavlink.angle_y;
@@ -513,8 +499,6 @@ void Simulator::handle_message_rc_channels(const mavlink_message_t *msg)
 	rc_input.values[15] = rc_channels.chan16_raw;
 	rc_input.values[16] = rc_channels.chan17_raw;
 	rc_input.values[17] = rc_channels.chan18_raw;
-
-	rc_input.timestamp = hrt_absolute_time();
 
 	// publish message
 	_input_rc_pub.publish(rc_input);
@@ -896,9 +880,8 @@ int openUart(const char *uart_name, int baud)
 
 int Simulator::publish_flow_topic(const mavlink_hil_optical_flow_t *flow_mavlink)
 {
-	optical_flow_s flow = {};
+	optical_flow_s flow{};
 	flow.sensor_id = flow_mavlink->sensor_id;
-	flow.timestamp = hrt_absolute_time();
 	flow.time_since_last_sonar_update = 0;
 	flow.frame_count_since_last_readout = 0; // ?
 	flow.integration_timespan = flow_mavlink->integration_time_us;
@@ -942,9 +925,8 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 {
 	uint64_t timestamp = hrt_absolute_time();
 
-	struct vehicle_odometry_s odom;
+	vehicle_odometry_s odom{};
 
-	odom.timestamp = timestamp;
 	odom.timestamp_sample = timestamp;
 
 	const size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
@@ -1054,7 +1036,6 @@ int Simulator::publish_odometry_topic(const mavlink_message_t *odom_mavlink)
 int Simulator::publish_distance_topic(const mavlink_distance_sensor_t *dist_mavlink)
 {
 	distance_sensor_s dist{};
-	dist.timestamp = hrt_absolute_time();
 	dist.min_distance = dist_mavlink->min_distance / 100.0f;
 	dist.max_distance = dist_mavlink->max_distance / 100.0f;
 	dist.current_distance = dist_mavlink->current_distance / 100.0f;

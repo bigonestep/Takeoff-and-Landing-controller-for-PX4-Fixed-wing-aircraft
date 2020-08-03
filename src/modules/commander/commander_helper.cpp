@@ -159,7 +159,6 @@ void set_tune_override(int tune)
 	tune_control.tune_id = tune;
 	tune_control.volume = tune_control_s::VOLUME_LEVEL_DEFAULT;
 	tune_control.tune_override = 1;
-	tune_control.timestamp = hrt_absolute_time();
 	orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 }
 
@@ -174,7 +173,6 @@ void set_tune(int tune)
 			tune_control.tune_id = tune;
 			tune_control.volume = tune_control_s::VOLUME_LEVEL_DEFAULT;
 			tune_control.tune_override = 0;
-			tune_control.timestamp = hrt_absolute_time();
 			orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 		}
 
@@ -289,7 +287,6 @@ int led_init()
 	led_control.led_mask = 0xff;
 	led_control.mode = led_control_s::MODE_OFF;
 	led_control.priority = 0;
-	led_control.timestamp = hrt_absolute_time();
 	led_control_pub = orb_advertise_queue(ORB_ID(led_control), &led_control, led_control_s::ORB_QUEUE_LENGTH);
 
 	/* first open normal LEDs */
@@ -349,7 +346,6 @@ void rgbled_set_color_and_mode(uint8_t color, uint8_t mode, uint8_t blinks, uint
 	led_control.color = color;
 	led_control.num_blinks = blinks;
 	led_control.priority = prio;
-	led_control.timestamp = hrt_absolute_time();
 	orb_publish(ORB_ID(led_control), led_control_pub, &led_control);
 }
 

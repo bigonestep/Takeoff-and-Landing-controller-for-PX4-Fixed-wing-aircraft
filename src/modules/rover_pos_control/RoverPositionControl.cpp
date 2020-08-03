@@ -459,11 +459,7 @@ RoverPositionControl::run()
 					pos_ctrl_status.acceptance_radius = turn_distance;
 					pos_ctrl_status.yaw_acceptance = NAN;
 
-					pos_ctrl_status.timestamp = hrt_absolute_time();
-
 					_pos_ctrl_status_pub.publish(pos_ctrl_status);
-
-
 				}
 
 			} else if (!manual_mode && _control_mode.flag_control_velocity_enabled) {
@@ -511,7 +507,6 @@ RoverPositionControl::run()
 			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
 
 			//orb_copy(ORB_ID(vehicle_attitude), _vehicle_attitude_sub, &_vehicle_att);
-			_act_controls.timestamp = hrt_absolute_time();
 
 			/* Only publish if any of the proper modes are enabled */
 			if (_control_mode.flag_control_velocity_enabled ||

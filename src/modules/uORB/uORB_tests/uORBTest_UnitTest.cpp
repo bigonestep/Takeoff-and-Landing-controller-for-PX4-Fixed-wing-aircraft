@@ -449,7 +449,6 @@ int uORBTest::UnitTest::pub_test_multi2_main()
 		px4_usleep(2); //make sure the timestamps are different
 		orb_advert_t &pub = orb_pub[data_next_idx];
 
-		data_topic.timestamp = hrt_absolute_time();
 		data_topic.val = data_next_idx;
 
 		orb_publish(ORB_ID(orb_test_medium_multi), pub, &data_topic);

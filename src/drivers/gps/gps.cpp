@@ -594,7 +594,6 @@ void GPS::dumpGpsData(uint8_t *data, size_t len, bool msg_to_gps_device)
 				dump_data->len |= 1 << 7;
 			}
 
-			dump_data->timestamp = hrt_absolute_time();
 			_dump_communication_pub.publish(*dump_data);
 			dump_data->len = 0;
 		}
@@ -659,7 +658,6 @@ GPS::run()
 	while (!should_exit()) {
 
 		if (_fake_gps) {
-			_report_gps_pos.timestamp = hrt_absolute_time();
 			_report_gps_pos.lat = (int32_t)47.378301e7f;
 			_report_gps_pos.lon = (int32_t)8.538777e7f;
 			_report_gps_pos.alt = (int32_t)1200e3f;

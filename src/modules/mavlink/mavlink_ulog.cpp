@@ -247,7 +247,6 @@ void MavlinkULog::handle_ack(mavlink_logging_ack_t ack)
 void MavlinkULog::publish_ack(uint16_t sequence)
 {
 	ulog_stream_ack_s ack;
-	ack.timestamp = hrt_absolute_time();
 	ack.msg_sequence = sequence;
 
 	_ulog_stream_ack_pub.publish(ack);

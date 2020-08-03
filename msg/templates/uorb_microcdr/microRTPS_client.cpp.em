@@ -130,7 +130,6 @@ void* send(void* /*unused*/)
                 if(@(topic)_data.sys_id == 0 && @(topic)_data.seq != last_remote_msg_seq && @(topic)_data.tc1 == 0) {
                     last_remote_msg_seq = @(topic)_data.seq;
 
-                    @(topic)_data.timestamp = hrt_absolute_time();
                     @(topic)_data.sys_id = 1;
                     @(topic)_data.seq = last_msg_seq;
                     @(topic)_data.tc1 = hrt_absolute_time() * 1000ULL;

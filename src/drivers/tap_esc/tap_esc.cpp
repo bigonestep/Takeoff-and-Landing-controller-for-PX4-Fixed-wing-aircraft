@@ -487,7 +487,6 @@ void TAP_ESC::cycle()
 		} else {
 
 			_outputs.noutputs = num_outputs;
-			_outputs.timestamp = hrt_absolute_time();
 
 			/* check for motor test commands */
 			bool test_motor_updated;
@@ -558,8 +557,6 @@ void TAP_ESC::cycle()
 			motor_out[i] = RPMSTOPPED;
 		}
 
-		_outputs.timestamp = hrt_absolute_time();
-
 		send_esc_outputs(motor_out, num_outputs);
 		tap_esc_common::read_data_from_uart(_uart_fd, &_uartbuf);
 
@@ -575,8 +572,6 @@ void TAP_ESC::cycle()
 					_esc_feedback.esc_count = num_outputs;
 					_esc_feedback.esc_online_flags = (1 << num_outputs) - 1;
 					_esc_feedback.esc_armed_flags = (1 << num_outputs) - 1;
-
-					_esc_feedback.timestamp = hrt_absolute_time();
 
 					orb_publish(ORB_ID(esc_status), _esc_feedback_pub, &_esc_feedback);
 				}

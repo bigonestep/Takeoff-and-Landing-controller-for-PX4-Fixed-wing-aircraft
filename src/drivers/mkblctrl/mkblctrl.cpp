@@ -545,7 +545,6 @@ MK::task_main()
 
 					/* do mixing */
 					outputs.noutputs = _mixers->mix(&outputs.output[0], _num_outputs);
-					outputs.timestamp = hrt_absolute_time();
 
 					/* iterate actuators */
 					for (unsigned int i = 0; i < _num_outputs; i++) {
@@ -608,7 +607,6 @@ MK::task_main()
 
 		if (hrt_absolute_time() - esc.timestamp > ESC_UORB_PUBLISH_DELAY) {
 			esc.counter++;
-			esc.timestamp = hrt_absolute_time();
 			esc.esc_count = (uint8_t) _num_outputs;
 			esc.esc_connectiontype = esc_status_s::ESC_CONNECTION_TYPE_I2C;
 			esc.esc_online_flags = (1 << esc.esc_count) - 1;

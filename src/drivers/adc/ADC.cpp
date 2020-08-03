@@ -112,8 +112,7 @@ void ADC::Run()
 
 void ADC::update_adc_report(hrt_abstime now)
 {
-	adc_report_s adc = {};
-	adc.timestamp = now;
+	adc_report_s adc{};
 	adc.device_id = BUILTIN_ADC_DEVID;
 
 	unsigned max_num = _channel_count;
@@ -217,7 +216,6 @@ void ADC::update_system_power(hrt_abstime now)
 	system_power.hipower_5v_oc = BOARD_ADC_HIPOWER_5V_OC;
 #endif
 
-	system_power.timestamp = hrt_absolute_time();
 	_to_system_power.publish(system_power);
 
 #endif // BOARD_ADC_USB_CONNECTED

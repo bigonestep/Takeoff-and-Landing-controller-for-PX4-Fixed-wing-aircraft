@@ -171,7 +171,6 @@ void MulticopterHoverThrustEstimator::publishStatus(ZeroOrderHoverThrustEkf::sta
 	status_msg.accel_innov_var = status.innov_var;
 	status_msg.accel_innov_test_ratio = status.innov_test_ratio;
 	status_msg.accel_noise_var = status.accel_noise_var;
-	status_msg.timestamp = hrt_absolute_time();
 	_hover_thrust_ekf_pub.publish(status_msg);
 }
 

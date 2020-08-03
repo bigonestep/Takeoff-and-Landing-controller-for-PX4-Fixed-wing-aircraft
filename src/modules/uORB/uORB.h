@@ -169,6 +169,8 @@ extern int orb_unadvertise(orb_advert_t handle) __EXPORT;
  * @see uORB::Manager::orb_publish()
  */
 extern int	orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data) __EXPORT;
+extern int	orb_publish_custom_timestamp(const struct orb_metadata *meta, orb_advert_t handle,
+		const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
