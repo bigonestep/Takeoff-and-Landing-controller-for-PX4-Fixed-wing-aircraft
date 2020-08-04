@@ -31,31 +31,32 @@
  ****************************************************************************/
 
 #include <arpa/inet.h>
-#include <cstdint>
 #include <cassert>
+#include <csignal>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
-#include <semaphore.h>
 #include <sys/socket.h>
 #include <termios.h>
 #include <unistd.h>
 
+#define BUFFER_SIZE 1024
 
+class DevSerial;
 class Mavlink2Dev;
 class RtpsDev;
 class ReadBuffer;
 
 struct StaticData {
+	DevSerial *serial;
 	Mavlink2Dev *mavlink2;
 	RtpsDev *rtps;
-	sem_t r_lock;
-	sem_t w_lock;
-	char device_name[16];
 	ReadBuffer *read_buffer;
 };
+
+volatile sig_atomic_t running = true;
 
 namespace
 {
@@ -105,101 +106,49 @@ void ReadBuffer::move(void *dest, size_t pos, size_t n)
 	buf_size -= n;
 }
 
-class DevCommon
+
+
+class DevSerial
 {
 public:
-	DevCommon(const uint16_t udp_port, const char* device_name, const uint32_t baudrate);
-	virtual ~DevCommon();
+	DevSerial(const char* device_name, const uint32_t baudrate);
+	virtual ~DevSerial();
 
-	int init();
 	int	open_uart();
-
-	int	open_udp();
-	ssize_t udp_read(void *buffer, size_t len);
-	ssize_t udp_write(void *buffer, size_t len);
-
 	int	close();
 
-	enum Operation {Read, Write};
+	int _uart_fd = -1;
 
 protected:
-
-	virtual uint8_t poll_state();
-
-	void lock(enum Operation op)
-	{
-		sem_t *this_lock = op == Read ? &objects->r_lock : &objects->w_lock;
-
-		while (sem_wait(this_lock) != 0) {
-			/* The only case that an error should occur here is if
-			 * the wait was awakened by a signal.
-			 */
-			assert(errno == EINTR);
-		}
-	}
-
-	void unlock(enum Operation op)
-	{
-		sem_t *this_lock = op == Read ? &objects->r_lock : &objects->w_lock;
-		sem_post(this_lock);
-	}
-
-	uint16_t _udp_port;
 	uint32_t _baudrate;
 
-	int _uart_fd = -1;
 	char _uart_name[64] = {};
 	bool baudrate_to_speed(uint32_t bauds, speed_t *speed);
-
-	int _socket_fd = -1;
-
-	struct sockaddr_in _addr;
-
-	uint16_t _packet_len;
-	enum class ParserState : uint8_t {
-		Idle = 0,
-		GotLength
-	};
-	ParserState _parser_state = ParserState::Idle;
-
-	bool _had_data = false; ///< whether poll() returned available data
 
 private:
 };
 
-DevCommon::DevCommon(const uint16_t udp_port, const char* device_name, const uint32_t baudrate)
-	: _udp_port(udp_port)
-	, _baudrate(baudrate)
+DevSerial::DevSerial(const char* device_name, const uint32_t baudrate)
+	: _baudrate(baudrate)
 {
 	strncpy(_uart_name, device_name, sizeof(_uart_name));
 }
 
-DevCommon::~DevCommon()
+DevSerial::~DevSerial()
 {
 	if (_uart_fd >= 0) {
-		::close(_uart_fd);
+		close();
 	}
 }
 
-int DevCommon::init()
-{
-	// Open UART port
-	open_uart();
-
-	// Open UDP port
-	open_udp();
-
-	return 0;
-}
-
-int DevCommon::open_uart()
+int DevSerial::open_uart()
 {
 	// Open a serial port, if not opened already
 	if (_uart_fd < 0) {
 		_uart_fd = open(_uart_name, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
 		if (_uart_fd < 0) {
-			printf("\033[0;31m[  protocol_splitter  ]\tFailed to open device: %s (%d)\033[0m\n", _uart_name, errno);
+			printf("\033[0;31m[ protocol__splitter ]\tSerial link: Failed to open device: %s (%d)\033[0m\n", _uart_name, errno);
 			return -errno;
 		}
 
@@ -215,7 +164,7 @@ int DevCommon::open_uart()
 		// Back up the original uart configuration to restore it after exit
 		if ((termios_state = tcgetattr(_uart_fd, &uart_config)) < 0) {
 			int errno_bkp = errno;
-			printf("\033[0;31m[  protocol_splitter  ]\tError getting config %s: %d (%d)\n\033[0m", _uart_name, termios_state, errno);
+			printf("\033[0;31m[ protocol__splitter ]\tSerial link: Error getting config %s: %d (%d)\n\033[0m", _uart_name, termios_state, errno);
 			close();
 			return -errno_bkp;
 		}
@@ -232,11 +181,14 @@ int DevCommon::open_uart()
 
 		uart_config.c_lflag &= !(ISIG | ICANON | ECHO | TOSTOP | IEXTEN);
 
+		bool _hw_flow_control = false;
+		bool _sw_flow_control = false;
+
 		// Set baud rate
 		speed_t speed;
 
 		if (!baudrate_to_speed(_baudrate, &speed)) {
-			printf("\033[0;31m[  protocol_splitter  ]\tError setting baudrate %s: Unsupported baudrate: %d\n\tsupported examples:\n\t9600, 19200, 38400, 57600, 115200, 230400, 460800, 500000, 921600, 1000000\033[0m\n",
+			printf("\033[0;31m[ protocol__splitter ]\tSerial link: Error setting baudrate %s: Unsupported baudrate: %d\n\tsupported examples:\n\t9600, 19200, 38400, 57600, 115200, 230400, 460800, 500000, 921600, 1000000\033[0m\n",
 				_uart_name, _baudrate);
 			close();
 			return -EINVAL;
@@ -244,17 +196,20 @@ int DevCommon::open_uart()
 
 		if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {
 			int errno_bkp = errno;
-			printf("\033[0;31m[  protocol_splitter  ]\tError setting baudrate %s: %d (%d)\033[0m\n", _uart_name, termios_state, errno);
+			printf("\033[0;31m[ protocol__splitter ]\tSerial link: Error setting baudrate %s: %d (%d)\033[0m\n", _uart_name, termios_state, errno);
 			close();
 			return -errno_bkp;
 		}
 
 		if ((termios_state = tcsetattr(_uart_fd, TCSANOW, &uart_config)) < 0) {
 			int errno_bkp = errno;
-			printf("\033[0;31m[  protocol_splitter  ]\tUART transport: ERR SET CONF %s (%d)\033[0m\n", _uart_name, errno);
+			printf("\033[0;31m[ protocol__splitter ]\tSerial link: ERR SET CONF %s (%d)\033[0m\n", _uart_name, errno);
 			close();
 			return -errno_bkp;
 		}
+
+		printf("[ protocol__splitter ]\tSerial link: device: %s; baudrate: %d; flow_control: %s\n",
+                     _uart_name, _baudrate, _sw_flow_control ? "SW enabled" : (_hw_flow_control ? "HW enabled" : "No"));
 
 		char aux[64];
 		bool flush = false;
@@ -265,18 +220,18 @@ int DevCommon::open_uart()
 		}
 
 		if (flush) {
-			printf("[  protocol_splitter  ]\tUART transport: Flush\n");
+			printf("[ protocol__splitter ]\tSerial link: Flush\n");
 		} else {
-			printf("[  protocol_splitter  ]\tUART transport: No flush\n");
+			printf("[ protocol__splitter ]\tSerial link: No flush\n");
 		}
-
-		poll_state();
 	}
 
 	return _uart_fd;
 }
 
-bool DevCommon::baudrate_to_speed(uint32_t bauds, speed_t *speed)
+
+
+bool DevSerial::baudrate_to_speed(uint32_t bauds, speed_t *speed)
 {
 #ifndef B460800
 #define B460800 460800
@@ -375,84 +330,161 @@ bool DevCommon::baudrate_to_speed(uint32_t bauds, speed_t *speed)
 	return true;
 }
 
-int DevCommon::open_udp()
-{
-	memset((char *)&_addr, 0, sizeof(_addr));
-	_addr.sin_family = AF_INET;
-	_addr.sin_port = htons(_udp_port);
-	_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	if ((_socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		printf("\033[0;31m[  protocol_splitter  ]\tCreate socket failed\033[0m\n");
-		return -1;
-	}
-	printf("[ protocol__splitter ]\tTrying to connect...");
-
-	if (bind(_socket_fd, (struct sockaddr *)&_addr, sizeof(_addr)) < 0) {
-		printf("\033[0;31m[  protocol_splitter  ]\tUDP transport: Bind failed\033[0m\n");
-		return -1;
-	}
-	printf("[ protocol__splitter ]\tConnected to server!\n\n");
-	return 0;
-}
-
-int DevCommon::close()
+int DevSerial::close()
 {
 	if (_uart_fd >= 0) {
-		printf("\033[1;33m[  protocol_splitter  ]\tClosed serial port!\033[0m\n");
+		printf("\033[1;33m[ protocol__splitter ]\tSerial link: Closed serial port!\033[0m\n");
 		::close(_uart_fd);
 		_uart_fd = -1;
 	}
 
-	if (_socket_fd >= 0) {
-		printf("\033[1;33m[  protocol_splitter  ]\tClosed socket!\033[0m\n");
-		shutdown(_socket_fd, SHUT_RDWR);
-		::close(_socket_fd);
-		_socket_fd = -1;
+	return 0;
+}
+
+
+class DevSocket
+{
+public:
+	DevSocket(const char* _udp_ip, const uint16_t udp_port_recv,
+			  const uint16_t udp_port_send, int uart_fd);
+	virtual ~DevSocket();
+
+	int close(int udp_fd);
+
+	int	open_udp();
+	ssize_t udp_read(void *buffer, size_t len);
+	ssize_t udp_write(void *buffer, size_t len);
+
+	int _uart_fd;
+	int _udp_sender_fd;
+	int _udp_receiver_fd;
+
+protected:
+	char _udp_ip[16] = {};
+
+	uint16_t _udp_port_recv;
+	uint16_t _udp_port_send;
+	struct sockaddr_in _sender_outaddr;
+	struct sockaddr_in _receiver_inaddr;
+	struct sockaddr_in _receiver_outaddr;
+
+	uint16_t _packet_len;
+	enum class ParserState : uint8_t {
+		Idle = 0,
+		GotLength
+	};
+	ParserState _parser_state = ParserState::Idle;
+
+private:
+};
+
+DevSocket::DevSocket(const char* udp_ip, const uint16_t udp_port_recv,
+					 const uint16_t udp_port_send, int uart_fd)
+	: _uart_fd(uart_fd)
+	, _udp_sender_fd(-1)
+	, _udp_receiver_fd(-1)
+	, _udp_port_recv(udp_port_recv)
+	, _udp_port_send(udp_port_send)
+{
+	if (nullptr != udp_ip) {
+			strcpy(_udp_ip, udp_ip);
+	}
+
+	open_udp();
+}
+
+DevSocket::~DevSocket()
+{
+	// Close the sender
+	if (_udp_sender_fd >= 0) {
+		close(_udp_sender_fd);
+	}
+
+	// Close the receiver
+	if (_udp_receiver_fd >= 0) {
+		close(_udp_receiver_fd);
+	}
+}
+
+int DevSocket::open_udp()
+{
+	// Init receiver
+	if ((_udp_receiver_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Create socket failed\033[0m\n");
+		return -1;
+	}
+
+	memset((char *)&_receiver_inaddr, 0, sizeof(_receiver_inaddr));
+	_receiver_inaddr.sin_family = AF_INET;
+	_receiver_inaddr.sin_port = htons(_udp_port_recv);
+	_receiver_inaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	printf("[ protocol__splitter ]\tUDP socket link: Trying to connect...\n");
+
+	if (bind(_udp_receiver_fd, (struct sockaddr *)&_receiver_inaddr, sizeof(_receiver_inaddr)) < 0) {
+		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Bind failed\033[0m\n");
+		return -1;
+	}
+	printf("[ protocol__splitter ]\tUDP socket link: Connected to server!\n");
+
+	// Init sender
+	if ((_udp_sender_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Create socket failed\033[0m\n");
+		return -1;
+	}
+
+	memset((char *) &_sender_outaddr, 0, sizeof(_sender_outaddr));
+	_sender_outaddr.sin_family = AF_INET;
+	_sender_outaddr.sin_port = htons(_udp_port_send);
+
+	if (inet_aton(_udp_ip, &_sender_outaddr.sin_addr) == 0) {
+		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: inet_aton() failed\033[0m\n");
+		return -1;
 	}
 
 	return 0;
 }
 
-ssize_t DevCommon::udp_read(void *buffer, size_t len)
+int DevSocket::close(int udp_fd)
 {
-	if (nullptr == buffer || !(-1 != _socket_fd)) {
+	if (udp_fd >= 0) {
+		printf("\033[1;33m[ protocol__splitter ]\tUDP socket link: Closed socket!\033[0m\n");
+		shutdown(udp_fd, SHUT_RDWR);
+		::close(udp_fd);
+		udp_fd = -1;
+	}
+
+	return 0;
+}
+
+ssize_t DevSocket::udp_read(void *buffer, size_t len)
+{
+	if (nullptr == buffer || !(-1 != _udp_receiver_fd)) {
 		return -1;
 	}
 
 	int ret = 0;
-	static socklen_t addrlen = sizeof(_addr);
-	ret = recvfrom(_socket_fd, buffer, len, 0, (struct sockaddr *) &_udp_port, &addrlen);
+	static socklen_t addrlen = sizeof(_receiver_outaddr);
+	ret = recvfrom(_udp_receiver_fd, buffer, len, 0, (struct sockaddr *) &_receiver_outaddr, &addrlen);
 	return ret;
 }
 
-ssize_t DevCommon::udp_write(void *buffer, size_t len)
+ssize_t DevSocket::udp_write(void *buffer, size_t len)
 {
-	if (nullptr == buffer || !(-1 != _socket_fd)) {
+	if (nullptr == buffer || !(-1 != _udp_sender_fd)) {
 		return -1;
 	}
 
 	int ret = 0;
-	ret = sendto(_socket_fd, buffer, len, 0, (struct sockaddr *)&_addr, sizeof(_addr));
+	ret = sendto(_udp_sender_fd, buffer, len, 0, (struct sockaddr *)&_sender_outaddr, sizeof(_sender_outaddr));
 	return ret;
 }
 
-uint8_t DevCommon::poll_state()
-{
-	pollfd fds[1];
-	fds[0].fd = _uart_fd;
-	fds[0].events = POLLIN;
-
-	int ret = ::poll(fds, sizeof(fds) / sizeof(fds[0]), 100);
-	_had_data = ret > 0 && (fds[0].revents & POLLIN);
-
-	return POLLIN;
-}
-
-class Mavlink2Dev : public DevCommon
+class Mavlink2Dev : public DevSocket
 {
 public:
-	Mavlink2Dev(ReadBuffer *_read_buffer);
+	Mavlink2Dev(ReadBuffer *read_buffer, const char* udp_ip, const uint16_t udp_port_recv,
+				const uint16_t udp_port_send, int uart_fd);
 	virtual ~Mavlink2Dev() {}
 
 	ssize_t	read(char *buffer, size_t buflen);
@@ -465,8 +497,11 @@ protected:
 	uint8_t _partial_buffer[512] = {};
 };
 
-Mavlink2Dev::Mavlink2Dev(ReadBuffer *read_buffer)
-	: DevCommon(5800, "/dev/ttyUSB0", 1000000)
+Mavlink2Dev::Mavlink2Dev(ReadBuffer *read_buffer, const char* udp_ip,
+						 const uint16_t udp_port_recv,
+						 const uint16_t udp_port_send,
+						 int uart_fd)
+	: DevSocket(udp_ip, udp_port_recv, udp_port_send, uart_fd)
 	, _read_buffer{read_buffer}
 {
 }
@@ -496,11 +531,6 @@ ssize_t Mavlink2Dev::read(char *buffer, size_t buflen)
 		return len;
 	}
 
-	if (!_had_data) {
-		return 0;
-	}
-
-	lock(Read);
 	ret = _read_buffer->read(_uart_fd);
 
 	if (ret < 0) {
@@ -558,8 +588,10 @@ ssize_t Mavlink2Dev::read(char *buffer, size_t buflen)
 	_read_buffer->move(buffer, i, packet_len);
 	ret = packet_len;
 
+	// Write to UDP port
+	udp_write(buffer, packet_len);
+
 end:
-	unlock(Read);
 	return ret;
 }
 
@@ -573,6 +605,9 @@ ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
 	 * - a single write call does not contain multiple (or parts of multiple) packets
 	 */
 	ssize_t ret = 0;
+
+	// Read from UDP port
+	udp_read((void *)buffer, buflen);
 
 	switch (_parser_state) {
 	case ParserState::Idle:
@@ -588,17 +623,15 @@ ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
 			}
 
 			_parser_state = ParserState::GotLength;
-			lock(Write);
 
 		} else if ((unsigned char)buffer[0] == 254) { // mavlink 1
 			uint8_t payload_len = buffer[1];
 			_packet_len = payload_len + 8;
 
 			_parser_state = ParserState::GotLength;
-			lock(Write);
 
 		} else {
-			printf("\033[1;33m[ protocol__splitter ]\tparser error\033[0m\n");
+			printf("\033[1;33m[ protocol__splitter ]\tParser error\033[0m\n");
 			return 0;
 		}
 
@@ -610,7 +643,6 @@ ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
 			ret = ::write(_uart_fd, buffer, buflen);
 
 			if (_packet_len == 0) {
-				unlock(Write);
 				_parser_state = ParserState::Idle;
 			}
 		}
@@ -621,10 +653,11 @@ ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
 	return ret;
 }
 
-class RtpsDev : public DevCommon
+class RtpsDev : public DevSocket
 {
 public:
-	RtpsDev(ReadBuffer *_read_buffer);
+	RtpsDev(ReadBuffer *read_buffer, const char* udp_ip, const uint16_t udp_port_recv,
+			const uint16_t udp_port_send, int uart_fd);
 	virtual ~RtpsDev() {}
 
 	ssize_t	read(char *buffer, size_t buflen);
@@ -636,8 +669,10 @@ protected:
 	static const uint8_t HEADER_SIZE = 9;
 };
 
-RtpsDev::RtpsDev(ReadBuffer *read_buffer)
-	: DevCommon(5801, "/dev/ttyUSB0", 1000000)
+RtpsDev::RtpsDev(ReadBuffer *read_buffer, const char* udp_ip,
+				 const uint16_t udp_port_recv, const uint16_t udp_port_send,
+				 int uart_fd)
+	: DevSocket(udp_ip, udp_port_recv, udp_port_send, uart_fd)
 	, _read_buffer{read_buffer}
 {
 }
@@ -647,11 +682,6 @@ ssize_t RtpsDev::read(char *buffer, size_t buflen)
 	int i, ret;
 	uint16_t packet_len, payload_len;
 
-	if (!_had_data) {
-		return 0;
-	}
-
-	lock(Read);
 	ret = _read_buffer->read(_uart_fd);
 
 	if (ret < 0) {
@@ -672,7 +702,8 @@ ssize_t RtpsDev::read(char *buffer, size_t buflen)
 	}
 
 	// We need at least the first six bytes to get packet len
-	if ((unsigned)i >= _read_buffer->buf_size - HEADER_SIZE) {
+	if ((unsigned)i > _read_buffer->buf_size - HEADER_SIZE) {
+		ret = -1;
 		goto end;
 	}
 
@@ -681,20 +712,23 @@ ssize_t RtpsDev::read(char *buffer, size_t buflen)
 
 	// packet is bigger than what we've read, better luck next time
 	if ((unsigned)i + packet_len > _read_buffer->buf_size) {
-		goto end;
-	}
-
-	// buffer should be big enough to hold a rtps packet
-	if (packet_len > buflen) {
 		ret = -EMSGSIZE;
 		goto end;
 	}
+
+	// we do not have a complete message yet
+	if ((unsigned)i + payload_len + HEADER_SIZE > _read_buffer->buf_size) {
+		ret = 0;
+		goto end;
+	}
+
+	// Write to UDP port
+	udp_write(buffer, packet_len);
 
 	_read_buffer->move(buffer, i, packet_len);
 	ret = packet_len;
 
 end:
-	unlock(Read);
 	return ret;
 }
 
@@ -710,19 +744,21 @@ ssize_t RtpsDev::write(const char *buffer, size_t buflen)
 	ssize_t ret = 0;
 	uint16_t payload_len;
 
+	// Read from UDP port
+	udp_read((void *)buffer, buflen);
+
 	switch (_parser_state) {
 	case ParserState::Idle:
 		assert(buflen >= HEADER_SIZE);
 
 		if (memcmp(buffer, ">>>", 3) != 0) {
-			printf("\033[1;33m[ protocol__splitter ]\tparser error\033[0m\n");
+			printf("\033[1;33m[ protocol__splitter ]\tParser error\033[0m\n");
 			return 0;
 		}
 
 		payload_len = ((uint16_t)buffer[5] << 8) | buffer[6];
 		_packet_len = payload_len + HEADER_SIZE;
 		_parser_state = ParserState::GotLength;
-		lock(Write);
 
 	/* FALLTHROUGH */
 
@@ -732,7 +768,6 @@ ssize_t RtpsDev::write(const char *buffer, size_t buflen)
 			ret = ::write(_uart_fd, buffer, buflen);
 
 			if (_packet_len == 0) {
-				unlock(Write);
 				_parser_state = ParserState::Idle;
 			}
 		}
@@ -743,36 +778,70 @@ ssize_t RtpsDev::write(const char *buffer, size_t buflen)
 	return ret;
 }
 
+void signal_handler(int signum)
+{
+   printf("\033[1;33m[ protocol__splitter ]\tInterrupt signal (%d) received.\033[0m\n", signum);
+   running = false;
+   delete objects->serial;
+   delete objects->mavlink2;
+   delete objects->rtps;
+   delete objects->read_buffer;
+   delete objects;
+   objects = nullptr;
+}
+
 int main(int argc, char *argv[])
 {
+	char data_buffer[BUFFER_SIZE];
+	size_t buflen = sizeof(data_buffer);
+
 	objects = new StaticData();
 
-	if (!objects) {
-		printf("\033[1;33m[ protocol__splitter ]\talloc failed\033[0m\n");
-		return -1;
-	}
+	signal(SIGINT, signal_handler);
 
-	strncpy(objects->device_name, argv[2], sizeof(objects->device_name));
-	sem_init(&objects->r_lock, 1, 1);
-	sem_init(&objects->w_lock, 1, 1);
+	// Init the read buffer
 	objects->read_buffer = new ReadBuffer();
-	objects->mavlink2 = new Mavlink2Dev(objects->read_buffer);
-	objects->rtps = new RtpsDev(objects->read_buffer);
 
-	if (!objects->mavlink2 || !objects->rtps) {
-		delete objects->mavlink2;
-		delete objects->rtps;
-		delete objects->read_buffer;
-		sem_destroy(&objects->r_lock);
-		sem_destroy(&objects->w_lock);
-		delete objects;
-		objects = nullptr;
-		printf("\033[1;33m[ protocol__splitter ]\talloc failed\033[0m\n");
-		return -1;
+	// Init the serial device
+	// TODO: add arg options to set the dev name, baudrate, etc.
+	objects->serial = new DevSerial("/dev/ttyUSB0", 3000000);
+	int uart_fd = objects->serial->open_uart();
 
-	} else {
-		objects->mavlink2->init();
-		objects->rtps->init();
+	// Init UDP sockets for Mavlink and RTPS
+	// TODO: add arg options to set the UDP IP and ports
+	objects->mavlink2 = new Mavlink2Dev(objects->read_buffer, "127.0.0.1", 5800, 5801, uart_fd);
+	objects->rtps = new RtpsDev(objects->read_buffer, "127.0.0.1", 5900, 5901, uart_fd);
+
+	// Init fd polling
+	pollfd fds[5];
+	fds[0].fd = uart_fd;
+	fds[0].events = POLLIN;
+	fds[1].fd = objects->mavlink2->_udp_receiver_fd;
+	fds[1].events = POLLIN;
+	fds[2].fd = objects->mavlink2->_udp_sender_fd;
+	fds[2].events = POLLIN;
+	fds[3].fd = objects->rtps->_udp_receiver_fd;
+	fds[3].events = POLLIN;
+	fds[4].fd = objects->rtps->_udp_sender_fd;
+	fds[4].events = POLLIN;
+
+	running = true;
+
+	while (running) {
+		int ret = ::poll(fds, sizeof(fds) / sizeof(fds[0]), 1);
+
+		if (ret > 0 && (fds[0].revents & POLLIN)) {
+			objects->rtps->read(data_buffer, buflen);
+			objects->mavlink2->read(data_buffer, buflen);
+		}
+
+		if (ret > 0 && (fds[1].revents & POLLIN) && (fds[2].revents & POLLIN)) {
+			objects->mavlink2->write(data_buffer, buflen);
+		}
+
+		if (ret > 0 && (fds[3].revents & POLLIN) && (fds[4].revents & POLLIN)) {
+			objects->rtps->write(data_buffer, buflen);
+		}
 	}
 
 	return 0;
