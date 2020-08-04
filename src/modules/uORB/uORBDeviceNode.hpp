@@ -53,12 +53,14 @@ class SubscriptionCallback;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
+class uORB::DeviceNode final : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
 {
 public:
-	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, ORB_PRIO priority,
-		   uint8_t queue_size = 1);
-	virtual ~DeviceNode();
+	DeviceNode() = delete;
+	explicit DeviceNode(const orb_metadata &meta, const uint8_t instance, const char *path, ORB_PRIO priority,
+			    uint8_t queue_size = 1);
+
+	~DeviceNode() override;
 
 	// no copy, assignment, move, move assignment
 	DeviceNode(const DeviceNode &) = delete;
@@ -115,6 +117,8 @@ public:
 	 * Method to publish a data to this node.
 	 */
 	static ssize_t    publish(const orb_metadata *meta, orb_advert_t handle, const void *data);
+
+	bool publish(ORB_ID publish_id, const void *data);
 
 	static int        unadvertise(orb_advert_t handle);
 
@@ -191,11 +195,10 @@ public:
 
 	unsigned published_message_count() const { return _generation.load(); }
 
-	const orb_metadata *get_meta() const { return _meta; }
+	ORB_ID id() const { return static_cast<ORB_ID>(_meta.o_id); }
 
-	ORB_ID id() const { return static_cast<ORB_ID>(_meta->o_id); }
-
-	const char *get_name() const { return _meta->o_name; }
+	const char *get_name() const { return _meta.o_name; }
+	uint16_t get_size() const { return _meta.o_size; }
 
 	uint8_t get_instance() const { return _instance; }
 
@@ -254,7 +257,7 @@ private:
 		UpdateIntervalData *update_interval{nullptr}; /**< if null, no update interval */
 	};
 
-	const orb_metadata *_meta; /**< object metadata information */
+	const orb_metadata &_meta; /**< object metadata information */
 
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
 	px4::atomic<unsigned>  _generation{0};  /**< object generation count */

@@ -61,6 +61,10 @@ uORB::DeviceMaster::~DeviceMaster()
 
 int uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, ORB_PRIO priority)
 {
+	if (meta == nullptr) {
+		return PX4_ERROR;
+	}
+
 	int ret = PX4_ERROR;
 
 	char nodepath[orb_maxpath];
@@ -107,7 +111,7 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_adver
 		}
 
 		/* construct the new node, passing the ownership of path to it */
-		uORB::DeviceNode *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
+		uORB::DeviceNode *node = new uORB::DeviceNode(*meta, group_tries, devpath, priority);
 
 		/* if we didn't get a device, that's bad, free the path too */
 		if (node == nullptr) {
@@ -239,7 +243,7 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 			bool matched = false;
 
 			for (int i = 0; i < num_filters; ++i) {
-				if (strstr(node->get_meta()->o_name, topic_filter[i])) {
+				if (strstr(node->get_name(), topic_filter[i])) {
 					matched = true;
 				}
 			}
@@ -263,7 +267,7 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 
 		last_node->node = node;
 
-		size_t name_length = strlen(last_node->node->get_meta()->o_name);
+		size_t name_length = strlen(last_node->node->get_name());
 
 		if (name_length > max_topic_name_length) {
 			max_topic_name_length = name_length;
@@ -396,9 +400,9 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 
 				if (!print_active_only || (cur_node->pub_msg_delta > 0 && cur_node->node->subscriber_count() > 0)) {
 					PX4_INFO_RAW(CLEAR_LINE "%-*s %2i %4i %4i %2i %4i \n", (int)max_topic_name_length,
-						     cur_node->node->get_meta()->o_name, (int)cur_node->node->get_instance(),
+						     cur_node->node->get_name(), (int)cur_node->node->get_instance(),
 						     (int)cur_node->node->subscriber_count(), cur_node->pub_msg_delta,
-						     cur_node->node->get_queue_size(), cur_node->node->get_meta()->o_size);
+						     cur_node->node->get_queue_size(), cur_node->node->get_size());
 				}
 
 				cur_node = cur_node->next;
