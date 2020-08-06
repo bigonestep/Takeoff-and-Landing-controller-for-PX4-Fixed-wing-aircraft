@@ -31,7 +31,10 @@ add_definitions(-DORB_COMMUNICATOR)
 set(DISABLE_PARAMS_MODULE_SCOPING TRUE)
 
 # add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+add_compile_options($<$<COMPILE_LANGUAGE:C>:-std=gnu99>)
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1y>)
 
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # This definition allows to differentiate the specific board.
 add_definitions(

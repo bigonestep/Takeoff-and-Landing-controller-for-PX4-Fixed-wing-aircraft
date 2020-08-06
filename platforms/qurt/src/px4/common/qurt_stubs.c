@@ -40,11 +40,11 @@ void _Parse_csd(void);
 void _Valbytes(void);
 void _Get_eh_data(void);
 void _Parse_lsda(void);
-void __cxa_guard_release(void);
 void _Read_enc_ptr(void);
 void _Read_sleb(void);
-void __cxa_guard_acquire(void);
-void __cxa_pure_virtual(void);
+// void __cxa_guard_acquire(void);
+// void __cxa_guard_release(void);
+// void __cxa_pure_virtual(void);
 
 void block_indefinite(void)
 {
@@ -89,11 +89,11 @@ void _Parse_lsda(void)
 	block_indefinite();
 }
 
-void __cxa_guard_release(void)
-{
-	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
-	block_indefinite();
-}
+// void __cxa_guard_release(void)
+// {
+// 	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
+// 	block_indefinite();
+// }
 
 void _Read_enc_ptr(void)
 {
@@ -107,17 +107,17 @@ void _Read_sleb(void)
 	block_indefinite();
 }
 
-void __cxa_guard_acquire(void)
-{
-	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
-	block_indefinite();
-}
+// void __cxa_guard_acquire(void)
+// {
+// 	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
+// 	block_indefinite();
+// }
 
-void __cxa_pure_virtual()
-{
-	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
-	block_indefinite();
-}
+// void __cxa_pure_virtual()
+// {
+// 	PX4_WARN("Error: Calling unresolved symbol stub[%s]", __FUNCTION__);
+// 	block_indefinite();
+// }
 
 float _Stof(const char *p0, char **p1, long p2)
 {
