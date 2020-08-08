@@ -380,10 +380,7 @@
 #  warning SDIO initialization cannot be perfomed on the IDLE thread
 #endif
 
-/* By Providing BOARD_ADC_USB_CONNECTED (using the px4_arch abstraction)
- * this board support the ADC system_power interface, and therefore
- * provides the true logic GPIO BOARD_ADC_xxxx macros.
- */
+
 #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
 
 #if BOARD_HAS_USB_VALID == 1
@@ -391,10 +388,6 @@
 #else
 #  define BOARD_ADC_USB_VALID     BOARD_ADC_USB_CONNECTED
 #endif
-
-/* FMUv5 never powers odd the Servo rail */
-
-#define BOARD_ADC_SERVO_VALID     (1)
 
 #if !defined(BOARD_HAS_LTC44XX_VALIDS) || BOARD_HAS_LTC44XX_VALIDS == 0
 #  define BOARD_ADC_BRICK1_VALID  (1)

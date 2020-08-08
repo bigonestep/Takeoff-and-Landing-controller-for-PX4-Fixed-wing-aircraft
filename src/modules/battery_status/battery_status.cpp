@@ -70,15 +70,6 @@ using namespace time_literals;
 /**
  * The channel definitions (e.g., ADC_BATTERY_VOLTAGE_CHANNEL, ADC_BATTERY_CURRENT_CHANNEL, and ADC_AIRSPEED_VOLTAGE_CHANNEL) are defined in board_config.h
  */
-
-#ifndef BOARD_NUMBER_BRICKS
-#error "battery_status module requires power bricks"
-#endif
-
-#if BOARD_NUMBER_BRICKS == 0
-#error "battery_status module requires power bricks"
-#endif
-
 class BatteryStatus : public ModuleBase<BatteryStatus>, public ModuleParams, public px4::ScheduledWorkItem
 {
 public:

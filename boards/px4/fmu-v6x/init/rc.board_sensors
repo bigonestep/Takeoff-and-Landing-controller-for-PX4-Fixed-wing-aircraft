@@ -4,6 +4,7 @@
 #------------------------------------------------------------------------------
 
 adc start
+system_power start
 
 # Start Digital power monitors
 ina226 -X -b 1 -t 1 -k start

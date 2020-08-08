@@ -57,10 +57,7 @@
 #define FLASH_BASED_PARAMS
 #define BOARD_USE_EXTERNAL_FLASH //Configuration and firmware are in external flash
 
-#define BOARD_HAS_USB_VALID            1 // LTC Has No USB valid
-
 /* LEDs are driven with push open drain to support Anode to 5V or 3.3V */
-
 #define GPIO_nLED_RED        /* PE3 */  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTE|GPIO_PIN3)
 
 #define BOARD_HAS_CONTROL_STATUS_LEDS      1

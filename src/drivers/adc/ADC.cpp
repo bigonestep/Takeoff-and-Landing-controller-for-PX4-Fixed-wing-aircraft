@@ -37,7 +37,6 @@
 
 ADC::ADC(uint32_t base_address, uint32_t channels) :
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::hp_default),
-	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": sample")),
 	_base_address(base_address)
 {
 	/* always enable the temperature sensor */
@@ -78,7 +77,7 @@ ADC::~ADC()
 		delete _samples;
 	}
 
-	perf_free(_sample_perf);
+	perf_free(_cycle_perf);
 	px4_arch_adc_uninit(_base_address);
 }
 
@@ -99,21 +98,19 @@ int ADC::init()
 
 void ADC::Run()
 {
-	hrt_abstime now = hrt_absolute_time();
+	if (should_exit()) {
+		exit_and_cleanup();
+		return;
+	}
+
+	perf_begin(_cycle_perf);
 
 	/* scan the channel set and sample each */
 	for (unsigned i = 0; i < _channel_count; i++) {
 		_samples[i].am_data = sample(_samples[i].am_channel);
 	}
 
-	update_adc_report(now);
-	update_system_power(now);
-}
-
-void ADC::update_adc_report(hrt_abstime now)
-{
-	adc_report_s adc = {};
-	adc.timestamp = now;
+	adc_report_s adc{};
 	adc.device_id = BUILTIN_ADC_DEVID;
 
 	unsigned max_num = _channel_count;
@@ -135,104 +132,20 @@ void ADC::update_adc_report(hrt_abstime now)
 
 	adc.v_ref = px4_arch_adc_reference_v();
 	adc.resolution = px4_arch_adc_dn_fullcount();
-
+	adc.timestamp = hrt_absolute_time();
 	_to_adc_report.publish(adc);
-}
 
-void ADC::update_system_power(hrt_abstime now)
-{
-#if defined (BOARD_ADC_USB_CONNECTED)
-	system_power_s system_power {};
-
-	/* Assume HW provides only ADC_SCALED_V5_SENSE */
-	int cnt = 1;
-	/* HW provides both ADC_SCALED_V5_SENSE and ADC_SCALED_V3V3_SENSORS_SENSE */
-#  if defined(ADC_SCALED_V5_SENSE) && defined(ADC_SCALED_V3V3_SENSORS_SENSE)
-	cnt++;
-#  endif
-
-	for (unsigned i = 0; i < _channel_count; i++) {
-#  if defined(ADC_SCALED_V5_SENSE)
-
-		if (_samples[i].am_channel == ADC_SCALED_V5_SENSE) {
-			// it is 2:1 scaled
-			system_power.voltage5v_v = _samples[i].am_data * (ADC_V5_V_FULL_SCALE / px4_arch_adc_dn_fullcount());
-			cnt--;
-
-		} else
-#  endif
-#  if defined(ADC_SCALED_V3V3_SENSORS_SENSE)
-		{
-			if (_samples[i].am_channel == ADC_SCALED_V3V3_SENSORS_SENSE) {
-				// it is 2:1 scaled
-				system_power.voltage3v3_v = _samples[i].am_data * (ADC_3V3_SCALE * (3.3f / px4_arch_adc_dn_fullcount()));
-				system_power.v3v3_valid = 1;
-				cnt--;
-			}
-		}
-
-#  endif
-
-		if (cnt == 0) {
-			break;
-		}
-	}
-
-	/* Note once the board_config.h provides BOARD_ADC_USB_CONNECTED,
-	 * It must provide the true logic GPIO BOARD_ADC_xxxx macros.
-	 */
-	// these are not ADC related, but it is convenient to
-	// publish these to the same topic
-
-	system_power.usb_connected = BOARD_ADC_USB_CONNECTED;
-	/* If provided used the Valid signal from HW*/
-#if defined(BOARD_ADC_USB_VALID)
-	system_power.usb_valid = BOARD_ADC_USB_VALID;
-#else
-	/* If not provided then use connected */
-	system_power.usb_valid = system_power.usb_connected;
-#endif
-
-#if defined(BOARD_BRICK_VALID_LIST)
-	/* The valid signals (HW dependent) are associated with each brick */
-	bool  valid_chan[BOARD_NUMBER_BRICKS] = BOARD_BRICK_VALID_LIST;
-	system_power.brick_valid = 0;
-
-	for (int b = 0; b < BOARD_NUMBER_BRICKS; b++) {
-		system_power.brick_valid |=  valid_chan[b] ? 1 << b : 0;
-	}
-
-#endif
-
-#if defined(BOARD_ADC_SERVO_VALID)
-	system_power.servo_valid = BOARD_ADC_SERVO_VALID;
-#endif
-
-#if defined(BOARD_ADC_PERIPH_5V_OC)
-	// OC pins are active low
-	system_power.periph_5v_oc = BOARD_ADC_PERIPH_5V_OC;
-#endif
-
-#if defined(BOARD_ADC_HIPOWER_5V_OC)
-	system_power.hipower_5v_oc = BOARD_ADC_HIPOWER_5V_OC;
-#endif
-
-	system_power.timestamp = hrt_absolute_time();
-	_to_system_power.publish(system_power);
-
-#endif // BOARD_ADC_USB_CONNECTED
+	perf_end(_cycle_perf);
 }
 
 uint32_t ADC::sample(unsigned channel)
 {
-	perf_begin(_sample_perf);
 	uint32_t result = px4_arch_adc_sample(_base_address, channel);
 
 	if (result == UINT32_MAX) {
 		PX4_ERR("sample timeout");
 	}
 
-	perf_end(_sample_perf);
 	return result;
 }
 

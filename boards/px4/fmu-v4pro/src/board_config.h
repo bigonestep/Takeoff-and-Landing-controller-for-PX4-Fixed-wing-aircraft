@@ -104,7 +104,7 @@
 
 #define ADC_BATTERY1_VOLTAGE_CHANNEL	2   // PA2
 #define ADC_BATTERY1_CURRENT_CHANNEL	3   // PA3
-#define ADC_5V_RAIL_SENSE				4   // PA4
+#define ADC_5V_RAIL_SENSE		4   // PA4
 #define ADC_BATTERY2_VOLTAGE_CHANNEL	11  // PC1
 #define ADC_BATTERY2_CURRENT_CHANNEL	13  // PC3
 
@@ -145,8 +145,7 @@
 #define GPIO_TONE_ALARM_IDLE	(GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15)
 #define GPIO_TONE_ALARM		(GPIO_ALT|GPIO_AF1|GPIO_SPEED_2MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN15)
 
-/* PWM
- */
+/* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS	6
 #define DIRECT_INPUT_TIMER_CHANNELS  6
 
@@ -184,15 +183,11 @@
  * the connector interface and Spektrum requires VDD 3v3 to be controllable
  */
 
-/* By Providing BOARD_ADC_USB_CONNECTED (using the px4_arch abstraction)
- * this board support the ADC system_power interface, and therefore
- * provides the true logic GPIO BOARD_ADC_xxxx macros.
- */
+
 #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
 #define BOARD_ADC_BRICK1_VALID  (!px4_arch_gpioread(GPIO_nVDD_BRICK1_VALID))
 #define BOARD_ADC_BRICK2_VALID  (!px4_arch_gpioread(GPIO_nVDD_BRICK2_VALID))
 #define BOARD_ADC_USB_VALID     (!px4_arch_gpioread(GPIO_nVDD_USB_VALID))
-#define BOARD_ADC_SERVO_VALID   (1)
 #define BOARD_ADC_PERIPH_5V_OC  (!px4_arch_gpioread(GPIO_VDD_5V_PERIPH_OC))
 #define BOARD_ADC_HIPOWER_5V_OC (!px4_arch_gpioread(GPIO_VDD_5V_HIPOWER_OC))
 

@@ -12,9 +12,8 @@ if bst start -X
 then
 fi
 
-if adc start
-then
-fi
+adc start
+system_power start
 
 if sdp3x_airspeed start -X
 then

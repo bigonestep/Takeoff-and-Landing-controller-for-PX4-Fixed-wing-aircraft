@@ -32,39 +32,31 @@
  ****************************************************************************/
 
 /**
- * @file adc.cpp
+ * @file SystemPower.hpp
  *
  * Driver for an ADC.
  *
  */
 #include <stdint.h>
 
-#include <drivers/drv_adc.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
 #include <lib/perf/perf_counter.h>
-#include <px4_arch/adc.h>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/adc_report.h>
+#include <uORB/topics/system_power.h>
 
 using namespace time_literals;
 
-#ifndef ADC_CHANNELS
-#error "board needs to define ADC_CHANNELS to use this driver"
-#endif
-
-#define ADC_TOTAL_CHANNELS 		32
-
-class ADC : public ModuleBase<ADC>, public px4::ScheduledWorkItem
+class SystemPower : public ModuleBase<SystemPower>, public px4::ScheduledWorkItem
 {
 public:
-	ADC(uint32_t base_address = SYSTEM_ADC_BASE, uint32_t channels = ADC_CHANNELS);
-
-	~ADC() override;
+	SystemPower();
+	~SystemPower() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -77,27 +69,17 @@ public:
 
 	int init();
 
-	int test();
-
 private:
+	void Run() override;
 
-	void		Run() override;
+	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
+	void DataReady();
+	bool DataReadyInterruptConfigure();
+	bool DataReadyInterruptDisable();
 
-	/**
-	 * Sample a single channel and return the measured value.
-	 *
-	 * @param channel		The channel to sample.
-	 * @return			The sampled value, or UINT32_MAX if sampling failed.
-	 */
-	uint32_t		sample(unsigned channel);
+	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
-	static const hrt_abstime	kINTERVAL{10_ms};	/**< 100Hz base rate */
+	uORB::Publication<system_power_s> _to_system_power{ORB_ID(system_power)};
 
-	perf_counter_t			_cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
-
-	unsigned			_channel_count{0};
-	const uint32_t			_base_address;
-	px4_adc_msg_t			*_samples{nullptr};	/**< sample buffer */
-
-	uORB::Publication<adc_report_s>		_to_adc_report{ORB_ID(adc_report)};
+	uORB::Subscription _adc_report_sub{ORB_ID(adc_report)};
 };

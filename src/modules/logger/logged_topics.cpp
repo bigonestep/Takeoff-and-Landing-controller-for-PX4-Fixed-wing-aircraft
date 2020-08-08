@@ -80,7 +80,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("sensor_correction");
 	add_topic("sensor_preflight", 200);
 	add_topic("sensor_selection");
-	add_topic("system_power", 500);
+	add_topic("system_power");
 	add_topic("tecs_status", 200);
 	add_topic("test_motor", 500);
 	add_topic("trajectory_setpoint", 200);
