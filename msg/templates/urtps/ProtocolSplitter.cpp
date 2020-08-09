@@ -782,12 +782,6 @@ void signal_handler(int signum)
 {
    printf("\033[1;33m[ protocol__splitter ]\tInterrupt signal (%d) received.\033[0m\n", signum);
    running = false;
-   delete objects->serial;
-   delete objects->mavlink2;
-   delete objects->rtps;
-   delete objects->read_buffer;
-   delete objects;
-   objects = nullptr;
 }
 
 int main(int argc, char *argv[])
@@ -843,6 +837,13 @@ int main(int argc, char *argv[])
 			objects->rtps->write(data_buffer, buflen);
 		}
 	}
+
+	delete objects->serial;
+    delete objects->mavlink2;
+    delete objects->rtps;
+    delete objects->read_buffer;
+    delete objects;
+    objects = nullptr;
 
 	return 0;
 }
