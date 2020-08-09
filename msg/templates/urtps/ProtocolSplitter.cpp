@@ -356,17 +356,15 @@ public:
 	ssize_t udp_write(void *buffer, size_t len);
 
 	int _uart_fd;
-	int _udp_sender_fd;
-	int _udp_receiver_fd;
+	int _udp_fd;
 
 protected:
 	char _udp_ip[16] = {};
 
 	uint16_t _udp_port_recv;
 	uint16_t _udp_port_send;
-	struct sockaddr_in _sender_outaddr;
-	struct sockaddr_in _receiver_inaddr;
-	struct sockaddr_in _receiver_outaddr;
+	struct sockaddr_in _outaddr;
+	struct sockaddr_in _inaddr;
 
 	uint16_t _packet_len;
 	enum class ParserState : uint8_t {
@@ -381,8 +379,7 @@ private:
 DevSocket::DevSocket(const char* udp_ip, const uint16_t udp_port_recv,
 					 const uint16_t udp_port_send, int uart_fd)
 	: _uart_fd(uart_fd)
-	, _udp_sender_fd(-1)
-	, _udp_receiver_fd(-1)
+	, _udp_fd(-1)
 	, _udp_port_recv(udp_port_recv)
 	, _udp_port_send(udp_port_send)
 {
@@ -396,48 +393,43 @@ DevSocket::DevSocket(const char* udp_ip, const uint16_t udp_port_recv,
 DevSocket::~DevSocket()
 {
 	// Close the sender
-	if (_udp_sender_fd >= 0) {
-		close(_udp_sender_fd);
+	if (_udp_fd >= 0) {
+		close(_udp_fd);
 	}
 
 	// Close the receiver
-	if (_udp_receiver_fd >= 0) {
-		close(_udp_receiver_fd);
+	if (_udp_fd >= 0) {
+		close(_udp_fd);
 	}
 }
 
 int DevSocket::open_udp()
 {
 	// Init receiver
-	if ((_udp_receiver_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((_udp_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Create socket failed\033[0m\n");
 		return -1;
 	}
 
-	memset((char *)&_receiver_inaddr, 0, sizeof(_receiver_inaddr));
-	_receiver_inaddr.sin_family = AF_INET;
-	_receiver_inaddr.sin_port = htons(_udp_port_recv);
-	_receiver_inaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	memset((char *)&_inaddr, 0, sizeof(_inaddr));
+	_inaddr.sin_family = AF_INET;
+	_inaddr.sin_port = htons(_udp_port_recv);
+	_inaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	memset((char *) &_outaddr, 0, sizeof(_outaddr));
+	_outaddr.sin_family = AF_INET;
+	_outaddr.sin_port = htons(_udp_port_send);
+	_outaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	printf("[ protocol__splitter ]\tUDP socket link: Trying to connect...\n");
 
-	if (bind(_udp_receiver_fd, (struct sockaddr *)&_receiver_inaddr, sizeof(_receiver_inaddr)) < 0) {
+	if (bind(_udp_fd, (struct sockaddr *)&_inaddr, sizeof(_inaddr)) < 0) {
 		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Bind failed\033[0m\n");
 		return -1;
 	}
 	printf("[ protocol__splitter ]\tUDP socket link: Connected to server!\n");
 
-	// Init sender
-	if ((_udp_sender_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: Create socket failed\033[0m\n");
-		return -1;
-	}
-
-	memset((char *) &_sender_outaddr, 0, sizeof(_sender_outaddr));
-	_sender_outaddr.sin_family = AF_INET;
-	_sender_outaddr.sin_port = htons(_udp_port_send);
-
-	if (inet_aton(_udp_ip, &_sender_outaddr.sin_addr) == 0) {
+	if (inet_aton(_udp_ip, &_outaddr.sin_addr) == 0) {
 		printf("\033[0;31m[ protocol__splitter ]\tUDP socket link: inet_aton() failed\033[0m\n");
 		return -1;
 	}
@@ -459,24 +451,24 @@ int DevSocket::close(int udp_fd)
 
 ssize_t DevSocket::udp_read(void *buffer, size_t len)
 {
-	if (nullptr == buffer || !(-1 != _udp_receiver_fd)) {
+	if (nullptr == buffer || !(-1 != _udp_fd)) {
 		return -1;
 	}
 
 	int ret = 0;
-	static socklen_t addrlen = sizeof(_receiver_outaddr);
-	ret = recvfrom(_udp_receiver_fd, buffer, len, 0, (struct sockaddr *) &_receiver_outaddr, &addrlen);
+	static socklen_t addrlen = sizeof(_inaddr);
+	ret = recvfrom(_udp_fd, buffer, len, 0, (struct sockaddr *) &_inaddr, &addrlen);
 	return ret;
 }
 
 ssize_t DevSocket::udp_write(void *buffer, size_t len)
 {
-	if (nullptr == buffer || !(-1 != _udp_sender_fd)) {
+	if (nullptr == buffer || !(-1 != _udp_fd)) {
 		return -1;
 	}
 
 	int ret = 0;
-	ret = sendto(_udp_sender_fd, buffer, len, 0, (struct sockaddr *)&_sender_outaddr, sizeof(_sender_outaddr));
+	ret = sendto(_udp_fd, buffer, len, 0, (struct sockaddr *)&_outaddr, sizeof(_outaddr));
 	return ret;
 }
 
@@ -487,8 +479,8 @@ public:
 				const uint16_t udp_port_send, int uart_fd);
 	virtual ~Mavlink2Dev() {}
 
-	ssize_t	read(char *buffer, size_t buflen);
-	ssize_t	write(const char *buffer, size_t buflen);
+	ssize_t	read();
+	ssize_t	write();
 
 protected:
 	ReadBuffer *_read_buffer;
@@ -506,10 +498,13 @@ Mavlink2Dev::Mavlink2Dev(ReadBuffer *read_buffer, const char* udp_ip,
 {
 }
 
-ssize_t Mavlink2Dev::read(char *buffer, size_t buflen)
+ssize_t Mavlink2Dev::read()
 {
 	int i, ret;
 	uint16_t packet_len = 0;
+
+	char buffer[BUFFER_SIZE];
+	size_t buflen = sizeof(buffer);
 
 	/* last reading was partial (i.e., buffer didn't fit whole message),
 	 * so now we'll just send remaining bytes */
@@ -595,7 +590,7 @@ end:
 	return ret;
 }
 
-ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
+ssize_t Mavlink2Dev::write()
 {
 	/*
 	 * we need to look into the data to make sure the output is locked for the duration
@@ -605,6 +600,9 @@ ssize_t Mavlink2Dev::write(const char *buffer, size_t buflen)
 	 * - a single write call does not contain multiple (or parts of multiple) packets
 	 */
 	ssize_t ret = 0;
+
+	char buffer[BUFFER_SIZE];
+	size_t buflen = sizeof(buffer);
 
 	// Read from UDP port
 	udp_read((void *)buffer, buflen);
@@ -660,8 +658,8 @@ public:
 			const uint16_t udp_port_send, int uart_fd);
 	virtual ~RtpsDev() {}
 
-	ssize_t	read(char *buffer, size_t buflen);
-	ssize_t	write(const char *buffer, size_t buflen);
+	ssize_t	read();
+	ssize_t	write();
 
 protected:
 	ReadBuffer *_read_buffer;
@@ -677,14 +675,16 @@ RtpsDev::RtpsDev(ReadBuffer *read_buffer, const char* udp_ip,
 {
 }
 
-ssize_t RtpsDev::read(char *buffer, size_t buflen)
+ssize_t RtpsDev::read()
 {
 	int i, ret;
 	uint16_t packet_len, payload_len;
 
+	char buffer[BUFFER_SIZE];
+
 	ret = _read_buffer->read(_uart_fd);
 
-	if (ret < 0) {
+	if (ret <= 0) {
 		goto end;
 	}
 
@@ -722,17 +722,18 @@ ssize_t RtpsDev::read(char *buffer, size_t buflen)
 		goto end;
 	}
 
+	_read_buffer->move(buffer, i, packet_len);
+
 	// Write to UDP port
 	udp_write(buffer, packet_len);
 
-	_read_buffer->move(buffer, i, packet_len);
 	ret = packet_len;
 
 end:
 	return ret;
 }
 
-ssize_t RtpsDev::write(const char *buffer, size_t buflen)
+ssize_t RtpsDev::write()
 {
 	/*
 	 * we need to look into the data to make sure the output is locked for the duration
@@ -743,6 +744,9 @@ ssize_t RtpsDev::write(const char *buffer, size_t buflen)
 	 */
 	ssize_t ret = 0;
 	uint16_t payload_len;
+
+	char buffer[BUFFER_SIZE];
+	size_t buflen = sizeof(buffer);
 
 	// Read from UDP port
 	udp_read((void *)buffer, buflen);
@@ -786,9 +790,6 @@ void signal_handler(int signum)
 
 int main(int argc, char *argv[])
 {
-	char data_buffer[BUFFER_SIZE];
-	size_t buflen = sizeof(data_buffer);
-
 	objects = new StaticData();
 
 	signal(SIGINT, signal_handler);
@@ -807,34 +808,31 @@ int main(int argc, char *argv[])
 	objects->rtps = new RtpsDev(objects->read_buffer, "127.0.0.1", 5900, 5901, uart_fd);
 
 	// Init fd polling
-	pollfd fds[5];
+	pollfd fds[3];
 	fds[0].fd = uart_fd;
-	fds[0].events = POLLIN;
-	fds[1].fd = objects->mavlink2->_udp_receiver_fd;
-	fds[1].events = POLLIN;
-	fds[2].fd = objects->mavlink2->_udp_sender_fd;
-	fds[2].events = POLLIN;
-	fds[3].fd = objects->rtps->_udp_receiver_fd;
-	fds[3].events = POLLIN;
-	fds[4].fd = objects->rtps->_udp_sender_fd;
-	fds[4].events = POLLIN;
+	fds[1].fd = objects->mavlink2->_udp_fd;
+	fds[2].fd = objects->rtps->_udp_fd;
+
+	for (size_t i = 0; i <= sizeof(fds) / sizeof(fds[0]); i++) {
+		fds[i].events = POLLIN;
+	}
 
 	running = true;
 
 	while (running) {
-		int ret = ::poll(fds, sizeof(fds) / sizeof(fds[0]), 1);
+		int ret = ::poll(fds, sizeof(fds) / sizeof(fds[0]), 100);
 
 		if (ret > 0 && (fds[0].revents & POLLIN)) {
-			objects->rtps->read(data_buffer, buflen);
-			objects->mavlink2->read(data_buffer, buflen);
+			objects->rtps->read();
+			objects->mavlink2->read();
 		}
 
-		if (ret > 0 && (fds[1].revents & POLLIN) && (fds[2].revents & POLLIN)) {
-			objects->mavlink2->write(data_buffer, buflen);
+		if (ret > 0 && (fds[1].revents & POLLIN)) {
+			objects->mavlink2->write();
 		}
 
-		if (ret > 0 && (fds[3].revents & POLLIN) && (fds[4].revents & POLLIN)) {
-			objects->rtps->write(data_buffer, buflen);
+		if (ret > 0 && (fds[2].revents & POLLIN)) {
+			objects->rtps->write();
 		}
 	}
 
