@@ -440,7 +440,7 @@ ssize_t RtpsDev::read(struct file *filp, char *buffer, size_t buflen)
 	lock(Read);
 	ret = _read_buffer->read(_fd);
 
-	if (ret < 0) {
+	if (ret <= 0) {
 		goto end;
 	}
 

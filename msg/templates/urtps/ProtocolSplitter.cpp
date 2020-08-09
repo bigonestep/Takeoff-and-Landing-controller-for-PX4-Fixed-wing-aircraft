@@ -42,7 +42,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 
 class DevSerial;
 class Mavlink2Dev;
@@ -69,7 +69,7 @@ public:
 	int read(int fd);
 	void move(void *dest, size_t pos, size_t n);
 
-	uint8_t buffer[512] = {};
+	uint8_t buffer[BUFFER_SIZE] = {};
 	size_t buf_size = 0;
 
 	static const size_t BUFFER_THRESHOLD = sizeof(buffer) * 0.8;
@@ -486,7 +486,7 @@ protected:
 	ReadBuffer *_read_buffer;
 	size_t _remaining_partial = 0;
 	size_t _partial_start = 0;
-	uint8_t _partial_buffer[512] = {};
+	uint8_t _partial_buffer[BUFFER_SIZE] = {};
 };
 
 Mavlink2Dev::Mavlink2Dev(ReadBuffer *read_buffer, const char* udp_ip,
