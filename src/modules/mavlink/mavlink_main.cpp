@@ -758,7 +758,7 @@ Mavlink::get_free_tx_buf()
 
 	// if we are using network sockets, return max length of one packet
 	if (get_protocol() == Protocol::UDP) {
-		return  1500;
+		return sizeof(_buf) - _buf_fill;
 
 	} else
 #endif // MAVLINK_UDP
@@ -796,20 +796,32 @@ void Mavlink::send_start(int length)
 
 	// check if there is space in the buffer
 	if (length > (int)get_free_tx_buf()) {
-		// not enough space in buffer to send
-		count_txerrbytes(length);
+#if defined(MAVLINK_UDP)
 
-		// prevent writes
-		_tx_buffer_low = true;
+		if (get_protocol() == Protocol::UDP) {
+			send_finish(true); // unlocks send mutex
 
-		perf_count(_send_start_tx_buf_low);
+			// re-acquire lock
+			pthread_mutex_lock(&_send_mutex);
+
+		} else
+#endif // MAVLINK_UDP
+		{
+			// not enough space in buffer to send
+			count_txerrbytes(length);
+
+			// prevent writes
+			_tx_buffer_low = true;
+
+			perf_count(_send_start_tx_buf_low);
+		}
 
 	} else {
 		_tx_buffer_low = false;
 	}
 }
 
-void Mavlink::send_finish()
+void Mavlink::send_finish(bool force)
 {
 	if (_tx_buffer_low || (_buf_fill == 0)) {
 		pthread_mutex_unlock(&_send_mutex);
@@ -826,6 +838,11 @@ void Mavlink::send_finish()
 #if defined(MAVLINK_UDP)
 
 	else if (get_protocol() == Protocol::UDP) {
+
+		if (!force && (_buf_fill < sizeof(_buf))) {
+			pthread_mutex_unlock(&_send_mutex);
+			return;
+		}
 
 # if defined(CONFIG_NET)
 
@@ -2463,6 +2480,16 @@ Mavlink::task_main(int argc, char *argv[])
 				resend_message(&msg);
 			}
 		}
+
+#if defined(MAVLINK_UDP)
+
+		// send any remaining messages in the buffer
+		if (get_protocol() == Protocol::UDP && (_buf_fill > 0)) {
+			pthread_mutex_lock(&_send_mutex);
+			send_finish(true); // unlocks send mutex
+		}
+
+#endif // MAVLINK_UDP
 
 		/* update TX/RX rates*/
 		if (t > _bytes_timestamp + 1000000) {

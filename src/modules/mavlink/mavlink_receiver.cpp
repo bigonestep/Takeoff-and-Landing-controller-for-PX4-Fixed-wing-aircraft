@@ -2970,6 +2970,15 @@ MavlinkReceiver::Run()
 		if (_tune_publisher != nullptr) {
 			_tune_publisher->publish_next_tune(t);
 		}
+
+#if defined(MAVLINK_UDP)
+
+		if (_mavlink->get_protocol() == Protocol::UDP) {
+			_mavlink->lock_send();
+			_mavlink->send_finish(true); // unlocks send mutex
+		}
+
+#endif // MAVLINK_UDP
 	}
 }
 
