@@ -75,6 +75,8 @@
 #include "px4_daemon/server.h"
 #include "px4_daemon/pxh.h"
 
+#include "px4muorb.h"
+
 #define MODULE_NAME "px4"
 
 static const char *LOCK_FILE_PATH = "/tmp/px4_lock";
@@ -278,6 +280,10 @@ int main(int argc, char **argv)
 		if (ret != PX4_OK) {
 			return ret;
 		}
+
+		PX4_INFO("Calling dummy RPC function");
+		px4muorb_say_hello();
+		PX4_INFO("did it");
 
 		px4::init_once();
 		px4::init(argc, argv, "px4");
