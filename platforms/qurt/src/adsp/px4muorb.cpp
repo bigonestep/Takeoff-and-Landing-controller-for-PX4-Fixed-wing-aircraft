@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "px4muorb.hpp"
+// #include "px4muorb.hpp"
 #include "uORBFastRpcChannel.hpp"
 #include "uORBManager.hpp"
 
@@ -48,7 +48,17 @@ __BEGIN_DECLS
 extern int dspal_main(int argc, char *argv[]);
 __END_DECLS
 
-int px4muorb_orb_initialize()
+extern "C" {
+
+#include "px4muorb.h"
+
+__EXPORT uint32 px4muorb_say_hello()
+{
+	// PX4_INFO("HELLOOOO");
+	return 0;
+}
+
+__EXPORT uint32 px4muorb_orb_initialize()
 {
 	HAP_power_request(100, 100, 1000);
 	shmem_info_p = NULL;
@@ -68,27 +78,34 @@ int px4muorb_orb_initialize()
 	return rc;
 }
 
-int px4muorb_set_absolute_time_offset(int32_t time_diff_us)
+__EXPORT uint32 px4muorb_set_absolute_time_offset(int32_t time_diff_us)
 {
 	return hrt_set_absolute_time_offset(time_diff_us);
 }
 
-int px4muorb_get_absolute_time(uint64_t *time_us)
+__EXPORT uint32 px4muorb_get_absolute_time(uint64_t *time_us)
 {
 	*time_us = hrt_absolute_time();
 	return 0;
 }
 
 /*update value and param's change bit in shared memory*/
-int px4muorb_param_update_to_shmem(uint32_t param, const uint8_t *value,
+__EXPORT uint32 px4muorb_param_update_to_shmem(uint32_t param, const uint8_t *value,
 				   int data_len_in_bytes)
 {
+	PX4_INFO("inside px4muorb_param_update_to_shmem");
+
 	unsigned int byte_changed, bit_changed;
 	union param_value_u *param_value = (union param_value_u *) value;
 
+	PX4_INFO("wowzers");
+
 	if (!shmem_info_p) {
+		PX4_INFO("init_shared_memory");
 		init_shared_memory();
 	}
+
+	PX4_INFO("made it here");
 
 	if (get_shmem_lock(__FILE__, __LINE__) != 0) {
 		PX4_INFO("Could not get shmem lock\n");
@@ -106,7 +123,7 @@ int px4muorb_param_update_to_shmem(uint32_t param, const uint8_t *value,
 	return 0;
 }
 
-int px4muorb_param_update_index_from_shmem(unsigned char *data, int data_len_in_bytes)
+__EXPORT uint32 px4muorb_param_update_index_from_shmem(unsigned char *data, int data_len_in_bytes)
 {
 	if (!shmem_info_p) {
 		return -1;
@@ -126,7 +143,7 @@ int px4muorb_param_update_index_from_shmem(unsigned char *data, int data_len_in_
 	return 0;
 }
 
-int px4muorb_param_update_value_from_shmem(uint32_t param, const uint8_t *value,
+__EXPORT uint32 px4muorb_param_update_value_from_shmem(uint32_t param, uint8_t *value,
 		int data_len_in_bytes)
 {
 	unsigned int byte_changed, bit_changed;
@@ -153,7 +170,7 @@ int px4muorb_param_update_value_from_shmem(uint32_t param, const uint8_t *value,
 	return 0;
 }
 
-int px4muorb_topic_advertised(const char *topic_name)
+__EXPORT uint32 px4muorb_topic_advertised(const char *topic_name)
 {
 	int rc = 0;
 	PX4_INFO("TEST px4muorb_topic_advertised of [%s] on remote side...", topic_name);
@@ -170,7 +187,7 @@ int px4muorb_topic_advertised(const char *topic_name)
 	return rc;
 }
 
-int px4muorb_topic_unadvertised(const char *topic_name)
+__EXPORT uint32 px4muorb_topic_unadvertised(const char *topic_name)
 {
 	int rc = 0;
 	PX4_INFO("TEST px4muorb_topic_unadvertised of [%s] on remote side...", topic_name);
@@ -187,7 +204,7 @@ int px4muorb_topic_unadvertised(const char *topic_name)
 	return rc;
 }
 
-int px4muorb_add_subscriber(const char *name)
+__EXPORT uint32 px4muorb_add_subscriber(const char *name)
 {
 	int rc = 0;
 	uORB::FastRpcChannel *channel = uORB::FastRpcChannel::GetInstance();
@@ -208,7 +225,7 @@ int px4muorb_add_subscriber(const char *name)
 	return rc;
 }
 
-int px4muorb_remove_subscriber(const char *name)
+__EXPORT uint32 px4muorb_remove_subscriber(const char *name)
 {
 	int rc = 0;
 	uORB::FastRpcChannel *channel = uORB::FastRpcChannel::GetInstance();
@@ -225,7 +242,7 @@ int px4muorb_remove_subscriber(const char *name)
 	return rc;
 }
 
-int px4muorb_send_topic_data(const char *name, const uint8_t *data,
+__EXPORT uint32 px4muorb_send_topic_data(const char *name, const uint8_t *data,
 			     int data_len_in_bytes)
 {
 	int rc = 0;
@@ -243,7 +260,7 @@ int px4muorb_send_topic_data(const char *name, const uint8_t *data,
 	return rc;
 }
 
-int px4muorb_is_subscriber_present(const char *topic_name, int *status)
+__EXPORT uint32 px4muorb_is_subscriber_present(const char *topic_name, int *status)
 {
 	int rc = 0;
 	int32_t local_status = 0;
@@ -257,7 +274,7 @@ int px4muorb_is_subscriber_present(const char *topic_name, int *status)
 	return rc;
 }
 
-int px4muorb_receive_msg(int *msg_type, char *topic_name, int topic_name_len,
+__EXPORT uint32 px4muorb_receive_msg(int *msg_type, char *topic_name, int topic_name_len,
 			 uint8_t *data, int data_len_in_bytes, int *bytes_returned)
 {
 	int rc = 0;
@@ -272,7 +289,7 @@ int px4muorb_receive_msg(int *msg_type, char *topic_name, int topic_name_len,
 	return rc;
 }
 
-int px4muorb_receive_bulk_data(uint8_t *bulk_transfer_buffer,
+__EXPORT uint32 px4muorb_receive_bulk_data(uint8_t *bulk_transfer_buffer,
 			       int max_size_in_bytes, int *returned_length_in_bytes, int *topic_count)
 {
 	int rc = 0;
@@ -287,10 +304,11 @@ int px4muorb_receive_bulk_data(uint8_t *bulk_transfer_buffer,
 	return rc;
 }
 
-int px4muorb_unblock_recieve_msg(void)
+__EXPORT uint32 px4muorb_unblock_recieve_msg(void)
 {
 	int rc = 0;
 	uORB::FastRpcChannel *channel = uORB::FastRpcChannel::GetInstance();
 	rc = channel->unblock_get_data_method();
 	return rc;
+}
 }

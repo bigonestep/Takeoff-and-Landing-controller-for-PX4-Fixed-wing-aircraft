@@ -114,7 +114,7 @@ static void *entry_adapter(void *ptr)
 px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int stack_size, px4_main_t entry,
 			      char *const argv[])
 {
-
+	PX4_INFO("px4_task_spawn_cmd: %s", name);
 	int i;
 	int argc = 0;
 	unsigned int len = 0;

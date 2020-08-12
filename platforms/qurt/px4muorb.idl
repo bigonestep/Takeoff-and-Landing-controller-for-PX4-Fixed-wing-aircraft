@@ -27,14 +27,19 @@
 // IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //=========================================================================
 
+#ifndef PX4MUORB_IDL
+#define PX4MUORB_IDL
+
 #include "AEEStdDef.idl"
 
 interface px4muorb{
 
+   uint32 say_hello();
+
    /**
     * interface method to start the uorb service and initialize the muorb
     */
-   AEEResult orb_initialize();
+   uint32 orb_initialize();
 
    /**
     * Interface to set an offset to hrt_absolute_time on the DSP.
@@ -42,47 +47,47 @@ interface px4muorb{
     * @param time_diff_us: time difference of the DSP clock to Linux clock.
     *   A positive number means the Linux clock is ahead of the DSP one.
     */
-   AEEResult set_absolute_time_offset( in long time_diff_us );
+   uint32 set_absolute_time_offset( in int32 time_diff_us );
 
    /**
     * Interface to request hrt_absolute_time on the DSP.
     * @param time_us: pointer to time in us
     */
-   AEEResult get_absolute_time(rout unsigned long long time_us);
-   
+   uint32 get_absolute_time(rout unsigned long long time_us);
+
    /**
     * Interface to update param for krait.
     *
     * @param param: param index.
     * @param value: param value.
     */
-   AEEResult param_update_to_shmem( in unsigned long param, in sequence<octet> value);
-   
+   uint32 param_update_to_shmem( in uint32 param, in sequence<octet> value);
+
    /**
     * Interface to update index for krait.
     * @param data: param index array.
     */
-   AEEResult param_update_index_from_shmem( rout sequence<octet> data);
-   
+   uint32 param_update_index_from_shmem( rout sequence<octet> data);
+
    /**
     * Interface to get param value for krait.
     *
     * @param param: param index.
     * @param value: param value.
     */
-   AEEResult param_update_value_from_shmem( in unsigned long param, rout sequence<octet> value);
+   uint32 param_update_value_from_shmem( in uint32 param, rout sequence<octet> value);
 
    /**
     * Interface called from krait to inform of a published topic.
     * @param topic_name: name of the topic being advertised
     */
-   AEEResult topic_advertised(in string topic_name);
+   uint32 topic_advertised(in string topic_name);
 
    /**
     * Interface called from krait to inform of a published topic.
     * @param topic_name: name of the topic being advertised
     */
-   AEEResult topic_unadvertised(in string topic_name);
+   uint32 topic_unadvertised(in string topic_name);
 
    /**
     * Interface to add a subscriber to the identified topic
@@ -91,7 +96,7 @@ interface px4muorb{
     *   0 == success
     *   all others is a failure.
     */
-   AEEResult  add_subscriber( in string topic_name );
+   uint32  add_subscriber( in string topic_name );
 
    /**
     * Interface to remove a subscriber for the identified topic.
@@ -100,7 +105,7 @@ interface px4muorb{
     *   0 == success
     *   all others is a failure.
     */
-   AEEResult  remove_subscriber( in string topic_name );
+   uint32  remove_subscriber( in string topic_name );
 
    /**
     * Interface called from krait for topic data.
@@ -112,7 +117,7 @@ interface px4muorb{
     *   0 == success
     *   all others is a failure.
     */
-   AEEResult  send_topic_data( in string topic_name, in sequence<octet> data );
+   uint32  send_topic_data( in string topic_name, in sequence<octet> data );
 
    /**
     * Inteface to check if there are subscribers on the remote adsp client
@@ -127,7 +132,7 @@ interface px4muorb{
     *   0 == success
     *   all others is a failure.
     */
-   AEEResult is_subscriber_present( in string topic_name, rout long status );
+   uint32 is_subscriber_present( in string topic_name, rout long status );
 
    /**
     * Interface to receive data from adsp.  Since there is only one interface, the different message
@@ -149,7 +154,7 @@ interface px4muorb{
     *   0 == success
     *   all others is a failure.
     */
-   AEEResult  receive_msg( rout long msg_type, rout string topic_name, rout sequence<octet> data, rout long bytes_returned );
+   uint32  receive_msg( rout long msg_type, rout string topic_name, rout sequence<octet> data, rout long bytes_returned );
 
    /**
     * Since the receive_msg is a blocking call, the client will not be able to peform a clean shutdown.  Calling this
@@ -160,7 +165,7 @@ interface px4muorb{
     *    0 = success
     *    all others is a failure.
     **/
-    AEEResult unblock_recieve_msg();
+    uint32 unblock_recieve_msg();
 
     /**
      * This interface will perform a bulk read from the adsp and return the data buffer.
@@ -180,5 +185,7 @@ interface px4muorb{
      *    0 = success
      *    all others is a failure.
      **/
-    AEEResult receive_bulk_data( rout sequence<octet> data, rout long bytes_returned, rout long topic_count );
+    uint32 receive_bulk_data( rout sequence<octet> data, rout long bytes_returned, rout long topic_count );
 };
+
+#endif /* PX4MUORB_IDL */

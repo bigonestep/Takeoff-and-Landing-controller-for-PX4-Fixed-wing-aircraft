@@ -37,6 +37,10 @@ if (NOT PARAM_DEFAULT_OVERRIDES)
 	set(PARAM_DEFAULT_OVERRIDES "{}")
 endif()
 
+add_definitions(
+	-DDEBUG_BUILD
+	)
+
 # get full path for each module
 get_property(module_list GLOBAL PROPERTY PX4_MODULE_PATHS)
 get_property(module_config_files GLOBAL PROPERTY PX4_MODULE_CONFIG_FILES)

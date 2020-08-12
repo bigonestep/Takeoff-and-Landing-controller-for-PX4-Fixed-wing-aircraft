@@ -32,7 +32,7 @@ set(DISABLE_PARAMS_MODULE_SCOPING TRUE)
 
 # add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
 add_compile_options($<$<COMPILE_LANGUAGE:C>:-std=gnu99>)
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1y>)
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++14>)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -69,7 +69,7 @@ px4_add_board(
 		mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
-		muorb/adsp
+		# muorb/adsp
 		rc_update
 		rover_pos_control
 		sensors

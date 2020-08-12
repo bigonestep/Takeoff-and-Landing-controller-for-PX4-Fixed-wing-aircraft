@@ -36,7 +36,7 @@
 #include <fcntl.h>
 #include "px4muorb_KraitRpcWrapper.hpp"
 #include <rpcmem.h>
-#include <px4muorb.h>
+#include "px4muorb.h"
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/shmem.h>
 #include <drivers/drv_hrt.h>

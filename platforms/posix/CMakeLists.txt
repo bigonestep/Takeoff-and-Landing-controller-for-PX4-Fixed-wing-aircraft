@@ -40,9 +40,11 @@ if (("${PX4_BOARD}" MATCHES "atlflight_eagle") OR ("${PX4_BOARD}" MATCHES "atlfl
 	LINUX_APP(
 		APP_NAME px4
 		IDL_NAME px4muorb
+		INCS
+			${PX4_SOURCE_DIR}/src/modules/uORB
 		APPS_DEST ${APPS_DEST}
 		SOURCES
-			px4muorb_stub.c
+			# px4muorb_stub.c # not needed
 			src/px4/common/main.cpp
 			apps.cpp
 		LINK_LIBS

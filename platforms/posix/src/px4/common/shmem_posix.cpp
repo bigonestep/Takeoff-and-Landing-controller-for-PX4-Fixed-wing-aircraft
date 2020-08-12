@@ -57,6 +57,7 @@
 
 static uint64_t update_from_shmem_prev_time = 0, update_from_shmem_current_time = 0;
 extern unsigned char *adsp_changed_index;
+uint32 px4muorb_say_hello();
 
 struct param_wbuf_s {
 	union param_value_u val;
@@ -67,9 +68,13 @@ struct param_wbuf_s {
 /*update value and param's change bit in shared memory*/
 void update_to_shmem(param_t param, union param_value_u value)
 {
-	if (px4muorb_param_update_to_shmem(param, (unsigned char *) &value, sizeof(value))) {
-		PX4_ERR("krait update param %u failed", param);
-	}
+	PX4_INFO("saying hello!");
+	px4muorb_say_hello();
+	PX4_INFO("said hello");
+
+	// if (px4muorb_param_update_to_shmem(param, (unsigned char *) &value, sizeof(value))) {
+	// 	PX4_ERR("krait update param %u failed", param);
+	// }
 }
 
 void update_index_from_shmem(void)
