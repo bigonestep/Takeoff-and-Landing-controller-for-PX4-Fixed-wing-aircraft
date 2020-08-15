@@ -281,61 +281,60 @@ ssize_t Mavlink2Dev::read(struct file *filp, char *buffer, size_t buflen)
 	ret = _read_buffer->read(_fd);
 
 	if (ret < 0) {
-		goto end;
+		return ret;
 	}
 
 	ret = 0;
 
-	if (_read_buffer->buf_size < 3) {
-		goto end;
-	}
-
 	// Search for a mavlink packet on buffer to send it
 	i = 0;
 
-	while ((unsigned)i < (_read_buffer->buf_size - 3)
-	       && _read_buffer->buffer[i] != 253
-	       && _read_buffer->buffer[i] != 254) {
-		i++;
-	}
-
-	// We need at least the first three bytes to get packet len
-	if ((unsigned)i >= _read_buffer->buf_size - 3) {
-		goto end;
-	}
-
-	if (_read_buffer->buffer[i] == 253) {
-		uint8_t payload_len = _read_buffer->buffer[i + 1];
-		uint8_t incompat_flags = _read_buffer->buffer[i + 2];
-		packet_len = payload_len + 12;
-
-		if (incompat_flags & 0x1) { //signing
-			packet_len += 13;
+	while (_read_buffer->buf_size >= 3) {
+		while ((unsigned)i < (_read_buffer->buf_size - 3)
+		       && _read_buffer->buffer[i] != 253
+		       && _read_buffer->buffer[i] != 254) {
+			i++;
 		}
 
-	} else {
-		packet_len = _read_buffer->buffer[i + 1] + 8;
+		// We need at least the first three bytes to get packet len
+		if ((unsigned)i >= _read_buffer->buf_size - 3) {
+			break;
+		}
+
+		if (_read_buffer->buffer[i] == 253) {
+			uint8_t payload_len = _read_buffer->buffer[i + 1];
+			uint8_t incompat_flags = _read_buffer->buffer[i + 2];
+			packet_len = payload_len + 12;
+
+			if (incompat_flags & 0x1) { //signing
+				packet_len += 13;
+			}
+
+		} else {
+			packet_len = _read_buffer->buffer[i + 1] + 8;
+		}
+
+		// packet is bigger than what we've read, better luck next time
+		if ((unsigned)i + packet_len > _read_buffer->buf_size) {
+			break;
+		}
+
+		/* if buffer doesn't fit message, send what's possible and copy remaining
+		 * data into a temporary buffer on this class */
+		if (packet_len > buflen) {
+			_read_buffer->move(buffer, i, buflen);
+			_read_buffer->move(_partial_buffer, i, packet_len - buflen);
+			_remaining_partial = packet_len - buflen;
+			ret = buflen;
+			break;
+		}
+
+		_read_buffer->move(buffer, i, packet_len);
+		ret = packet_len;
+
+		i = 0;
 	}
 
-	// packet is bigger than what we've read, better luck next time
-	if ((unsigned)i + packet_len > _read_buffer->buf_size) {
-		goto end;
-	}
-
-	/* if buffer doesn't fit message, send what's possible and copy remaining
-	 * data into a temporary buffer on this class */
-	if (packet_len > buflen) {
-		_read_buffer->move(buffer, i, buflen);
-		_read_buffer->move(_partial_buffer, i, packet_len - buflen);
-		_remaining_partial = packet_len - buflen;
-		ret = buflen;
-		goto end;
-	}
-
-	_read_buffer->move(buffer, i, packet_len);
-	ret = packet_len;
-
-end:
 	unlock(Read);
 	return ret;
 }
@@ -441,45 +440,44 @@ ssize_t RtpsDev::read(struct file *filp, char *buffer, size_t buflen)
 	ret = _read_buffer->read(_fd);
 
 	if (ret < 0) {
-		goto end;
+		return ret;
 	}
 
 	ret = 0;
 
-	if (_read_buffer->buf_size < HEADER_SIZE) {
-		goto end;        // starting ">>>" + topic + seq + lenhigh + lenlow + crchigh + crclow
-	}
-
 	// Search for a rtps packet on buffer to send it
 	i = 0;
 
-	while ((unsigned)i < (_read_buffer->buf_size - HEADER_SIZE) && (memcmp(_read_buffer->buffer + i, ">>>", 3) != 0)) {
-		i++;
+	while (_read_buffer->buf_size >= HEADER_SIZE) {
+		while ((unsigned)i < (_read_buffer->buf_size - HEADER_SIZE) && (memcmp(_read_buffer->buffer + i, ">>>", 3) != 0)) {
+			i++;
+		}
+
+		// We need at least the first six bytes to get packet len
+		if ((unsigned)i >= _read_buffer->buf_size - HEADER_SIZE) {
+			break;
+		}
+
+		payload_len = ((uint16_t)_read_buffer->buffer[i + 5] << 8) | _read_buffer->buffer[i + 6];
+		packet_len = payload_len + HEADER_SIZE;
+
+		// packet is bigger than what we've read, better luck next time
+		if ((unsigned)i + packet_len > _read_buffer->buf_size) {
+			break;
+		}
+
+		// buffer should be big enough to hold a rtps packet
+		if (packet_len > buflen) {
+			ret = -EMSGSIZE;
+			break;
+		}
+
+		_read_buffer->move(buffer, i, packet_len);
+		ret = packet_len;
+
+		i = 0;
 	}
 
-	// We need at least the first six bytes to get packet len
-	if ((unsigned)i >= _read_buffer->buf_size - HEADER_SIZE) {
-		goto end;
-	}
-
-	payload_len = ((uint16_t)_read_buffer->buffer[i + 5] << 8) | _read_buffer->buffer[i + 6];
-	packet_len = payload_len + HEADER_SIZE;
-
-	// packet is bigger than what we've read, better luck next time
-	if ((unsigned)i + packet_len > _read_buffer->buf_size) {
-		goto end;
-	}
-
-	// buffer should be big enough to hold a rtps packet
-	if (packet_len > buflen) {
-		ret = -EMSGSIZE;
-		goto end;
-	}
-
-	_read_buffer->move(buffer, i, packet_len);
-	ret = packet_len;
-
-end:
 	unlock(Read);
 	return ret;
 }
