@@ -626,7 +626,6 @@ MulticopterPositionControl::Run()
 			if (not_taken_off || flying_but_ground_contact) {
 				// we are not flying yet and need to avoid any corrections
 				reset_setpoint_to_nan(setpoint);
-				Vector3f(0.f, 0.f, 100.f).copyTo(setpoint.acceleration); // High downwards acceleration to make sure there's no thrust
 				// set yaw-sp to current yaw
 				// TODO: we need a clean way to disable yaw control
 				setpoint.yaw = _states.yaw;
