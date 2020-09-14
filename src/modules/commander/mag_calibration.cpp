@@ -41,6 +41,7 @@
 #include "commander_helper.h"
 #include "calibration_routines.h"
 #include "calibration_messages.h"
+#include "factory_calibration_storage.h"
 
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/posix.h>
@@ -855,6 +856,13 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 		free(worker_data.z[cur_mag]);
 	}
 
+	FactoryCalibrationStorage factory_storage;
+
+	if (result == calibrate_return_ok && factory_storage.open() != PX4_OK) {
+		calibration_log_critical(mavlink_log_pub, "ERROR: cannot open calibration storage");
+		result = calibrate_return_error;
+	}
+
 	if (result == calibrate_return_ok) {
 		bool param_save = false;
 		bool failed = true;
@@ -894,6 +902,10 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 				calibration_log_critical(mavlink_log_pub, "calibration save failed");
 				break;
 			}
+		}
+
+		if (!failed && factory_storage.store() != PX4_OK) {
+			failed = true;
 		}
 
 		if (param_save) {
