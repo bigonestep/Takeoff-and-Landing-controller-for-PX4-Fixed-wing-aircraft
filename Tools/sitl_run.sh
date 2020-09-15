@@ -122,7 +122,7 @@ elif [ "$program" == "gazebo" ] && [ ! -n "$no_sim" ]; then
 		gzserver $verbose $world_path &
 		SIM_PID=$!
 
-		while gz model --verbose --spawn-file="${src_path}/Tools/sitl_gazebo/models/${model}/${model_name}.sdf" --model-name=${model} -x 1.01 -y 0.98 -z 0.83 2>&1 | grep -q "An instance of Gazebo is not running."; do
+		while gz model "${verbose}" --spawn-file="${src_path}/Tools/sitl_gazebo/models/${model}/${model_name}.sdf" --model-name=${model} -x 1.01 -y 0.98 -z 0.83 2>&1 | grep -q "An instance of Gazebo is not running."; do
 			echo "gzserver not ready yet, trying again!"
 			sleep 1
 		done
@@ -133,7 +133,7 @@ elif [ "$program" == "gazebo" ] && [ ! -n "$no_sim" ]; then
 			# gzserver needs to be running to avoid a race. Since the launch
 			# is putting it into the background we need to avoid it by backing off
 			sleep 3
-			nice -n 20 gzclient --verbose &
+			nice -n 20 gzclient "${verbose}" &
 			GUI_PID=$!
 		fi
 	else
