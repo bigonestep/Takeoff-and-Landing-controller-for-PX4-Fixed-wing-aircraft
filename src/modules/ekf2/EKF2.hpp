@@ -228,6 +228,8 @@ private:
 	float   _wgs84_hgt_offset = 0;  ///< height offset between AMSL and WGS84
 
 	bool _imu_bias_reset_request{false};
+	uint8_t _imu_calibration_count{0};
+	uint8_t _mag_calibration_count{0};
 
 	// republished aligned external visual odometry
 	bool new_ev_data_received = false;

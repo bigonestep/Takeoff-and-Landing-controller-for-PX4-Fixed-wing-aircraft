@@ -300,6 +300,15 @@ void EKF2::Run()
 		_estimator_status_pub.get().accel_device_id = imu.accel_device_id;
 		_estimator_status_pub.get().gyro_device_id = imu.gyro_device_id;
 
+		// reset IMU bias if calibration changed
+		if (_imu_calibration_count != imu.calibration_count) {
+			if ((_imu_calibration_count > 0) && (_vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED)) {
+				_imu_bias_reset_request = true;
+			}
+
+			_imu_calibration_count = imu.calibration_count;
+		}
+
 	} else {
 		sensor_combined_s sensor_combined;
 		updated = _sensor_combined_sub.update(&sensor_combined);
@@ -395,6 +404,18 @@ void EKF2::Run()
 			vehicle_magnetometer_s magnetometer;
 
 			if (_magnetometer_sub.copy(&magnetometer)) {
+
+				bool mag_bias_reset = false;
+
+				// reset mag bias if calibration changed
+				if (_mag_calibration_count != magnetometer.calibration_count) {
+					_mag_calibration_count = magnetometer.calibration_count;
+
+					if (_mag_calibration_count > 0) {
+						mag_bias_reset = true;
+					}
+				}
+
 				// Reset learned bias parameters if there has been a persistant change in magnetometer ID
 				// Do not reset parmameters when armed to prevent potential time slips casued by parameter set
 				// and notification events
@@ -412,24 +433,36 @@ void EKF2::Run()
 					}
 				}
 
-				_estimator_status_pub.get().mag_device_id = magnetometer.device_id;
-
-				if ((_vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED) && (_invalid_mag_id_count > 100)) {
+				if (_invalid_mag_id_count > 100) {
 					// the sensor ID used for the last saved mag bias is not confirmed to be the same as the current sensor ID
 					// this means we need to reset the learned bias values to zero
-					_param_ekf2_magbias_x.set(0.f);
-					_param_ekf2_magbias_x.commit_no_notification();
-					_param_ekf2_magbias_y.set(0.f);
-					_param_ekf2_magbias_y.commit_no_notification();
-					_param_ekf2_magbias_z.set(0.f);
-					_param_ekf2_magbias_z.commit_no_notification();
-					_param_ekf2_magbias_id.set(magnetometer.device_id);
-					_param_ekf2_magbias_id.commit();
+					mag_bias_reset = true;
 
 					_invalid_mag_id_count = 0;
 
-					PX4_INFO("Mag sensor ID changed to %i", _param_ekf2_magbias_id.get());
+					if (_param_ekf2_magbias_id.get() != 0) {
+						PX4_INFO("Mag sensor ID changed %d -> %d", (uint32_t)_param_ekf2_magbias_id.get(), magnetometer.device_id);
+					}
+
+					_param_ekf2_magbias_id.set(magnetometer.device_id);
 				}
+
+				if (mag_bias_reset) {
+					_param_ekf2_magbias_x.set(0.f);
+					_param_ekf2_magbias_y.set(0.f);
+					_param_ekf2_magbias_z.set(0.f);
+					_param_ekf2_magbias_id.set(magnetometer.device_id);
+
+					// only commit parameter changes if disarmed
+					if (_vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED) {
+						_param_ekf2_magbias_x.commit_no_notification();
+						_param_ekf2_magbias_y.commit_no_notification();
+						_param_ekf2_magbias_z.commit_no_notification();
+						_param_ekf2_magbias_id.commit();
+					}
+				}
+
+				_estimator_status_pub.get().mag_device_id = magnetometer.device_id;
 
 				magSample mag_sample {};
 				mag_sample.mag(0) = magnetometer.magnetometer_ga[0] - _param_ekf2_magbias_x.get();
@@ -1164,6 +1197,7 @@ void EKF2::Run()
 					update_mag_bias(_param_ekf2_magbias_x, 0);
 					update_mag_bias(_param_ekf2_magbias_y, 1);
 					update_mag_bias(_param_ekf2_magbias_z, 2);
+					_param_ekf2_magbias_id.commit();
 
 					// reset to prevent data being saved too frequently
 					_total_cal_time_us = 0;
