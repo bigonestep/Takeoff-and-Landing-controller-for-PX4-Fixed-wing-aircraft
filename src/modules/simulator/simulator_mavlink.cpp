@@ -216,38 +216,42 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 	if ((sensors.fields_updated & SensorSource::BARO) == SensorSource::BARO) {
 		if (PX4_ISFINITE(sensors.temperature)) {
 
-			_px4_accel_0.set_temperature(sensors.temperature);
-			_px4_accel_1.set_temperature(sensors.temperature);
+			_px4_accel[0].set_temperature(sensors.temperature);
+			_px4_accel[1].set_temperature(sensors.temperature);
+			_px4_accel[2].set_temperature(sensors.temperature);
 
-			_px4_gyro_0.set_temperature(sensors.temperature);
-			_px4_gyro_1.set_temperature(sensors.temperature);
+			_px4_gyro[0].set_temperature(sensors.temperature);
+			_px4_gyro[1].set_temperature(sensors.temperature);
+			_px4_gyro[2].set_temperature(sensors.temperature);
 
-			_px4_mag_0.set_temperature(sensors.temperature);
-			_px4_mag_1.set_temperature(sensors.temperature);
+			_px4_mag[0].set_temperature(sensors.temperature);
+			_px4_mag[1].set_temperature(sensors.temperature);
 		}
 	}
 
 	// accel
 	if ((sensors.fields_updated & SensorSource::ACCEL) == SensorSource::ACCEL && !_accel_blocked) {
-		_px4_accel_0.update(time, sensors.xacc, sensors.yacc, sensors.zacc);
-		_px4_accel_1.update(time, sensors.xacc, sensors.yacc, sensors.zacc);
+		_px4_accel[0].update(time, sensors.xacc, sensors.yacc, sensors.zacc);
+		_px4_accel[1].update(time, sensors.xacc, sensors.yacc, sensors.zacc);
+		_px4_accel[2].update(time, sensors.xacc, sensors.yacc, sensors.zacc);
 	}
 
 	// gyro
 	if ((sensors.fields_updated & SensorSource::GYRO) == SensorSource::GYRO && !_gyro_blocked) {
-		_px4_gyro_0.update(time, sensors.xgyro, sensors.ygyro, sensors.zgyro);
-		_px4_gyro_1.update(time, sensors.xgyro, sensors.ygyro, sensors.zgyro);
+		_px4_gyro[0].update(time, sensors.xgyro, sensors.ygyro, sensors.zgyro);
+		_px4_gyro[1].update(time, sensors.xgyro, sensors.ygyro, sensors.zgyro);
+		_px4_gyro[2].update(time, sensors.xgyro, sensors.ygyro, sensors.zgyro);
 	}
 
 	// magnetometer
 	if ((sensors.fields_updated & SensorSource::MAG) == SensorSource::MAG && !_mag_blocked) {
 		if (_mag_stuck) {
-			_px4_mag_0.update(time, _last_magx, _last_magy, _last_magz);
-			_px4_mag_1.update(time, _last_magx, _last_magy, _last_magz);
+			_px4_mag[0].update(time, _last_magx, _last_magy, _last_magz);
+			_px4_mag[1].update(time, _last_magx, _last_magy, _last_magz);
 
 		} else {
-			_px4_mag_0.update(time, sensors.xmag, sensors.ymag, sensors.zmag);
-			_px4_mag_1.update(time, sensors.xmag, sensors.ymag, sensors.zmag);
+			_px4_mag[0].update(time, sensors.xmag, sensors.ymag, sensors.zmag);
+			_px4_mag[1].update(time, sensors.xmag, sensors.ymag, sensors.zmag);
 			_last_magx = sensors.xmag;
 			_last_magy = sensors.ymag;
 			_last_magz = sensors.zmag;
@@ -257,16 +261,16 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 	// baro
 	if ((sensors.fields_updated & SensorSource::BARO) == SensorSource::BARO && !_baro_blocked) {
 		if (_baro_stuck) {
-			_px4_baro_0.update(time, _px4_baro_0.get().pressure);
-			_px4_baro_0.set_temperature(_px4_baro_0.get().temperature);
-			_px4_baro_1.update(time, _px4_baro_1.get().pressure);
-			_px4_baro_1.set_temperature(_px4_baro_1.get().temperature);
+			_px4_baro[0].update(time, _px4_baro[0].get().pressure);
+			_px4_baro[0].set_temperature(_px4_baro[0].get().temperature);
+			_px4_baro[1].update(time, _px4_baro[1].get().pressure);
+			_px4_baro[1].set_temperature(_px4_baro[1].get().temperature);
 
 		} else {
-			_px4_baro_0.update(time, sensors.abs_pressure);
-			_px4_baro_0.set_temperature(sensors.temperature);
-			_px4_baro_1.update(time, sensors.abs_pressure);
-			_px4_baro_1.set_temperature(sensors.temperature);
+			_px4_baro[0].update(time, sensors.abs_pressure);
+			_px4_baro[0].set_temperature(sensors.temperature);
+			_px4_baro[1].update(time, sensors.abs_pressure);
+			_px4_baro[1].set_temperature(sensors.temperature);
 		}
 	}
 

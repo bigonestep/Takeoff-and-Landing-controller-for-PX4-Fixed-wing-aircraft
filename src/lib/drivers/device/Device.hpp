@@ -183,6 +183,7 @@ public:
 	 * @return The bus type
 	 */
 	DeviceBusType	get_device_bus_type() const { return _device_id.devid_s.bus_type; }
+	void            set_device_bus_type(DeviceBusType bus_type) { _device_id.devid_s.bus_type = bus_type; }
 
 	static const char *get_device_bus_string(DeviceBusType bus)
 	{
@@ -211,6 +212,7 @@ public:
 	 * @return The bus ID
 	 */
 	uint8_t get_device_bus() const { return _device_id.devid_s.bus; }
+	void    set_device_bus(uint8_t bus) { _device_id.devid_s.bus = bus; }
 
 	/**
 	 * Return the bus address of the device.

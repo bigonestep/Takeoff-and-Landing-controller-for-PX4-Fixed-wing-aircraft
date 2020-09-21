@@ -33,18 +33,16 @@
 
 #pragma once
 
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_mag.h>
 
-class PX4Magnetometer : public cdev::CDev
+class PX4Magnetometer
 {
 public:
 	PX4Magnetometer(uint32_t device_id, enum Rotation rotation = ROTATION_NONE);
-	~PX4Magnetometer() override;
+	~PX4Magnetometer();
 
 	bool external() { return _external; }
 
@@ -58,7 +56,7 @@ public:
 
 	void update(const hrt_abstime &timestamp_sample, float x, float y, float z);
 
-	int get_class_instance() { return _class_device_instance; };
+	int get_instance() { return _sensor_pub.get_instance(); };
 
 private:
 	uORB::PublicationQueuedMulti<sensor_mag_s> _sensor_pub;
@@ -71,6 +69,4 @@ private:
 	uint32_t		_error_count{0};
 
 	bool _external{false};
-
-	int _class_device_instance{-1};
 };

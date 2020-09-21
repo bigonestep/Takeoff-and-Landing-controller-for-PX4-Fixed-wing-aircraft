@@ -44,7 +44,6 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
-#include <drivers/drv_range_finder.h>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
@@ -157,17 +156,31 @@ private:
 	static Simulator *_instance;
 
 	// simulated sensor instances
-	PX4Accelerometer	_px4_accel_0{1311244, ROTATION_NONE}; // 1311244: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-	PX4Accelerometer	_px4_accel_1{1311500, ROTATION_NONE}; // 1311500: DRV_IMU_DEVTYPE_SIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+	static constexpr uint8_t ACCEL_COUNT_MAX = 3;
+	PX4Accelerometer _px4_accel[ACCEL_COUNT_MAX] {
+		{1311244, ROTATION_NONE}, // 1311244: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+		{1311500, ROTATION_NONE}, // 1311500: DRV_IMU_DEVTYPE_SIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+		{1311600, ROTATION_NONE}, // 1311600: DRV_IMU_DEVTYPE_SIM, BUS: 3, ADDR: 1, TYPE: SIMULATION
+	};
 
-	PX4Gyroscope		_px4_gyro_0{1311244, ROTATION_NONE}; // 1311244: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-	PX4Gyroscope		_px4_gyro_1{1311500, ROTATION_NONE}; // 1311500: DRV_IMU_DEVTYPE_SIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+	static constexpr uint8_t GYRO_COUNT_MAX = 3;
+	PX4Gyroscope _px4_gyro[GYRO_COUNT_MAX] {
+		{1311244, ROTATION_NONE}, // 1311244: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+		{1311500, ROTATION_NONE}, // 1311500: DRV_IMU_DEVTYPE_SIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+		{1311600, ROTATION_NONE}, // 1311600: DRV_IMU_DEVTYPE_SIM, BUS: 3, ADDR: 1, TYPE: SIMULATION
+	};
 
-	PX4Magnetometer		_px4_mag_0{197388, ROTATION_NONE}; // 197388: DRV_MAG_DEVTYPE_MAGSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-	PX4Magnetometer		_px4_mag_1{197644, ROTATION_NONE}; // 197644: DRV_MAG_DEVTYPE_MAGSIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+	static constexpr uint8_t MAG_COUNT_MAX = 2;
+	PX4Magnetometer _px4_mag[MAG_COUNT_MAX] {
+		{197388, ROTATION_NONE}, // 197388: DRV_MAG_DEVTYPE_MAGSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+		{197644, ROTATION_NONE}, // 197644: DRV_MAG_DEVTYPE_MAGSIM, BUS: 2, ADDR: 1, TYPE: SIMULATION
+	};
 
-	PX4Barometer		_px4_baro_0{6620172}; // 6620172: DRV_BARO_DEVTYPE_BAROSIM, BUS: 1, ADDR: 4, TYPE: SIMULATION
-	PX4Barometer		_px4_baro_1{6620428}; // 6620428: DRV_BARO_DEVTYPE_BAROSIM, BUS: 2, ADDR: 4, TYPE: SIMULATION
+	static constexpr uint8_t BARO_COUNT_MAX = 2;
+	PX4Barometer _px4_baro[BARO_COUNT_MAX] {
+		{6620172}, // 6620172: DRV_BARO_DEVTYPE_BAROSIM, BUS: 1, ADDR: 4, TYPE: SIMULATION
+		{6620428}, // 6620428: DRV_BARO_DEVTYPE_BAROSIM, BUS: 2, ADDR: 4, TYPE: SIMULATION
+	};
 
 	perf_counter_t _perf_sim_delay{perf_alloc(PC_ELAPSED, MODULE_NAME": network delay")};
 	perf_counter_t _perf_sim_interval{perf_alloc(PC_INTERVAL, MODULE_NAME": network interval")};
@@ -181,8 +194,8 @@ private:
 
 	uORB::PublicationQueued<vehicle_command_ack_s>	_command_ack_pub{ORB_ID(vehicle_command_ack)};
 
-	uORB::PublicationMulti<distance_sensor_s>	*_dist_pubs[RANGE_FINDER_MAX_SENSORS] {};
-	uint8_t _dist_sensor_ids[RANGE_FINDER_MAX_SENSORS] {};
+	uORB::PublicationMulti<distance_sensor_s>	*_dist_pubs[ORB_MULTI_MAX_INSTANCES] {};
+	uint8_t _dist_sensor_ids[ORB_MULTI_MAX_INSTANCES] {};
 
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
 

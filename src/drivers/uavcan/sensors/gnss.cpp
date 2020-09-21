@@ -52,7 +52,7 @@ using namespace time_literals;
 const char *const UavcanGnssBridge::NAME = "gnss";
 
 UavcanGnssBridge::UavcanGnssBridge(uavcan::INode &node) :
-	UavcanCDevSensorBridgeBase("uavcan_gnss", "/dev/uavcan/gnss", "/dev/gnss", ORB_ID(vehicle_gps_position)),
+	UavcanSensorBridgeBase("uavcan_gnss", ORB_ID(vehicle_gps_position)),
 	_node(node),
 	_sub_auxiliary(node),
 	_sub_fix(node),
@@ -72,16 +72,9 @@ UavcanGnssBridge::~UavcanGnssBridge()
 	delete [] _channel_using_fix2;
 }
 
-int
-UavcanGnssBridge::init()
+int UavcanGnssBridge::init()
 {
-	int res = device::CDev::init();
-
-	if (res < 0) {
-		return res;
-	}
-
-	res = _pub_fix2.init(uavcan::TransferPriority::MiddleLower);
+	int res = _pub_fix2.init(uavcan::TransferPriority::MiddleLower);
 
 	if (res < 0) {
 		PX4_WARN("GNSS fix2 pub failed %i", res);

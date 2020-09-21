@@ -42,7 +42,7 @@
 
 #include <com/hex/equipment/flow/Measurement.hpp>
 
-class UavcanFlowBridge : public UavcanCDevSensorBridgeBase
+class UavcanFlowBridge : public UavcanSensorBridgeBase
 {
 public:
 	static const char *const NAME;
