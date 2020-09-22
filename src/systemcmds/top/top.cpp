@@ -71,7 +71,7 @@ extern "C" __EXPORT int top_main(int argc, char *argv[])
 
 	if (argc > 1) {
 		if (!strcmp(argv[1], "once")) {
-			px4_sleep(1);
+			px4_usleep(1500000);
 			print_load(STDOUT_FILENO, &load);
 
 		} else {
