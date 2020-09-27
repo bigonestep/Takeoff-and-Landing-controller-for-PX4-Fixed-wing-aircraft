@@ -177,7 +177,7 @@ foreach(viewer ${viewers})
 endforeach()
 
 # create targets for jsbsim
-set(models_jsbsim none rascal quadrotor_x hexarotor_x)
+set(models_jsbsim none easystar rascal quadrotor_x hexarotor_x)
 set(worlds_jsbsim none LSZH)
 foreach(debugger ${debuggers})
 	foreach(model ${models_jsbsim})

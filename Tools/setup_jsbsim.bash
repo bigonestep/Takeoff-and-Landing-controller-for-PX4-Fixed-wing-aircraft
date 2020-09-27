@@ -18,6 +18,10 @@ export FG_AIRCRAFT="${SRC_DIR}/Tools/jsbsim_bridge/models"
 # This is needed for aircraft namespace mapping
 # Need more architectural discussions to make this more scalable
 case "$MODEL" in
+        easystar)
+            AIRCRAFT_DIR="easystar"
+            MODEL_NAME="easystar"
+            ;;
         rascal)
             AIRCRAFT_DIR="Rascal"
             MODEL_NAME="Rascal110-JSBSim"
