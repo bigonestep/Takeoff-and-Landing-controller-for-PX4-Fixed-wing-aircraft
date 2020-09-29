@@ -202,7 +202,6 @@ float calc_IAS(float differential_pressure)
 	} else {
 		return -sqrtf((2.0f * fabsf(differential_pressure)) / CONSTANTS_AIR_DENSITY_SEA_LEVEL_15C);
 	}
-
 }
 
 /**
